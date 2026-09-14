@@ -1,8 +1,6 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. buat elemen body > div:nth-of-type(3) > div:nth-of-type(1) menjadi sticky
-2. elemen #posCatalogSection dan #posCartAside baiknya dibuat mengikuti ukuran window browser. karena untuk saat ini, ukurannya mengikuti jumlah menu yang tersedia sehingga tombol bayar jauh berada dibawah dan user harus scroll kepaling bawah untuk menekannya.
-3. tombol bayar terhalang elemen shadow overlay.
+1. menu Pembayaran Transaksi pada perangkat desktop buat tetap menjadi popup.
 
 
 

@@ -699,9 +699,10 @@
             <span class="text-muted small">Total Belanja:</span>
             <span class="fs-4 fw-bold text-success" id="mobileSheetGrandTotal">Rp0</span>
         </div>
-        <button type="button" class="btn btn-primary-green w-100 py-3 fw-bold fs-6 rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" id="btnSheetProceedPayment">
+        <button type="button" class="btn btn-primary-green w-100 py-3 fw-bold fs-6 rounded-3 shadow d-flex align-items-center justify-content-center gap-2" id="btnSheetProceedPayment">
             <i class="fa-solid fa-credit-card"></i>
-            <span>Lanjut ke Pembayaran</span>
+            <span>Bayar Sekarang</span>
+            <i class="fa-solid fa-arrow-right ms-auto"></i>
         </button>
     </div>
 </div>
@@ -1035,6 +1036,22 @@
     const cartBottomSheetEl = document.getElementById('posCartBottomSheet');
     const cartBottomSheet = cartBottomSheetEl ? new bootstrap.Offcanvas(cartBottomSheetEl) : null;
 
+    // Offcanvas Bottom Sheet Lifecycle: Sembunyikan floating bar saat sheet terbuka agar tidak tertutup backdrop
+    cartBottomSheetEl?.addEventListener('show.bs.offcanvas', function() {
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        if (floatingBar) floatingBar.style.display = 'none';
+    });
+
+    cartBottomSheetEl?.addEventListener('hidden.bs.offcanvas', function() {
+        const screen = document.getElementById('posCheckoutScreen');
+        const isScreenOpen = screen && screen.style.display === 'block';
+        const isMobile = window.innerWidth < 992;
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        if (floatingBar && isMobile && cart.length > 0 && !isScreenOpen) {
+            floatingBar.style.display = 'block';
+        }
+    });
+
     // Render Cart HTML & Calculations (Desktop + Mobile Floating Bar + Slide Card)
     function renderCart() {
         const cartList = document.getElementById('posCartList');
@@ -1134,13 +1151,14 @@
             payBtn.classList.add('has-items');
         }
 
-        // Mobile Floating Bar updates (Show when cart has items on mobile only)
+        // Mobile Floating Bar updates (Show when cart has items on mobile only and sheet is not open)
         if (floatingBar) {
             const isMobile = window.innerWidth < 992;
             const screen = document.getElementById('posCheckoutScreen');
             const isScreenOpen = screen && screen.style.display === 'block';
+            const isSheetOpen = cartBottomSheetEl && cartBottomSheetEl.classList.contains('show');
 
-            if (isMobile && cart.length > 0 && !isScreenOpen) {
+            if (isMobile && cart.length > 0 && !isScreenOpen && !isSheetOpen) {
                 floatingBar.style.display = 'block';
             } else {
                 floatingBar.style.display = 'none';
@@ -1169,7 +1187,8 @@
             const isMobile = window.innerWidth < 992;
             const screen = document.getElementById('posCheckoutScreen');
             const isScreenOpen = screen && screen.style.display === 'block';
-            if (isMobile && cart.length > 0 && !isScreenOpen) {
+            const isSheetOpen = cartBottomSheetEl && cartBottomSheetEl.classList.contains('show');
+            if (isMobile && cart.length > 0 && !isScreenOpen && !isSheetOpen) {
                 floatingBar.style.display = 'block';
             } else {
                 floatingBar.style.display = 'none';
@@ -1218,8 +1237,12 @@
             return;
         }
 
-        // Hide Mobile Bottom Sheet if open
+        // Hide Mobile Bottom Sheet if open and safely clean up lingering backdrops
         if (cartBottomSheet) cartBottomSheet.hide();
+        document.querySelectorAll('.offcanvas-backdrop, .modal-backdrop').forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
 
         // Hide Catalog and Desktop Aside
         const catSection = document.getElementById('posCatalogSection');
