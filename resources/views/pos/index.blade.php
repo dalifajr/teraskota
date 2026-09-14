@@ -73,6 +73,10 @@
         box-shadow: 0 4px 10px rgba(17, 54, 27, 0.2);
     }
 
+    .pos-cat-btn * {
+        pointer-events: none;
+    }
+
     /* Product Grid */
     .pos-product-grid {
         flex: 1;
@@ -565,11 +569,11 @@
 
     <!-- Category Tabs -->
     <div class="pos-categories-nav" id="categoryNav">
-        <button class="pos-cat-btn active" data-category="all">
+        <button type="button" class="pos-cat-btn active" data-category="all">
             <i class="fa-solid fa-border-all"></i> Semua Menu
         </button>
         @foreach($categories as $cat)
-            <button class="pos-cat-btn" data-category="cat-{{ $cat->id }}">
+            <button type="button" class="pos-cat-btn" data-category="cat-{{ $cat->id }}">
                 <i class="fa-solid fa-tag"></i> {{ $cat->name }}
                 <span class="badge bg-white text-dark rounded-pill ms-1" style="font-size:0.7rem;">{{ $cat->menus->count() }}</span>
             </button>
@@ -1693,10 +1697,109 @@
         }
     });
 
+    // ==========================================
+    // POS Catalog Filtering (Category & Search)
+    // ==========================================
+    let currentCategory = 'all';
+
+    function filterCatalog() {
+        const searchInput = document.getElementById('posSearchInput');
+        const btnClearSearch = document.getElementById('btnClearSearch');
+        const query = (searchInput?.value || '').trim().toLowerCase();
+
+        if (btnClearSearch) {
+            if (query.length > 0) {
+                btnClearSearch.classList.remove('d-none');
+            } else {
+                btnClearSearch.classList.add('d-none');
+            }
+        }
+
+        const items = document.querySelectorAll('#posProductGrid .menu-item-element');
+        let visibleCount = 0;
+
+        items.forEach(item => {
+            const itemCategory = item.getAttribute('data-category');
+            const itemName = (item.getAttribute('data-name') || '').toLowerCase();
+            const itemCode = (item.getAttribute('data-code') || '').toLowerCase();
+
+            const matchCategory = (currentCategory === 'all') || (itemCategory === currentCategory);
+            const matchSearch = !query || itemName.includes(query) || itemCode.includes(query);
+
+            if (matchCategory && matchSearch) {
+                item.style.display = '';
+                visibleCount++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+
+        // Handle empty state inside posProductGrid
+        let emptyStateEl = document.getElementById('posEmptyFilterState');
+        if (visibleCount === 0) {
+            if (!emptyStateEl) {
+                emptyStateEl = document.createElement('div');
+                emptyStateEl.id = 'posEmptyFilterState';
+                emptyStateEl.className = 'w-100 text-center py-5 text-muted';
+                emptyStateEl.style.gridColumn = '1 / -1';
+                emptyStateEl.innerHTML = `
+                    <div class="mb-3">
+                        <i class="fa-solid fa-utensils fs-1 text-secondary opacity-50"></i>
+                    </div>
+                    <h6 class="fw-bold">Tidak ada menu yang sesuai</h6>
+                    <p class="small text-muted mb-0">Coba ubah kata kunci pencarian atau pilih kategori lain.</p>
+                `;
+                document.getElementById('posProductGrid')?.appendChild(emptyStateEl);
+            } else {
+                emptyStateEl.style.display = 'block';
+            }
+        } else if (emptyStateEl) {
+            emptyStateEl.style.display = 'none';
+        }
+    }
+
+    // Category Nav Buttons Event Handlers
+    document.querySelectorAll('#categoryNav .pos-cat-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            document.querySelectorAll('#categoryNav .pos-cat-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            currentCategory = this.getAttribute('data-category') || 'all';
+            
+            // Smoothly center the active category button in scroll view on mobile/small viewports
+            this.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+            filterCatalog();
+        });
+    });
+
+    // Search Input Event Handlers
+    const posSearchInputEl = document.getElementById('posSearchInput');
+    posSearchInputEl?.addEventListener('input', function() {
+        filterCatalog();
+    });
+
+    document.getElementById('btnClearSearch')?.addEventListener('click', function() {
+        if (posSearchInputEl) {
+            posSearchInputEl.value = '';
+            posSearchInputEl.focus();
+        }
+        filterCatalog();
+    });
+
     function resetPosForNewTransaction() {
         cart = [];
         renderCart();
-        document.getElementById('posSearchInput').value = '';
+        currentCategory = 'all';
+        document.querySelectorAll('#categoryNav .pos-cat-btn').forEach(b => {
+            if (b.getAttribute('data-category') === 'all') {
+                b.classList.add('active');
+            } else {
+                b.classList.remove('active');
+            }
+        });
+        const searchInput = document.getElementById('posSearchInput');
+        if (searchInput) searchInput.value = '';
         filterCatalog();
     }
 
