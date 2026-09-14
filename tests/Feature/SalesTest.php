@@ -410,6 +410,40 @@ class SalesTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Teras Kota');
         $response->assertSee($trx->transaction_number);
+        // Ensure no global universal selector is polluting fonts
+        $response->assertDontSee("* {\n            margin: 0;\n            padding: 0;\n            box-sizing: border-box;\n            font-family: 'Courier New'", false);
+        $response->assertSee('.receipt-card,', false);
+    }
+
+    /**
+     * Test POS checkout returns receipt HTML without duplicate buttons when called via AJAX.
+     */
+    public function test_pos_checkout_returns_receipt_html_without_duplicate_buttons_in_ajax(): void
+    {
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::first();
+
+        $response = $this->actingAs($cashier)
+            ->postJson('/pos/checkout', [
+                'items' => [
+                    [
+                        'menu_id' => $menu->id,
+                        'quantity' => 2,
+                    ]
+                ],
+                'payment_method' => 'tunai',
+                'cash_tendered' => 50000,
+            ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+        
+        $receiptHtml = $response->json('receipt_html');
+        // Ensure duplicate button block is NOT rendered in AJAX/modal mode
+        $this->assertStringNotContainsString('class="btn-print"', $receiptHtml);
+        $this->assertStringNotContainsString('class="btn-close-receipt"', $receiptHtml);
+        // Ensure receipt card is present
+        $this->assertStringContainsString('id="printableReceipt"', $receiptHtml);
     }
 
     /**

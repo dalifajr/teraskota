@@ -5,14 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Struk - {{ $transaction->transaction_number }}</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
+        .receipt-card,
+        .receipt-card * {
             box-sizing: border-box;
-            font-family: 'Courier New', Courier, monospace, 'Outfit', sans-serif;
+            font-family: 'Courier New', Courier, monospace !important;
         }
 
-        body {
+        .receipt-standalone-wrapper {
             background-color: #f1f5f9;
             display: flex;
             justify-content: center;
@@ -31,6 +30,8 @@
             font-size: 12px;
             color: #1e293b;
             line-height: 1.4;
+            margin: 0 auto;
+            text-align: left;
         }
 
         .receipt-header {
@@ -46,11 +47,13 @@
             text-transform: uppercase;
             margin-bottom: 2px;
             letter-spacing: 0.5px;
+            color: #0f172a;
         }
 
         .receipt-header p {
             font-size: 10px;
             color: #64748b;
+            margin: 0;
         }
 
         .receipt-meta {
@@ -79,6 +82,7 @@
         .item-name {
             font-weight: 600;
             font-size: 11px;
+            color: #1e293b;
         }
 
         .item-calc {
@@ -146,16 +150,26 @@
 
         @media print {
             body {
-                background: none;
-                padding: 0;
-                margin: 0;
+                background: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .receipt-standalone-wrapper {
+                background: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                min-height: auto !important;
+                display: block !important;
             }
 
             .receipt-card {
-                width: 100%;
-                box-shadow: none;
-                padding: 0;
-                border-radius: 0;
+                width: 100% !important;
+                max-width: 80mm !important;
+                box-shadow: none !important;
+                padding: 4px !important;
+                border-radius: 0 !important;
+                margin: 0 !important;
             }
 
             .no-print {
@@ -163,7 +177,7 @@
             }
 
             @page {
-                margin: 0;
+                margin: 2mm;
                 size: auto;
             }
         }
@@ -171,7 +185,7 @@
 </head>
 <body>
 
-    <div>
+    <div class="{{ (isset($isModal) || request()->ajax() || request()->expectsJson()) ? '' : 'receipt-standalone-wrapper' }}">
         <div class="receipt-card" id="printableReceipt">
             <!-- Header -->
             <div class="receipt-header">
@@ -249,14 +263,16 @@
             </div>
         </div>
 
-        <div class="no-print">
-            <button onclick="window.print()" class="btn-print">
-                🖨️ Cetak Struk
-            </button>
-            <a href="{{ route('pos.index') }}" class="btn-close-receipt">
-                ➕ Transaksi Baru
-            </a>
-        </div>
+        @if(!isset($isModal) && !request()->ajax() && !request()->expectsJson())
+            <div class="no-print">
+                <button onclick="window.print()" class="btn-print">
+                    🖨️ Cetak Struk
+                </button>
+                <a href="{{ route('pos.index') }}" class="btn-close-receipt">
+                    ➕ Transaksi Baru
+                </a>
+            </div>
+        @endif
     </div>
 
 </body>

@@ -94,7 +94,7 @@ class PosController extends Controller
                     'success' => true,
                     'message' => 'Transaksi berhasil diproses!',
                     'transaction' => $transaction,
-                    'receipt_html' => view('pos.receipt', compact('transaction'))->render(),
+                    'receipt_html' => view('pos.receipt', ['transaction' => $transaction, 'isModal' => true])->render(),
                 ]);
             }
 

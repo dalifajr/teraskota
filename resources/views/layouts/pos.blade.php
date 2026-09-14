@@ -132,6 +132,74 @@
                 display: block;
             }
         }
+
+        /* Print Isolation: Only print thermal receipt if window.print is triggered directly */
+        @media print {
+            body {
+                background: #ffffff !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                min-height: auto !important;
+                overflow: visible !important;
+            }
+
+            .pos-navbar,
+            .pos-content-wrapper,
+            .modal-backdrop,
+            .modal-header,
+            .modal-footer,
+            .no-print {
+                display: none !important;
+            }
+
+            .modal {
+                position: static !important;
+                display: block !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+
+            .modal-dialog {
+                margin: 0 !important;
+                max-width: 80mm !important;
+                transform: none !important;
+            }
+
+            .modal-content {
+                border: none !important;
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                background: transparent !important;
+            }
+
+            .modal-body {
+                padding: 0 !important;
+                overflow: visible !important;
+                max-height: none !important;
+            }
+
+            #printableReceipt,
+            #printableReceipt * {
+                visibility: visible !important;
+            }
+
+            #printableReceipt {
+                width: 80mm !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 2mm 3mm !important;
+                box-shadow: none !important;
+                border: none !important;
+                background: #ffffff !important;
+                font-family: 'Courier New', Courier, monospace !important;
+            }
+
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
+        }
     </style>
 
     @yield('styles')

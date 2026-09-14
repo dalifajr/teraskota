@@ -602,6 +602,9 @@
         </div>
     </div>
 </div>
+
+<!-- Hidden Iframe for Direct Isolated Thermal Receipt Printing -->
+<iframe id="receiptPrintFrame" style="position:fixed; right:100%; bottom:100%; width:0; height:0; border:0; visibility:hidden;"></iframe>
 @endsection
 
 @section('scripts')
@@ -875,7 +878,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
 
-        fetch("{{ route('pos.checkout') }}", {
+        fetch("{{ route('pos.checkout', [], false) }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -884,7 +887,24 @@
             },
             body: JSON.stringify(payload)
         })
-        .then(res => res.json())
+        .then(async res => {
+            if (!res.ok) {
+                if (res.status === 419) {
+                    throw new Error('Sesi atau token CSRF telah kedaluwarsa. Silakan muat ulang (refresh) halaman.');
+                }
+                const errData = await res.json().catch(() => null);
+                if (errData) {
+                    let errMsg = errData.message || 'Gagal memproses transaksi.';
+                    if (errData.errors) {
+                        const errList = Object.values(errData.errors).flat();
+                        if (errList.length > 0) errMsg = errList[0];
+                    }
+                    throw new Error(errMsg);
+                }
+                throw new Error(`Server mengembalikan respon error (Status ${res.status}).`);
+            }
+            return res.json();
+        })
         .then(data => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran';
@@ -911,16 +931,18 @@
         .catch(err => {
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran';
+            
+            const isConnectionErr = err.name === 'TypeError' && err.message.includes('fetch');
             Swal.fire({
                 icon: 'error',
-                title: 'Error Koneksi',
-                text: 'Gagal menghubungi server.',
+                title: isConnectionErr ? 'Error Koneksi' : 'Gagal Memproses Transaksi',
+                text: isConnectionErr ? 'Gagal menghubungi server. Periksa jaringan Anda.' : err.message,
                 confirmButtonColor: '#11361b'
             });
         });
     });
 
-    // Print Receipt Button in Modal
+    // Print Receipt Button in Modal (Isolated Hidden Iframe Method)
     document.getElementById('btnPrintReceiptBtn')?.addEventListener('click', function() {
         const receiptCard = document.getElementById('printableReceipt');
         if (!receiptCard) {
@@ -928,26 +950,130 @@
             return;
         }
 
-        const printWindow = window.open('', '_blank');
-        printWindow.document.write(`
-            <html>
+        const printFrame = document.getElementById('receiptPrintFrame');
+        if (!printFrame) {
+            window.print();
+            return;
+        }
+
+        try {
+            const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
+            frameDoc.open();
+            frameDoc.write(`
+                <!DOCTYPE html>
+                <html lang="id">
                 <head>
+                    <meta charset="UTF-8">
                     <title>Struk Pembayaran</title>
                     <style>
-                        * { margin:0; padding:0; box-sizing:border-box; font-family: 'Courier New', monospace; font-size:12px; }
-                        body { padding:10px; width:80mm; }
-                        .receipt-row { display:flex; justify-content:space-between; margin-bottom:3px; }
-                        .receipt-header { text-align:center; margin-bottom:10px; border-bottom:1px dashed #000; padding-bottom:6px; }
-                        .receipt-meta, .receipt-items, .receipt-totals { border-bottom:1px dashed #000; padding-bottom:6px; margin-bottom:6px; }
-                        .receipt-footer { text-align:center; font-size:10px; margin-top:8px; }
+                        * {
+                            margin: 0;
+                            padding: 0;
+                            box-sizing: border-box;
+                            font-family: 'Courier New', Courier, monospace !important;
+                            font-size: 12px;
+                            color: #000000;
+                        }
+                        body {
+                            width: 80mm;
+                            margin: 0 auto;
+                            padding: 2mm 3mm;
+                            background: #ffffff;
+                        }
+                        .receipt-card {
+                            width: 100% !important;
+                            max-width: 80mm !important;
+                            background: #ffffff;
+                            padding: 0 !important;
+                            box-shadow: none !important;
+                            border: none !important;
+                        }
+                        .receipt-header {
+                            text-align: center;
+                            margin-bottom: 8px;
+                            padding-bottom: 6px;
+                            border-bottom: 1px dashed #000000;
+                        }
+                        .receipt-header h1 {
+                            font-size: 14px;
+                            font-weight: bold;
+                            text-transform: uppercase;
+                            margin-bottom: 2px;
+                        }
+                        .receipt-header p {
+                            font-size: 10px;
+                            margin: 0;
+                        }
+                        .receipt-meta {
+                            margin-bottom: 8px;
+                            font-size: 11px;
+                            padding-bottom: 6px;
+                            border-bottom: 1px dashed #000000;
+                        }
+                        .receipt-row {
+                            display: flex;
+                            justify-content: space-between;
+                            margin-bottom: 2px;
+                        }
+                        .receipt-items {
+                            margin-bottom: 8px;
+                            padding-bottom: 6px;
+                            border-bottom: 1px dashed #000000;
+                        }
+                        .item-row {
+                            margin-bottom: 4px;
+                        }
+                        .item-name {
+                            font-weight: bold;
+                            font-size: 11px;
+                        }
+                        .item-calc {
+                            display: flex;
+                            justify-content: space-between;
+                            font-size: 11px;
+                        }
+                        .receipt-totals {
+                            margin-bottom: 8px;
+                            padding-bottom: 6px;
+                            border-bottom: 1px dashed #000000;
+                            font-size: 11px;
+                        }
+                        .receipt-totals .receipt-row.grand-total {
+                            font-size: 13px;
+                            font-weight: bold;
+                            margin: 3px 0;
+                            padding-top: 3px;
+                            border-top: 1px dotted #000000;
+                        }
+                        .receipt-footer {
+                            text-align: center;
+                            font-size: 10px;
+                            margin-top: 8px;
+                        }
+                        .no-print {
+                            display: none !important;
+                        }
+                        @page {
+                            size: 80mm auto;
+                            margin: 0;
+                        }
                     </style>
                 </head>
-                <body onload="window.print(); window.close();">
+                <body>
                     ${receiptCard.outerHTML}
                 </body>
-            </html>
-        `);
-        printWindow.document.close();
+                </html>
+            `);
+            frameDoc.close();
+
+            setTimeout(() => {
+                printFrame.contentWindow.focus();
+                printFrame.contentWindow.print();
+            }, 250);
+        } catch (e) {
+            console.error('Iframe printing error:', e);
+            window.print();
+        }
     });
 
     function resetPosForNewTransaction() {
@@ -968,7 +1094,7 @@
             </div>
         `;
 
-        fetch("{{ route('pos.summary') }}", {
+        fetch("{{ route('pos.summary', [], false) }}", {
             headers: { 'Accept': 'application/json' }
         })
         .then(res => res.json())
