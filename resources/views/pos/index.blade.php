@@ -7,6 +7,8 @@
     /* POS Catalog Layout */
     .pos-catalog-panel {
         flex: 1;
+        height: 100%;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         background: #ffffff;
@@ -18,8 +20,10 @@
     }
 
     .pos-cart-panel {
-        width: 420px;
-        min-width: 360px;
+        width: 400px;
+        min-width: 350px;
+        height: 100%;
+        min-height: 0;
         display: flex;
         flex-direction: column;
         background: #ffffff;
@@ -27,6 +31,7 @@
         box-shadow: 0 4px 20px rgba(0,0,0,0.03);
         border: 1px solid #e2e8f0;
         overflow: hidden;
+        position: relative;
     }
 
     /* Category Navigation */
@@ -71,6 +76,7 @@
     /* Product Grid */
     .pos-product-grid {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
         padding: 1rem;
         display: grid;
@@ -163,6 +169,7 @@
 
     .pos-cart-items-wrapper {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
         padding: 0.8rem 1rem;
     }
@@ -255,9 +262,12 @@
 
     /* Cart Footer */
     .pos-cart-footer {
+        flex-shrink: 0;
         padding: 1.2rem;
         background: #f8fafc;
         border-top: 1px solid #e2e8f0;
+        position: relative;
+        z-index: 15;
     }
 
     .pos-total-row {
@@ -289,6 +299,8 @@
         justify-content: center;
         gap: 10px;
         box-shadow: 0 4px 15px rgba(17, 54, 27, 0.25);
+        position: relative;
+        z-index: 20;
     }
 
     .pos-btn-pay:hover:not(:disabled) {
@@ -330,14 +342,196 @@
         color: var(--accent-green);
     }
 
+    /* Mobile Floating Bottom Bar */
+    .pos-floating-bar {
+        position: fixed;
+        bottom: 14px;
+        left: 12px;
+        right: 12px;
+        z-index: 1025;
+        animation: slideUpFloatingBar 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes slideUpFloatingBar {
+        from { transform: translateY(100px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    .pos-floating-bar-inner {
+        background: #ffffff;
+        border-radius: 18px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
+        border: 1px solid #e2e8f0;
+        display: flex;
+        align-items: center;
+        padding: 6px;
+        gap: 8px;
+    }
+
+    .pos-floating-cart-btn {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: var(--mint-soft);
+        border: 1px solid rgba(46, 125, 50, 0.15);
+        border-radius: 14px;
+        padding: 8px 12px;
+        color: var(--primary-green);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: left;
+    }
+
+    .pos-floating-cart-btn:active {
+        transform: scale(0.97);
+    }
+
+    .pos-cart-icon-wrapper {
+        position: relative;
+        width: 36px;
+        height: 36px;
+        background: var(--primary-green);
+        color: #ffffff;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.05rem;
+        flex-shrink: 0;
+    }
+
+    .pos-cart-badge-dot {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        background: #ef4444;
+        color: #ffffff;
+        font-size: 0.72rem;
+        font-weight: 800;
+        min-width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+        border: 2px solid #ffffff;
+        box-shadow: 0 2px 6px rgba(239, 68, 68, 0.4);
+    }
+
+    .pos-floating-qty {
+        font-size: 0.72rem;
+        font-weight: 600;
+        color: #64748b;
+        line-height: 1.2;
+    }
+
+    .pos-floating-total {
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: var(--primary-green);
+        line-height: 1.1;
+    }
+
+    .pos-floating-pay-btn {
+        background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+        color: #ffffff;
+        border: none;
+        border-radius: 14px;
+        padding: 10px 20px;
+        font-weight: 700;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(17, 54, 27, 0.3);
+        transition: all 0.2s ease;
+        white-space: nowrap;
+    }
+
+    .pos-floating-pay-btn:active {
+        transform: scale(0.96);
+    }
+
+    /* Bottom Sheet Slide Card */
+    .pos-cart-bottom-sheet {
+        height: auto !important;
+        max-height: 85vh !important;
+        border-top-left-radius: 24px !important;
+        border-top-right-radius: 24px !important;
+        box-shadow: none !important;
+        z-index: 1040 !important;
+    }
+
+    .pos-cart-bottom-sheet.show {
+        box-shadow: 0 -10px 35px rgba(0, 0, 0, 0.25) !important;
+    }
+
+    .pos-sheet-handle-wrapper {
+        display: flex;
+        justify-content: center;
+        padding: 10px 0 6px;
+        cursor: pointer;
+    }
+
+    .pos-sheet-handle {
+        width: 44px;
+        height: 5px;
+        background: #cbd5e1;
+        border-radius: 3px;
+    }
+
+    /* Dedicated Fullscreen Payment Screen */
+    .pos-checkout-screen {
+        display: none;
+        flex: 1;
+        width: 100%;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 4px 25px rgba(0,0,0,0.05);
+        border: 1px solid #e2e8f0;
+        overflow-y: auto;
+        padding: 1.5rem;
+        animation: fadeInScreen 0.25s ease-out;
+    }
+
+    @keyframes fadeInScreen {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
     @media (max-width: 991px) {
         .pos-catalog-panel {
+            height: auto;
             margin-right: 0;
-            margin-bottom: 1rem;
-            min-height: 500px;
+            margin-bottom: 0;
+            min-height: auto;
+            padding-bottom: 90px; /* Room for floating cart bar */
         }
-        .pos-cart-panel {
-            width: 100%;
+        .pos-checkout-screen {
+            border-radius: 12px;
+            padding: 1rem;
+            margin-bottom: 2rem;
+        }
+        .pos-product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            padding: 0.75rem;
+        }
+    }
+
+    /* Strict Desktop Isolation: Never show mobile floating bar or bottom sheet on desktop */
+    @media (min-width: 992px) {
+        .pos-floating-bar,
+        #posFloatingCartBar,
+        .pos-cart-bottom-sheet,
+        #posCartBottomSheet {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            box-shadow: none !important;
         }
     }
 </style>
@@ -345,7 +539,7 @@
 
 @section('content')
 <!-- Left Panel: Menu Catalog -->
-<section class="pos-catalog-panel">
+<section class="pos-catalog-panel" id="posCatalogSection">
     <!-- Top Search & Info Bar -->
     <div class="p-3 border-bottom d-flex align-items-center gap-3">
         <div class="input-group">
@@ -411,8 +605,8 @@
     </div>
 </section>
 
-<!-- Right Panel: Interactive Shopping Cart -->
-<aside class="pos-cart-panel">
+<!-- Right Panel: Interactive Shopping Cart (Desktop >= 992px) -->
+<aside class="pos-cart-panel d-none d-lg-flex" id="posCartAside">
     <!-- Cart Header -->
     <div class="pos-cart-header">
         <div>
@@ -453,6 +647,185 @@
         </button>
     </div>
 </aside>
+
+<!-- Mobile Floating Bottom Action Bar (< 992px) -->
+<div class="pos-floating-bar d-lg-none" id="posFloatingCartBar" style="display: none;">
+    <div class="pos-floating-bar-inner">
+        <!-- Left Button: Cart Toggle with Dot Counter Badge -->
+        <button type="button" class="pos-floating-cart-btn" id="btnOpenMobileCartSheet">
+            <div class="pos-cart-icon-wrapper">
+                <i class="fa-solid fa-basket-shopping"></i>
+                <span class="pos-cart-badge-dot" id="mobileCartDot">0</span>
+            </div>
+            <div class="d-flex flex-column text-start">
+                <div class="pos-floating-qty" id="mobileCartQtyText">0 Menu (0 pcs)</div>
+                <div class="pos-floating-total" id="mobileCartTotalText">Rp0</div>
+            </div>
+            <i class="fa-solid fa-chevron-up ms-auto opacity-75 small"></i>
+        </button>
+
+        <!-- Right Button: Direct Pay Button -->
+        <button type="button" class="pos-floating-pay-btn" id="btnMobileGoToCheckout">
+            <span>Bayar</span>
+            <i class="fa-solid fa-arrow-right"></i>
+        </button>
+    </div>
+</div>
+
+<!-- Mobile Slide Card (Bottom Sheet Offcanvas) -->
+<div class="offcanvas offcanvas-bottom pos-cart-bottom-sheet d-lg-none" tabindex="-1" id="posCartBottomSheet" aria-labelledby="posCartBottomSheetLabel">
+    <div class="pos-sheet-handle-wrapper" data-bs-dismiss="offcanvas">
+        <div class="pos-sheet-handle"></div>
+    </div>
+    <div class="offcanvas-header border-bottom py-2 px-3 bg-light">
+        <div class="d-flex align-items-center gap-2">
+            <i class="fa-solid fa-basket-shopping text-success fs-5"></i>
+            <h6 class="offcanvas-title fw-bold text-dark m-0" id="posCartBottomSheetLabel">
+                Daftar Pesanan (<span id="mobileSheetCountText">0</span>)
+            </h6>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" id="btnMobileClearCart" title="Kosongkan">
+                <i class="fa-solid fa-trash-can me-1"></i> Kosongkan
+            </button>
+            <button type="button" class="btn-close text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+    </div>
+    <div class="offcanvas-body p-3" id="mobileSheetCartList" style="max-height: 55vh; overflow-y: auto;">
+        <!-- Injected dynamically via renderCart() -->
+    </div>
+    <div class="pos-sheet-footer border-top p-3 bg-white">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="text-muted small">Total Belanja:</span>
+            <span class="fs-4 fw-bold text-success" id="mobileSheetGrandTotal">Rp0</span>
+        </div>
+        <button type="button" class="btn btn-primary-green w-100 py-3 fw-bold fs-6 rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-2" id="btnSheetProceedPayment">
+            <i class="fa-solid fa-credit-card"></i>
+            <span>Lanjut ke Pembayaran</span>
+        </button>
+    </div>
+</div>
+
+<!-- Dedicated Fullscreen Payment Screen (Laman Bayar) -->
+<div class="pos-checkout-screen" id="posCheckoutScreen">
+    <!-- Header Back Navigation -->
+    <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 fw-semibold" id="btnBackToCatalog">
+            <i class="fa-solid fa-arrow-left me-1"></i> Kembali ke Katalog
+        </button>
+        <h5 class="fw-bold text-dark m-0 d-flex align-items-center gap-2">
+            <i class="fa-solid fa-cash-register text-success"></i> Pembayaran Transaksi
+        </h5>
+        <div class="d-none d-md-block" style="width: 120px;"></div>
+    </div>
+
+    <div class="row g-4 justify-content-center">
+        <!-- Col 1: Order Summary -->
+        <div class="col-lg-5">
+            <div class="p-3 bg-light rounded-4 border mb-3">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold text-dark small text-uppercase">Ringkasan Pesanan</span>
+                    <span class="badge bg-success bg-opacity-10 text-success fw-bold" id="checkoutScreenItemCount">0 item</span>
+                </div>
+                <div id="checkoutScreenItemsList" class="pos-checkout-items-list mb-3" style="max-height: 250px; overflow-y: auto;">
+                    <!-- Items injected dynamically -->
+                </div>
+                <div class="border-top pt-2">
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>Total Kuantitas:</span>
+                        <strong class="text-dark" id="checkoutScreenTotalQty">0 pcs</strong>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
+                        <span class="fw-bold text-dark fs-6">Total Tagihan:</span>
+                        <span class="fs-2 fw-bold text-success" id="checkoutScreenGrandTotal">Rp0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes & Customer -->
+            <div class="card border rounded-4 p-3 shadow-none">
+                <div class="mb-3">
+                    <label for="posScreenCustomerName" class="form-label small fw-bold text-dark">Nama Pelanggan / No. Meja</label>
+                    <input type="text" id="posScreenCustomerName" class="form-control" placeholder="Opsional (contoh: Meja 4 / Bpk. Budi)">
+                </div>
+                <div>
+                    <label for="posScreenNotes" class="form-label small fw-bold text-dark">Catatan Pesanan</label>
+                    <input type="text" id="posScreenNotes" class="form-control" placeholder="Opsional (contoh: Less ice, manis sedang)">
+                </div>
+            </div>
+        </div>
+
+        <!-- Col 2: Payment Method, Cash Input, & Submit -->
+        <div class="col-lg-6">
+            <div class="card border rounded-4 p-3 shadow-none h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <!-- Payment Methods -->
+                    <label class="form-label fw-bold text-dark small mb-2">Pilih Metode Pembayaran</label>
+                    <div class="row g-2 mb-3">
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayCash" value="tunai" checked>
+                            <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayCash">
+                                <i class="fa-solid fa-money-bill-wave d-block mb-1 fs-4"></i> Tunai
+                            </label>
+                        </div>
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayQris" value="qris">
+                            <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayQris">
+                                <i class="fa-solid fa-qrcode d-block mb-1 fs-4"></i> QRIS
+                            </label>
+                        </div>
+                        <div class="col-4">
+                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayTransfer" value="transfer">
+                            <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayTransfer">
+                                <i class="fa-solid fa-building-columns d-block mb-1 fs-4"></i> Transfer
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Cash Section -->
+                    <div id="screenSectionCash">
+                        <label class="form-label fw-bold text-dark small mb-1">Pecahan Cepat Uang Diterima</label>
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash('pas')">Uang Pas</button>
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash(10000)">10.000</button>
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash(20000)">20.000</button>
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash(50000)">50.000</button>
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash(100000)">100.000</button>
+                            <button type="button" class="btn btn-quick-cash flex-fill" onclick="setScreenQuickCash(200000)">200.000</button>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="screenCashInput" class="form-label small fw-bold text-dark">Jumlah Uang Diterima (Rp)</label>
+                            <div class="input-group input-group-lg">
+                                <span class="input-group-text fw-bold bg-light">Rp</span>
+                                <input
+                                    type="number"
+                                    id="screenCashInput"
+                                    class="form-control form-control-lg fw-bold text-dark"
+                                    placeholder="0"
+                                    min="0"
+                                >
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center p-3 rounded-3 border mb-4" id="screenChangeContainer" style="background: #f8fafc;">
+                            <span class="fw-bold text-muted fs-6">Kembalian:</span>
+                            <span class="fs-3 fw-bold text-success" id="screenChangeText">Rp0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div>
+                    <button type="button" class="btn btn-primary-green w-100 py-3 fw-bold fs-5 rounded-3 shadow d-flex align-items-center justify-content-center gap-2" id="btnSubmitScreenPayment">
+                        <i class="fa-solid fa-circle-check"></i>
+                        <span>Proses Pembayaran & Cetak Struk</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Modal 1: Checkout & Pembayaran POS -->
 <div class="modal fade" id="posCheckoutModal" tabindex="-1" aria-labelledby="posCheckoutModalLabel" aria-hidden="true">
@@ -658,7 +1031,11 @@
         renderCart();
     }
 
-    // Render Cart HTML & Calculations
+    // Offcanvas Bottom Sheet Instance
+    const cartBottomSheetEl = document.getElementById('posCartBottomSheet');
+    const cartBottomSheet = cartBottomSheetEl ? new bootstrap.Offcanvas(cartBottomSheetEl) : null;
+
+    // Render Cart HTML & Calculations (Desktop + Mobile Floating Bar + Slide Card)
     function renderCart() {
         const cartList = document.getElementById('posCartList');
         const countText = document.getElementById('cartItemCountText');
@@ -666,19 +1043,57 @@
         const grandTotalEl = document.getElementById('posGrandTotal');
         const payBtn = document.getElementById('btnOpenCheckout');
 
+        // Mobile Floating Bar Elements
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        const mobileDot = document.getElementById('mobileCartDot');
+        const mobileQtyText = document.getElementById('mobileCartQtyText');
+        const mobileTotalText = document.getElementById('mobileCartTotalText');
+
+        // Mobile Sheet Elements
+        const sheetList = document.getElementById('mobileSheetCartList');
+        const sheetCountText = document.getElementById('mobileSheetCountText');
+        const sheetGrandTotal = document.getElementById('mobileSheetGrandTotal');
+
         if (cart.length === 0) {
-            cartList.innerHTML = `
-                <div class="text-center py-5 text-muted" id="posCartEmpty">
-                    <i class="fa-solid fa-basket-shopping fs-1 mb-3 text-secondary opacity-50"></i>
-                    <h6 class="fw-semibold text-secondary">Keranjang Kosong</h6>
-                    <p class="small text-muted mb-0">Klik menu di katalog sebelah kiri untuk menambahkan pesanan.</p>
-                </div>
-            `;
-            countText.textContent = '0 item';
-            totalQtyEl.textContent = '0 pcs';
-            grandTotalEl.textContent = 'Rp0';
-            payBtn.disabled = true;
-            payBtn.classList.remove('has-items');
+            // Desktop Aside
+            if (cartList) {
+                cartList.innerHTML = `
+                    <div class="text-center py-5 text-muted" id="posCartEmpty">
+                        <i class="fa-solid fa-basket-shopping fs-1 mb-3 text-secondary opacity-50"></i>
+                        <h6 class="fw-semibold text-secondary">Keranjang Kosong</h6>
+                        <p class="small text-muted mb-0">Klik menu di katalog sebelah kiri untuk menambahkan pesanan.</p>
+                    </div>
+                `;
+            }
+            if (countText) countText.textContent = '0 item';
+            if (totalQtyEl) totalQtyEl.textContent = '0 pcs';
+            if (grandTotalEl) grandTotalEl.textContent = 'Rp0';
+            if (payBtn) {
+                payBtn.disabled = true;
+                payBtn.classList.remove('has-items');
+            }
+
+            // Mobile Floating Bar (Hide when empty)
+            if (floatingBar) floatingBar.style.display = 'none';
+
+            // Mobile Bottom Sheet
+            if (sheetList) {
+                sheetList.innerHTML = `
+                    <div class="text-center py-5 text-muted">
+                        <i class="fa-solid fa-basket-shopping fs-1 mb-3 text-secondary opacity-50"></i>
+                        <h6 class="fw-semibold text-secondary">Keranjang Kosong</h6>
+                        <p class="small text-muted mb-0">Pilih menu dari katalog untuk menambahkan pesanan.</p>
+                    </div>
+                `;
+            }
+            if (sheetCountText) sheetCountText.textContent = '0';
+            if (sheetGrandTotal) sheetGrandTotal.textContent = 'Rp0';
+
+            // Close checkout screen if open with empty cart
+            const checkoutScreen = document.getElementById('posCheckoutScreen');
+            if (checkoutScreen && checkoutScreen.style.display === 'block') {
+                showCatalogView();
+            }
             return;
         }
 
@@ -709,16 +1124,61 @@
             `;
         });
 
-        cartList.innerHTML = html;
-        countText.textContent = `${cart.length} item (${totalQty} pcs)`;
-        totalQtyEl.textContent = `${totalQty} pcs`;
-        grandTotalEl.textContent = formatRupiah(grandTotal);
-        payBtn.disabled = false;
-        payBtn.classList.add('has-items');
+        // Desktop aside updates
+        if (cartList) cartList.innerHTML = html;
+        if (countText) countText.textContent = `${cart.length} item (${totalQty} pcs)`;
+        if (totalQtyEl) totalQtyEl.textContent = `${totalQty} pcs`;
+        if (grandTotalEl) grandTotalEl.textContent = formatRupiah(grandTotal);
+        if (payBtn) {
+            payBtn.disabled = false;
+            payBtn.classList.add('has-items');
+        }
+
+        // Mobile Floating Bar updates (Show when cart has items on mobile only)
+        if (floatingBar) {
+            const isMobile = window.innerWidth < 992;
+            const screen = document.getElementById('posCheckoutScreen');
+            const isScreenOpen = screen && screen.style.display === 'block';
+
+            if (isMobile && cart.length > 0 && !isScreenOpen) {
+                floatingBar.style.display = 'block';
+            } else {
+                floatingBar.style.display = 'none';
+            }
+        }
+        if (mobileDot) mobileDot.textContent = totalQty > 99 ? '99+' : totalQty;
+        if (mobileQtyText) mobileQtyText.textContent = `${cart.length} Menu (${totalQty} pcs)`;
+        if (mobileTotalText) mobileTotalText.textContent = formatRupiah(grandTotal);
+
+        // Mobile Bottom Sheet updates
+        if (sheetList) sheetList.innerHTML = html;
+        if (sheetCountText) sheetCountText.textContent = cart.length;
+        if (sheetGrandTotal) sheetGrandTotal.textContent = formatRupiah(grandTotal);
+
+        // Update Checkout screen if currently visible
+        const screen = document.getElementById('posCheckoutScreen');
+        if (screen && screen.style.display === 'block') {
+            populateCheckoutScreen();
+        }
     }
 
-    // Clear Cart
-    document.getElementById('btnClearCart')?.addEventListener('click', function() {
+    // Window Resize Sync for Mobile Floating Bar
+    window.addEventListener('resize', function() {
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        if (floatingBar) {
+            const isMobile = window.innerWidth < 992;
+            const screen = document.getElementById('posCheckoutScreen');
+            const isScreenOpen = screen && screen.style.display === 'block';
+            if (isMobile && cart.length > 0 && !isScreenOpen) {
+                floatingBar.style.display = 'block';
+            } else {
+                floatingBar.style.display = 'none';
+            }
+        }
+    });
+
+    // Clear Cart Helper
+    function executeClearCart() {
         if (cart.length === 0) return;
         Swal.fire({
             title: 'Kosongkan Keranjang?',
@@ -733,130 +1193,157 @@
             if (res.isConfirmed) {
                 cart = [];
                 renderCart();
-            }
-        });
-    });
-
-    // Category Filter Navigation
-    document.querySelectorAll('.pos-cat-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-            document.querySelectorAll('.pos-cat-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-
-            const selectedCat = this.getAttribute('data-category');
-            filterCatalog();
-        });
-    });
-
-    // Live Search Filter
-    const searchInput = document.getElementById('posSearchInput');
-    const clearSearchBtn = document.getElementById('btnClearSearch');
-
-    searchInput?.addEventListener('input', function() {
-        if (this.value.length > 0) {
-            clearSearchBtn.classList.remove('d-none');
-        } else {
-            clearSearchBtn.classList.add('d-none');
-        }
-        filterCatalog();
-    });
-
-    clearSearchBtn?.addEventListener('click', function() {
-        searchInput.value = '';
-        this.classList.add('d-none');
-        searchInput.focus();
-        filterCatalog();
-    });
-
-    function filterCatalog() {
-        const query = (searchInput.value || '').toLowerCase().trim();
-        const activeCategory = document.querySelector('.pos-cat-btn.active')?.getAttribute('data-category') || 'all';
-
-        document.querySelectorAll('.menu-item-element').forEach(card => {
-            const name = (card.getAttribute('data-name') || '').toLowerCase();
-            const code = (card.getAttribute('data-code') || '').toLowerCase();
-            const itemCat = card.getAttribute('data-category');
-
-            const matchesCategory = (activeCategory === 'all' || itemCat === activeCategory);
-            const matchesQuery = (!query || name.includes(query) || code.includes(query));
-
-            if (matchesCategory && matchesQuery) {
-                card.style.display = 'flex';
-            } else {
-                card.style.display = 'none';
+                if (cartBottomSheet) cartBottomSheet.hide();
             }
         });
     }
 
-    // Open Checkout Modal
-    document.getElementById('btnOpenCheckout')?.addEventListener('click', function() {
-        if (cart.length === 0) return;
+    document.getElementById('btnClearCart')?.addEventListener('click', executeClearCart);
+    document.getElementById('btnMobileClearCart')?.addEventListener('click', executeClearCart);
 
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        document.getElementById('checkoutModalTotal').textContent = formatRupiah(grandTotal);
-
-        // Reset inputs
-        document.getElementById('payMethodCash').checked = true;
-        document.getElementById('sectionCashPayment').style.display = 'block';
-        document.getElementById('cashTenderedInput').value = '';
-        document.getElementById('changeAmountText').textContent = 'Rp0';
-        document.getElementById('changeAmountText').className = 'fs-4 fw-bold text-success';
-        document.getElementById('posCustomerName').value = '';
-        document.getElementById('posNotes').value = '';
-
-        checkoutModal.show();
-        setTimeout(() => document.getElementById('cashTenderedInput').focus(), 400);
+    // Open Mobile Slide Card (Bottom Sheet)
+    document.getElementById('btnOpenMobileCartSheet')?.addEventListener('click', function() {
+        if (cartBottomSheet) cartBottomSheet.show();
     });
 
-    // Payment Method Radio Change
-    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+    // View Switching: Catalog vs Dedicated Payment Screen (Laman Bayar)
+    function showCheckoutView() {
+        if (cart.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Keranjang Kosong',
+                text: 'Silakan pilih minimal 1 menu sebelum melakukan pembayaran.',
+                confirmButtonColor: '#11361b'
+            });
+            return;
+        }
+
+        // Hide Mobile Bottom Sheet if open
+        if (cartBottomSheet) cartBottomSheet.hide();
+
+        // Hide Catalog and Desktop Aside
+        const catSection = document.getElementById('posCatalogSection');
+        if (catSection) catSection.style.display = 'none';
+        const cartAside = document.getElementById('posCartAside');
+        if (cartAside) cartAside.style.setProperty('display', 'none', 'important');
+
+        // Hide Mobile Floating Bar
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        if (floatingBar) floatingBar.style.display = 'none';
+
+        // Show Fullscreen Checkout Screen
+        const screen = document.getElementById('posCheckoutScreen');
+        if (screen) {
+            screen.style.display = 'block';
+            populateCheckoutScreen();
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showCatalogView() {
+        const catSection = document.getElementById('posCatalogSection');
+        if (catSection) catSection.style.display = '';
+        const cartAside = document.getElementById('posCartAside');
+        if (cartAside) cartAside.style.removeProperty('display');
+
+        const screen = document.getElementById('posCheckoutScreen');
+        if (screen) screen.style.display = 'none';
+
+        const floatingBar = document.getElementById('posFloatingCartBar');
+        if (floatingBar) {
+            const isMobile = window.innerWidth < 992;
+            if (isMobile && cart.length > 0) {
+                floatingBar.style.display = 'block';
+            } else {
+                floatingBar.style.display = 'none';
+            }
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // Populate Data in Dedicated Checkout Screen
+    function populateCheckoutScreen() {
+        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+
+        document.getElementById('checkoutScreenGrandTotal').textContent = formatRupiah(grandTotal);
+        document.getElementById('checkoutScreenTotalQty').textContent = `${totalQty} pcs`;
+        document.getElementById('checkoutScreenItemCount').textContent = `${cart.length} menu`;
+
+        let itemsHtml = '';
+        cart.forEach(item => {
+            const subtotal = item.price * item.qty;
+            itemsHtml += `
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div class="text-truncate me-2" style="max-width: 65%;">
+                        <div class="fw-semibold text-dark text-truncate">${item.name}</div>
+                        <small class="text-muted">${formatRupiah(item.price)} &times; ${item.qty}</small>
+                    </div>
+                    <div class="fw-bold text-success">${formatRupiah(subtotal)}</div>
+                </div>
+            `;
+        });
+        document.getElementById('checkoutScreenItemsList').innerHTML = itemsHtml;
+
+        // Auto calculate change
+        calculateScreenChange();
+    }
+
+    // Wire Up Checkout Buttons
+    document.getElementById('btnMobileGoToCheckout')?.addEventListener('click', showCheckoutView);
+    document.getElementById('btnSheetProceedPayment')?.addEventListener('click', showCheckoutView);
+    document.getElementById('btnOpenCheckout')?.addEventListener('click', showCheckoutView);
+    document.getElementById('btnBackToCatalog')?.addEventListener('click', showCatalogView);
+
+    // Screen Payment Method Radio Change
+    document.querySelectorAll('input[name="screen_payment_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
-            const cashSection = document.getElementById('sectionCashPayment');
+            const cashSec = document.getElementById('screenSectionCash');
             if (this.value === 'tunai') {
-                cashSection.style.display = 'block';
-                document.getElementById('cashTenderedInput').focus();
+                cashSec.style.display = 'block';
+                document.getElementById('screenCashInput').focus();
             } else {
-                cashSection.style.display = 'none';
+                cashSec.style.display = 'none';
             }
         });
     });
 
-    // Quick Cash Buttons
-    function setQuickCash(val) {
+    // Screen Quick Cash
+    function setScreenQuickCash(val) {
         const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        const cashInput = document.getElementById('cashTenderedInput');
-
+        const input = document.getElementById('screenCashInput');
         if (val === 'pas') {
-            cashInput.value = grandTotal;
+            input.value = grandTotal;
         } else {
-            cashInput.value = val;
+            input.value = val;
         }
-        calculateChange();
+        calculateScreenChange();
     }
 
-    // Calculate Change
-    document.getElementById('cashTenderedInput')?.addEventListener('input', calculateChange);
-
-    function calculateChange() {
+    function calculateScreenChange() {
         const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        const cashTendered = parseFloat(document.getElementById('cashTenderedInput').value) || 0;
+        const cashInput = document.getElementById('screenCashInput');
+        const cashTendered = parseFloat(cashInput?.value) || 0;
         const change = cashTendered - grandTotal;
 
-        const changeTextEl = document.getElementById('changeAmountText');
+        const changeText = document.getElementById('screenChangeText');
+        if (!changeText) return;
+
         if (change >= 0) {
-            changeTextEl.textContent = formatRupiah(change);
-            changeTextEl.className = 'fs-4 fw-bold text-success';
+            changeText.textContent = formatRupiah(change);
+            changeText.className = 'fs-3 fw-bold text-success';
         } else {
-            changeTextEl.textContent = `Uang Kurang (${formatRupiah(Math.abs(change))})`;
-            changeTextEl.className = 'fs-5 fw-bold text-danger';
+            changeText.textContent = `Kurang (${formatRupiah(Math.abs(change))})`;
+            changeText.className = 'fs-4 fw-bold text-danger';
         }
     }
+    document.getElementById('screenCashInput')?.addEventListener('input', calculateScreenChange);
 
-    // Submit Payment
-    document.getElementById('btnSubmitPayment')?.addEventListener('click', function() {
+    // Shared Process Payment Checkout Function
+    function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn) {
         const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value || 'tunai';
-        const cashTendered = parseFloat(document.getElementById('cashTenderedInput').value);
 
         if (paymentMethod === 'tunai') {
             if (isNaN(cashTendered) || cashTendered < grandTotal) {
@@ -874,11 +1361,11 @@
             items: cart.map(i => ({ menu_id: i.id, quantity: i.qty })),
             payment_method: paymentMethod,
             cash_tendered: paymentMethod === 'tunai' ? cashTendered : grandTotal,
-            customer_name: document.getElementById('posCustomerName').value,
-            notes: document.getElementById('posNotes').value,
+            customer_name: customerName,
+            notes: notes,
         };
 
-        const submitBtn = this;
+        const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
 
@@ -911,16 +1398,18 @@
         })
         .then(data => {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran';
+            submitBtn.innerHTML = originalBtnHtml;
 
             if (data.success) {
+                // Return screen back to catalog view
+                showCatalogView();
                 checkoutModal.hide();
-                
+
                 // Show receipt modal with generated HTML
                 document.getElementById('receiptModalBody').innerHTML = data.receipt_html;
                 receiptModal.show();
 
-                // Clear active cart
+                // Clear active cart safely
                 cart = [];
                 renderCart();
             } else {
@@ -934,8 +1423,8 @@
         })
         .catch(err => {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran';
-            
+            submitBtn.innerHTML = originalBtnHtml;
+
             const isConnectionErr = err.name === 'TypeError' && err.message.includes('fetch');
             Swal.fire({
                 icon: 'error',
@@ -944,6 +1433,26 @@
                 confirmButtonColor: '#11361b'
             });
         });
+    }
+
+    // Submit Payment from Dedicated Screen
+    document.getElementById('btnSubmitScreenPayment')?.addEventListener('click', function() {
+        const paymentMethod = document.querySelector('input[name="screen_payment_method"]:checked')?.value || 'tunai';
+        const cashTendered = parseFloat(document.getElementById('screenCashInput').value);
+        const customerName = document.getElementById('posScreenCustomerName').value;
+        const notes = document.getElementById('posScreenNotes').value;
+
+        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this);
+    });
+
+    // Submit Payment from Modal (for modal fallback if used)
+    document.getElementById('btnSubmitPayment')?.addEventListener('click', function() {
+        const paymentMethod = document.querySelector('input[name="payment_method"]:checked')?.value || 'tunai';
+        const cashTendered = parseFloat(document.getElementById('cashTenderedInput').value);
+        const customerName = document.getElementById('posCustomerName').value;
+        const notes = document.getElementById('posNotes').value;
+
+        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this);
     });
 
     // Print Receipt Button in Modal (Isolated Hidden Iframe Method)

@@ -1,11 +1,13 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. elemen body > main > aside pada pos ketika dibuka pada perangkat mobile sebaiknya muncul ketika user memilih menu yang dijual. elemen tersebut digantikan dengan tombol bayar yang melayang dengan tombol keranjang dengan dot angka pesanan disampingnya yang menyatu. ketika tombol keranjang dibuka akan muncul tampilan slide card dari bawah ke atas dengan animasi yang halus menampilkan daftar menu yang ditambahkan ke keranjang. ketika tombol bayar diklik maka akan mengarahkan user ke laman bayar bukan popup.
+1. buat elemen body > div:nth-of-type(3) > div:nth-of-type(1) menjadi sticky
+2. elemen #posCatalogSection dan #posCartAside baiknya dibuat mengikuti ukuran window browser. karena untuk saat ini, ukurannya mengikuti jumlah menu yang tersedia sehingga tombol bayar jauh berada dibawah dan user harus scroll kepaling bawah untuk menekannya.
+3. tombol bayar terhalang elemen shadow overlay.
 
-2. 
 
 
 catat untuk kamu;
 - lakukan brainstroming sebelum melakukan eksekusi, tak lupa pula lakukan analisa kritik dan saran.
 - pastikan untuk melakukan test pada setiap perubahan yang kamu buat. agar tidak ada error yang terlewatkan.
 - jangan pernah ragu untuk meminta arahan lebih detail.
+- tidak usah melakukan uji menggunakan browser agent.

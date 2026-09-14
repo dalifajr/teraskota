@@ -116,15 +116,6 @@
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
         </div>
         <div class="offcanvas-body">
-            <!-- Mini User Card -->
-            <div class="offcanvas-user-card">
-                <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()?->name ?? 'User') }}&background=11361b&color=ffffff" alt="Avatar" class="offcanvas-user-avatar">
-                <div class="text-truncate">
-                    <div class="fw-bold text-white text-truncate">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
-                    <small class="text-warning text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">{{ Auth::user()?->role ?? 'User' }}</small>
-                </div>
-            </div>
-
             <!-- Full Navigation Menu -->
             <ul class="sidebar-menu mb-0">
                 <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">

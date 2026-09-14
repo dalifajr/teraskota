@@ -11,11 +11,12 @@
     --border-color: #e2e8f0;
 }
 
+html,
 body {
     font-family: 'Outfit', sans-serif;
     background-color: var(--bg-cream);
     color: #334155;
-    overflow-x: hidden;
+    overflow-x: visible;
 }
 
 /* Sidebar Styling */
@@ -103,10 +104,10 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.04);
     position: sticky;
     top: 0;
-    z-index: 1000;
+    z-index: 1010;
 }
 
 .nav-user {
@@ -340,27 +341,9 @@ body {
 }
 
 .offcanvas-sidebar .offcanvas-body {
-    padding: 0.75rem 0 2rem 0;
+    padding: 1rem 0 2rem 0;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-}
-
-.offcanvas-user-card {
-    background: rgba(255, 255, 255, 0.08);
-    border-radius: 12px;
-    padding: 0.85rem 1rem;
-    margin: 0 1rem 0.75rem 1rem;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.offcanvas-user-avatar {
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    border: 2px solid var(--light-accent);
 }
 
 /* Mobile Bottom Navigation */

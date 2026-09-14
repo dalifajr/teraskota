@@ -27,22 +27,27 @@
     <style>
         body {
             background-color: #f1f5f9;
-            overflow-x: hidden;
+            overflow: hidden;
             height: 100vh;
+            max-height: 100vh;
             display: flex;
             flex-direction: column;
         }
 
-        /* Dedicated POS Navbar */
+        /* Dedicated Sticky POS Navbar */
         .pos-navbar {
             background-color: var(--primary-green);
             color: #ffffff;
-            padding: 0.6rem 1.5rem;
+            padding: 0.6rem 1.25rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            z-index: 100;
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            flex-shrink: 0;
+            min-height: 56px;
         }
 
         .pos-brand {
@@ -117,7 +122,9 @@
 
         .pos-content-wrapper {
             flex: 1;
-            padding: 1rem;
+            min-height: 0;
+            height: calc(100vh - 56px);
+            padding: 0.85rem;
             overflow: hidden;
             display: flex;
         }
@@ -125,11 +132,16 @@
         @media (max-width: 991px) {
             body {
                 height: auto;
+                min-height: 100vh;
+                max-height: none;
                 overflow-y: auto;
+                overflow-x: hidden;
             }
             .pos-content-wrapper {
+                height: auto;
                 overflow: visible;
                 display: block;
+                padding: 0.75rem;
             }
         }
 
@@ -201,78 +213,11 @@
             }
         }
 
-        /* POS Orientation Warning (Mobile Portrait Mode) */
-        .pos-portrait-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(17, 54, 27, 0.97);
-            backdrop-filter: blur(10px);
-            z-index: 99999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
-
-        .pos-prompt-card {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            max-width: 380px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.3);
-        }
-
-        .pos-rotate-phone-icon {
-            font-size: 2.8rem;
-            color: var(--light-accent);
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            animation: phoneRotateAnim 2.5s infinite ease-in-out;
-        }
-
-        @keyframes phoneRotateAnim {
-            0%, 15% { transform: rotate(0deg); }
-            45%, 65% { transform: rotate(90deg); }
-            90%, 100% { transform: rotate(0deg); }
-        }
-
-        @media (max-width: 767px) and (orientation: portrait) {
-            .pos-portrait-overlay:not(.dismissed) {
-                display: flex !important;
-            }
-        }
-
-        @media (orientation: landscape), (min-width: 768px) {
-            .pos-portrait-overlay {
-                display: none !important;
-            }
-        }
     </style>
 
     @yield('styles')
 </head>
 <body>
-
-    <!-- POS Orientation Prompt for Mobile Portrait -->
-    <div id="posOrientationPrompt" class="pos-portrait-overlay">
-        <div class="pos-prompt-card text-center p-4">
-            <div class="pos-rotate-phone-icon mb-3">
-                <i class="fa-solid fa-mobile-screen-button"></i>
-                <i class="fa-solid fa-rotate-right text-warning fs-4"></i>
-            </div>
-            <h5 class="fw-bold text-white mb-2">Gunakan Mode Landscape / Desktop</h5>
-            <p class="text-white-50 small mb-4">
-                Terminal Kasir POS membutuhkan ruang horizontal untuk katalog menu dan keranjang kasir. Silakan putar ponsel ke posisi <strong>Landscape (Mendatar)</strong> atau gunakan tablet/PC untuk transaksi yang optimal.
-            </p>
-            <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4" onclick="document.getElementById('posOrientationPrompt').classList.add('dismissed')">
-                Tetap Lanjutkan (Abaikan)
-            </button>
-        </div>
-    </div>
 
     <!-- Top POS Navbar -->
     <header class="pos-navbar">
