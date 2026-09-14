@@ -228,7 +228,19 @@ body {
 /* Responsive Table */
 .table-responsive {
     border-radius: 12px;
-    overflow: hidden;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+}
+
+.table-responsive table {
+    min-width: 680px;
+    margin-bottom: 0;
+}
+
+.table-responsive th,
+.table-responsive td {
+    white-space: nowrap;
 }
 
 .table thead {
@@ -238,11 +250,11 @@ body {
 
 .table th {
     font-weight: 600;
-    padding: 1rem;
+    padding: 0.9rem 1rem;
 }
 
 .table td {
-    padding: 1rem;
+    padding: 0.85rem 1rem;
     vertical-align: middle;
 }
 
@@ -309,15 +321,135 @@ body {
 }
 
 /* Responsive adjustments */
+.sidebar-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.25s ease, visibility 0.25s ease;
+}
+
+.sidebar-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Mobile Bottom Navigation */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    background: #ffffff;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 1020;
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+    padding: 0 6px;
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 500;
+    padding: 4px 6px;
+    border-radius: 10px;
+    transition: all 0.15s ease;
+    flex: 1;
+    text-align: center;
+}
+
+.mobile-nav-item i {
+    font-size: 1.15rem;
+    margin-bottom: 2px;
+}
+
+.mobile-nav-item:hover, .mobile-nav-item.active {
+    color: var(--primary-green);
+    font-weight: 700;
+}
+
+.mobile-nav-pos {
+    position: relative;
+    top: -12px;
+}
+
+.mobile-nav-pos .pos-icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary-green) 0%, var(--accent-green) 100%);
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(17, 54, 27, 0.35);
+    margin: 0 auto 2px;
+    border: 3px solid #ffffff;
+    transition: transform 0.2s ease;
+}
+
+.mobile-nav-pos:active .pos-icon-circle {
+    transform: scale(0.92);
+}
+
+.mobile-nav-pos .pos-icon-circle i {
+    font-size: 1.25rem;
+    margin-bottom: 0;
+}
+
+.mobile-nav-pos span {
+    color: var(--primary-green);
+    font-weight: 700;
+    font-size: 0.72rem;
+}
+
 @media (max-width: 991px) {
     .sidebar {
         left: -280px;
+        box-shadow: 10px 0 30px rgba(0, 0, 0, 0.2);
     }
     .sidebar.active {
         left: 0;
     }
     .main-wrapper {
         margin-left: 0;
+    }
+}
+
+@media (max-width: 767px) {
+    .main-wrapper {
+        padding-bottom: 74px;
+    }
+    .top-navbar {
+        padding: 0.75rem 1rem;
+    }
+    .top-navbar h4 {
+        font-size: 1.05rem;
+        max-width: 200px;
+    }
+    .premium-header {
+        padding: 1rem;
+    }
+    .card-body {
+        padding: 1rem !important;
+    }
+    .stat-value {
+        font-size: 1.4rem;
     }
 }
 

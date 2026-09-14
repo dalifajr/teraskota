@@ -17,10 +17,95 @@ class SystemUpdateController extends Controller
     }
 
     /**
+     * Check if shell_exec is allowed and available.
+     */
+    protected function isShellExecAvailable(): bool
+    {
+        if (!function_exists('shell_exec')) {
+            return false;
+        }
+
+        $disabled = explode(',', ini_get('disable_functions') ?: '');
+        $disabled = array_map('trim', $disabled);
+
+        return !in_array('shell_exec', $disabled, true);
+    }
+
+    /**
+     * Find the Git executable binary on Windows or Linux.
+     */
+    protected function getGitBinary(): ?string
+    {
+        // 1. Check custom .env GIT_PATH
+        if ($envPath = env('GIT_PATH')) {
+            if (file_exists($envPath)) {
+                return '"' . $envPath . '"';
+            }
+        }
+
+        if (!$this->isShellExecAvailable()) {
+            return null;
+        }
+
+        // 2. Try default 'git' in PATH
+        $testOutput = @shell_exec('git --version 2>&1');
+        if ($testOutput && str_contains(strtolower($testOutput), 'git version')) {
+            return 'git';
+        }
+
+        // 3. Scan common Windows installation directories
+        $commonPaths = [
+            'C:\\Program Files\\Git\\cmd\\git.exe',
+            'C:\\Program Files\\Git\\bin\\git.exe',
+            'C:\\Program Files (x86)\\Git\\cmd\\git.exe',
+            'C:\\Program Files (x86)\\Git\\bin\\git.exe',
+            'D:\\laragon\\bin\\git\\bin\\git.exe',
+            'C:\\laragon\\bin\\git\\bin\\git.exe',
+            (getenv('LOCALAPPDATA') ?: '') . '\\Programs\\Git\\cmd\\git.exe',
+        ];
+
+        foreach ($commonPaths as $path) {
+            if (!empty($path) && file_exists($path)) {
+                return '"' . $path . '"';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Check if Git is fully available.
+     */
+    protected function isGitAvailable(): bool
+    {
+        return $this->getGitBinary() !== null;
+    }
+
+    /**
      * Helper to run safe shell commands in the application root directory.
      */
     protected function runCommand(string $command): array
     {
+        if (!$this->isShellExecAvailable()) {
+            return [
+                'command' => $command,
+                'output' => 'Fungsi shell_exec dinonaktifkan pada hosting ini.',
+            ];
+        }
+
+        $gitBinary = $this->getGitBinary();
+        if (!$gitBinary) {
+            return [
+                'command' => $command,
+                'output' => "Git binary tidak ditemukan pada sistem.",
+            ];
+        }
+
+        // Replace leading 'git ' with resolved binary
+        if (str_starts_with($command, 'git ')) {
+            $command = $gitBinary . ' ' . substr($command, 4);
+        }
+
         $cwd = $this->getAppPath();
         $fullCommand = "cd /d \"{$cwd}\" && {$command} 2>&1";
         $output = shell_exec($fullCommand);
@@ -36,22 +121,40 @@ class SystemUpdateController extends Controller
      */
     public function index()
     {
-        // Git Information
-        $gitVersion = $this->runCommand('git --version')['output'];
-        $currentBranch = $this->runCommand('git branch --show-current')['output'];
-        $remoteUrl = $this->runCommand('git config --get remote.origin.url')['output'];
-        
-        // Latest Local Commit
-        $lastCommitHash = $this->runCommand('git log -1 --format="%h"')['output'];
-        $lastCommitMsg = $this->runCommand('git log -1 --format="%s"')['output'];
-        $lastCommitDate = $this->runCommand('git log -1 --format="%cd" --date=relative')['output'];
-        $lastCommitAuthor = $this->runCommand('git log -1 --format="%an"')['output'];
+        $isShellAllowed = $this->isShellExecAvailable();
+        $gitBinary = $this->getGitBinary();
+        $isGitAvailable = ($gitBinary !== null);
+
+        if ($isGitAvailable) {
+            $gitVersion = $this->runCommand('git --version')['output'];
+            $currentBranch = $this->runCommand('git branch --show-current')['output'];
+            $remoteUrl = $this->runCommand('git config --get remote.origin.url')['output'];
+            
+            // Latest Local Commit
+            $lastCommitHash = $this->runCommand('git log -1 --format="%h"')['output'];
+            $lastCommitMsg = $this->runCommand('git log -1 --format="%s"')['output'];
+            $lastCommitDate = $this->runCommand('git log -1 --format="%cd" --date=relative')['output'];
+            $lastCommitAuthor = $this->runCommand('git log -1 --format="%an"')['output'];
+        } else {
+            $gitVersion = $isShellAllowed 
+                ? 'Git CLI tidak terdeteksi di server' 
+                : 'Fungsi shell dinonaktifkan (Shared Hosting / InfinityFree)';
+            $currentBranch = '-';
+            $remoteUrl = 'https://github.com/dalifajr/teraskota.git';
+            $lastCommitHash = '-';
+            $lastCommitMsg = 'Pembaruan otomatis Git non-aktif pada lingkungan server ini';
+            $lastCommitDate = '-';
+            $lastCommitAuthor = '-';
+        }
 
         // Environment Details
         $phpVersion = PHP_VERSION;
         $laravelVersion = app()->version();
 
         return view('settings.update', compact(
+            'isGitAvailable',
+            'isShellAllowed',
+            'gitBinary',
             'gitVersion',
             'currentBranch',
             'remoteUrl',
@@ -69,6 +172,10 @@ class SystemUpdateController extends Controller
      */
     public function check()
     {
+        if (!$this->isGitAvailable()) {
+            return back()->with('error', 'Pengecekan Git tidak dapat dilakukan karena Git tidak terdeteksi atau fungsi shell dinonaktifkan oleh hosting.');
+        }
+
         try {
             // 1. Fetch remote changes
             $fetchRes = $this->runCommand('git fetch origin main');
@@ -104,6 +211,10 @@ class SystemUpdateController extends Controller
      */
     public function execute(Request $request)
     {
+        if (!$this->isGitAvailable()) {
+            return back()->with('error', 'Pembaruan otomatis via Git tidak dapat dijalankan pada lingkungan hosting ini.');
+        }
+
         $log = [];
         $log[] = '=== MEMULAI PROSES PEMBARUAN SISTEM TERAS KOTA ===';
         $log[] = 'Waktu: ' . Carbon::now()->toDateTimeString();
@@ -146,6 +257,21 @@ class SystemUpdateController extends Controller
 
             return back()->with('update_log', implode("\n", $log))
                          ->with('error', 'Pembaruan sistem gagal: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Run database migrations manually (safe for shared hosting like InfinityFree without shell/git).
+     */
+    public function migrateDb()
+    {
+        try {
+            Artisan::call('migrate', ['--force' => true]);
+            $output = Artisan::output();
+            return back()->with('update_log', "=== EKSEKUSI MIGRASI BASIS DATA (ARTISAN) ===\nWaktu: " . Carbon::now()->toDateTimeString() . "\n\n" . ($output ?: 'Semua tabel sudah dalam status termigrasi (Nothing to migrate).'))
+                         ->with('success', 'Migrasi basis data berhasil dijalankan!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Gagal menjalankan migrasi: ' . $e->getMessage());
         }
     }
 

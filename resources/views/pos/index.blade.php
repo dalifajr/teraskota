@@ -878,7 +878,7 @@
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
 
-        fetch("{{ route('pos.checkout', [], false) }}", {
+        fetch("{{ route('pos.checkout') }}", {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1094,7 +1094,7 @@
             </div>
         `;
 
-        fetch("{{ route('pos.summary', [], false) }}", {
+        fetch("{{ route('pos.summary') }}", {
             headers: { 'Accept': 'application/json' }
         })
         .then(res => res.json())

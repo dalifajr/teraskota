@@ -473,5 +473,30 @@ class SalesTest extends TestCase
             'role' => 'kasir',
         ]);
     }
+
+    /**
+     * Test System Update page loads gracefully.
+     */
+    public function test_system_update_page_loads_gracefully(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        $response = $this->actingAs($admin)->get('/settings/update');
+        $response->assertStatus(200);
+        $response->assertSee('Sinkronisasi & Pembaruan Sistem', false);
+        $response->assertSee('Migrasi DB');
+    }
+
+    /**
+     * Test Admin can run database migration via web endpoint (safe for shared hosting like InfinityFree).
+     */
+    public function test_admin_can_run_database_migration_via_web(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+
+        $response = $this->actingAs($admin)->post('/settings/update/migrate');
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+    }
 }
 

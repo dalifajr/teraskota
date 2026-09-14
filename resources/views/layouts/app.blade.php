@@ -29,9 +29,14 @@
 
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-brand">
-            <i class="fa-solid fa-mug-hot"></i>
-            <span>Teras Kota Berlian Makmur</span>
+        <div class="sidebar-brand d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 text-truncate">
+                <i class="fa-solid fa-mug-hot text-warning"></i>
+                <span class="text-truncate">Teras Kota</span>
+            </div>
+            <button type="button" class="btn btn-sm text-white d-lg-none p-1" id="sidebarCloseBtn" aria-label="Tutup Menu">
+                <i class="fa-solid fa-xmark fs-5"></i>
+            </button>
         </div>
         <ul class="sidebar-menu">
             <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
@@ -106,34 +111,37 @@
         </ul>
     </div>
 
+    <!-- Sidebar Mobile Backdrop -->
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
     <!-- Main Wrapper -->
     <div class="main-wrapper">
         
         <!-- Top Navbar -->
         <div class="top-navbar">
             <div class="d-flex align-items-center">
-                <button class="btn btn-outline-secondary d-lg-none me-3" id="sidebarToggle">
+                <button class="btn btn-outline-secondary d-lg-none me-2" id="sidebarToggle" aria-label="Buka Menu">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <h4 class="m-0 fw-semibold text-dark">@yield('page_title', 'Teras Kota Berlian Makmur')</h4>
+                <h4 class="m-0 fw-semibold text-dark text-truncate">@yield('page_title', 'Teras Kota Berlian Makmur')</h4>
             </div>
             
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-2 gap-sm-3">
                 <div class="text-end d-none d-sm-block">
                     <div class="fw-semibold text-dark">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
                     <small class="text-muted">{{ Auth::user()?->email ?? '' }}</small>
                 </div>
-                <div class="nav-user">
+                <a href="{{ route('profile.edit') }}" class="nav-user text-decoration-none" title="Profil Akun">
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()?->name ?? 'User') }}&background=11361b&color=ffffff" alt="Avatar">
-                </div>
+                </a>
             </div>
         </div>
 
         <!-- Main Content -->
-        <div class="container-fluid p-4">
+        <div class="container-fluid p-3 p-md-4">
             
             <!-- Breadcrumbs -->
-            <nav aria-label="breadcrumb" class="mb-4">
+            <nav aria-label="breadcrumb" class="mb-3 mb-md-4">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" class="text-decoration-none text-success"><i class="fa-solid fa-home"></i> Home</a></li>
                     @yield('breadcrumbs')
@@ -167,38 +175,73 @@
         <!-- Footer -->
         <footer class="mt-auto py-3 bg-white border-top text-center text-muted">
             <div class="container">
-                <small>&copy; {{ date('Y') }} Teras Kota Berlian Makmur. All Rights Reserved. Powered by Laravel.</small>
+                <small>&copy; {{ date('Y') }} Teras Kota Berlian Makmur. All Rights Reserved.</small>
             </div>
         </footer>
+
+        <!-- Mobile Bottom Navigation Bar (Visible only on < 768px) -->
+        <nav class="mobile-bottom-nav d-md-none">
+            <a href="{{ route('dashboard') }}" class="mobile-nav-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
+                <i class="fa-solid fa-chart-line"></i>
+                <span>Dashboard</span>
+            </a>
+            <a href="{{ route('menus.index') }}" class="mobile-nav-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
+                <i class="fa-solid fa-coffee"></i>
+                <span>Menu</span>
+            </a>
+            <a href="{{ route('pos.index') }}" class="mobile-nav-item mobile-nav-pos" target="_blank" title="Buka Kasir POS">
+                <div class="pos-icon-circle">
+                    <i class="fa-solid fa-cash-register"></i>
+                </div>
+                <span>Kasir</span>
+            </a>
+            <a href="{{ route('transactions.index') }}" class="mobile-nav-item {{ Request::routeIs('transactions.*') ? 'active' : '' }}">
+                <i class="fa-solid fa-clock-rotate-left"></i>
+                <span>Transaksi</span>
+            </a>
+            <a href="javascript:void(0)" class="mobile-nav-item" id="mobileSidebarToggle">
+                <i class="fa-solid fa-bars"></i>
+                <span>Lainnya</span>
+            </a>
+        </nav>
     </div>
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Sidebar Toggle Script -->
+    <!-- Sidebar Toggle & Mobile Scripts -->
     <script>
-        document.getElementById('sidebarToggle')?.addEventListener('click', function() {
-            document.getElementById('sidebar')?.classList.toggle('active');
-        });
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', function () {
-            navigator.serviceWorker
-                .register('/service-worker.js')
-                .then(function (registration) {
-                    console.log(
-                        'Service Worker terdaftar:',
-                        registration.scope
-                    );
-                })
-                .catch(function (error) {
-                    console.error(
-                        'Service Worker gagal didaftarkan:',
-                        error
-                    );
-                });
-        });
-    }
-</script>
+        const sidebarEl = document.getElementById('sidebar');
+        const backdropEl = document.getElementById('sidebarBackdrop');
+
+        function toggleSidebar() {
+            sidebarEl?.classList.toggle('active');
+            backdropEl?.classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            sidebarEl?.classList.remove('active');
+            backdropEl?.classList.remove('active');
+        }
+
+        document.getElementById('sidebarToggle')?.addEventListener('click', toggleSidebar);
+        document.getElementById('mobileSidebarToggle')?.addEventListener('click', toggleSidebar);
+        document.getElementById('sidebarCloseBtn')?.addEventListener('click', closeSidebar);
+        backdropEl?.addEventListener('click', closeSidebar);
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker
+                    .register('/service-worker.js')
+                    .then(function (registration) {
+                        console.log('Service Worker terdaftar:', registration.scope);
+                    })
+                    .catch(function (error) {
+                        console.error('Service Worker gagal didaftarkan:', error);
+                    });
+            });
+        }
+    </script>
     
     @yield('scripts')
 </body>

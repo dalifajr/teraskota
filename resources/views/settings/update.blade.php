@@ -76,14 +76,24 @@
             </h5>
             <small class="text-muted">Kelola versi aplikasi terintegrasi langsung dengan repositori GitHub</small>
         </div>
-        <div class="d-flex gap-2">
-            <!-- Form Cek Pembaruan -->
-            <form action="{{ route('settings.update.check') }}" method="POST" class="d-inline">
+        <div class="d-flex flex-wrap gap-2">
+            <!-- Form Migrasi Basis Data -->
+            <form action="{{ route('settings.update.migrate') }}" method="POST" class="d-inline" onsubmit="return confirm('Jalankan migrasi basis data (php artisan migrate)?');">
                 @csrf
-                <button type="submit" class="btn btn-outline-success">
-                    <i class="fa-solid fa-magnifying-glass me-1"></i> Periksa Pembaruan
+                <button type="submit" class="btn btn-outline-primary" title="Jalankan migrasi tabel database secara mandiri (Aman untuk InfinityFree/Shared Hosting)">
+                    <i class="fa-solid fa-database me-1"></i> Migrasi DB
                 </button>
             </form>
+
+            @if($isGitAvailable)
+                <!-- Form Cek Pembaruan -->
+                <form action="{{ route('settings.update.check') }}" method="POST" class="d-inline">
+                    @csrf
+                    <button type="submit" class="btn btn-outline-success">
+                        <i class="fa-solid fa-magnifying-glass me-1"></i> Periksa Pembaruan
+                    </button>
+                </form>
+            @endif
 
             <!-- Form Bersihkan Cache -->
             <form action="{{ route('settings.update.clear-cache') }}" method="POST" class="d-inline">
@@ -96,6 +106,29 @@
     </div>
 
     <div class="card-body p-4">
+        <!-- Shared Hosting / InfinityFree Warning Banner if Git Not Available -->
+        @if(!$isGitAvailable)
+            <div class="alert alert-info border-0 border-start border-5 border-info shadow-sm rounded-3 p-4 mb-4">
+                <div class="d-flex align-items-start">
+                    <i class="fa-solid fa-circle-info fs-2 text-info me-3 mt-1"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold text-dark mb-1">Mode Shared Hosting Terdeteksi (cPanel / InfinityFree)</h6>
+                        <p class="small text-muted mb-2">
+                            Layanan hosting gratis seperti <strong>InfinityFree</strong> menonaktifkan fungsi terminal shell (<code>shell_exec</code>) dan tidak menyediakan Git CLI di server demi keamanan bersama. Pembaruan otomatis via <code>git pull</code> dinonaktifkan pada lingkungan ini.
+                        </p>
+                        <div class="bg-white p-3 rounded border small">
+                            <strong class="text-dark"><i class="fa-solid fa-lightbulb text-warning me-1"></i> Panduan Pembaruan Aplikasi di InfinityFree:</strong>
+                            <ol class="mb-0 ps-3 mt-1 text-muted">
+                                <li>Unggah berkas kode terbaru ke direktori hosting (<code>htdocs</code>) menggunakan <strong>FileZilla (FTP)</strong> atau <strong>cPanel File Manager</strong>.</li>
+                                <li>Klik tombol <strong class="text-primary"><i class="fa-solid fa-database"></i> Migrasi DB</strong> di atas untuk memperbarui tabel database secara otomatis tanpa memerlukan terminal SSH.</li>
+                                <li>Klik tombol <strong class="text-secondary"><i class="fa-solid fa-broom"></i> Bersihkan Cache</strong> agar seluruh view dan konfigurasi baru langsung aktif.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        @endif
+
         <!-- Remote Information -->
         <div class="p-3 bg-light rounded-3 border mb-4">
             <div class="row g-3 align-items-center">
@@ -109,11 +142,15 @@
                     </div>
                 </div>
                 <div class="col-md-5 text-md-end">
-                    <span class="small text-muted d-block mb-1">Pesan Commit Terakhir:</span>
-                    <span class="badge bg-secondary text-wrap" style="font-size: 0.8rem;">
+                    <span class="small text-muted d-block mb-1">Status Git & Commit Terakhir:</span>
+                    <span class="badge {{ $isGitAvailable ? 'bg-secondary' : 'bg-warning text-dark' }} text-wrap" style="font-size: 0.8rem;">
                         {{ $lastCommitMsg ?: 'Belum ada commit' }}
                     </span>
-                    <div class="small text-muted mt-1">{{ $lastCommitDate }} oleh {{ $lastCommitAuthor }}</div>
+                    @if($isGitAvailable && $lastCommitAuthor !== '-')
+                        <div class="small text-muted mt-1">{{ $lastCommitDate }} oleh {{ $lastCommitAuthor }}</div>
+                    @else
+                        <div class="small text-muted mt-1">{{ $gitVersion }}</div>
+                    @endif
                 </div>
             </div>
         </div>
@@ -142,11 +179,11 @@
                     </div>
                 </div>
             </div>
-        @else
-            <!-- Action Box if no update triggered yet -->
+        @elseif($isGitAvailable)
+            <!-- Action Box if Git is available -->
             <div class="p-4 rounded-3 border text-center mb-4" style="background: #fafafa;">
                 <i class="fa-solid fa-shield-halved fs-1 text-success mb-3"></i>
-                <h5 class="fw-bold text-dark">Alur Pembaruan Sistem Aman (5 Tahap Atomik)</h5>
+                <h5 class="fw-bold text-dark">Alur Pembaruan Sistem Otomatis (5 Tahap Atomik)</h5>
                 <p class="text-muted small mx-auto mb-3" style="max-width: 600px;">
                     Sistem pembaruan ini menjalankan pipeline otomatis: mengaktifkan mode pemeliharaan, menarik perubahan dari GitHub, menjalankan migrasi basis data, membersihkan seluruh cache, dan mengaktifkan kembali aplikasi tanpa risiko desinkronisasi.
                 </p>
@@ -158,13 +195,36 @@
                     </button>
                 </form>
             </div>
+        @else
+            <!-- Action Box for Shared Hosting -->
+            <div class="p-4 rounded-3 border text-center mb-4" style="background: #fafafa;">
+                <i class="fa-solid fa-server fs-1 text-primary mb-3"></i>
+                <h5 class="fw-bold text-dark">Pemeliharaan Aplikasi Mandiri (Shared Hosting)</h5>
+                <p class="text-muted small mx-auto mb-3" style="max-width: 600px;">
+                    Anda dapat menjalankan migrasi database dan membersihkan cache aplikasi sewaktu-waktu secara langsung melalui tombol di bawah tanpa perlu terminal command line.
+                </p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <form action="{{ route('settings.update.migrate') }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-primary px-4 py-2">
+                            <i class="fa-solid fa-database me-2"></i> Jalankan Migrasi Database
+                        </button>
+                    </form>
+                    <form action="{{ route('settings.update.clear-cache') }}" method="POST" class="d-inline">
+                        @csrf
+                        <button type="submit" class="btn btn-outline-secondary px-4 py-2">
+                            <i class="fa-solid fa-broom me-2"></i> Bersihkan Seluruh Cache
+                        </button>
+                    </form>
+                </div>
+            </div>
         @endif
 
         <!-- Log Output Terminal (If Available) -->
         @if(session('update_log'))
             <div class="mt-4">
                 <h6 class="fw-bold text-dark mb-2">
-                    <i class="fa-solid fa-terminal text-muted me-1"></i> Riwayat Eksekusi Log Pembaruan:
+                    <i class="fa-solid fa-terminal text-muted me-1"></i> Riwayat Eksekusi Log:
                 </h6>
                 <div class="p-3 rounded-3 text-light" style="background-color: #0f172a; font-family: 'Courier New', monospace; font-size: 0.85rem; max-height: 350px; overflow-y: auto;">
                     <pre class="m-0" style="color: #38bdf8;">{{ session('update_log') }}</pre>

@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings/update', [SystemUpdateController::class, 'index'])->name('settings.update.index');
         Route::post('/settings/update/check', [SystemUpdateController::class, 'check'])->name('settings.update.check');
         Route::post('/settings/update/execute', [SystemUpdateController::class, 'execute'])->name('settings.update.execute');
+        Route::post('/settings/update/migrate', [SystemUpdateController::class, 'migrateDb'])->name('settings.update.migrate');
         Route::post('/settings/update/clear-cache', [SystemUpdateController::class, 'clearCache'])->name('settings.update.clear-cache');
 
         // User Management
