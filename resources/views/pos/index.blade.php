@@ -462,7 +462,7 @@
         border-top-left-radius: 24px !important;
         border-top-right-radius: 24px !important;
         box-shadow: none !important;
-        z-index: 1040 !important;
+        z-index: 1055 !important;
     }
 
     .pos-cart-bottom-sheet.show {
@@ -1314,10 +1314,91 @@
         calculateScreenChange();
     }
 
+    // Desktop Checkout: Open Focused Popup Modal
+    function openCheckoutModal() {
+        if (cart.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Keranjang Kosong',
+                text: 'Silakan pilih minimal 1 menu sebelum melakukan pembayaran.',
+                confirmButtonColor: '#11361b'
+            });
+            return;
+        }
+
+        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        document.getElementById('checkoutModalTotal').textContent = formatRupiah(grandTotal);
+
+        // Reset modal inputs
+        document.getElementById('cashTenderedInput').value = '';
+        document.getElementById('posCustomerName').value = '';
+        document.getElementById('posNotes').value = '';
+        document.getElementById('payMethodCash').checked = true;
+        document.getElementById('sectionCashPayment').style.display = 'block';
+
+        calculateChange();
+        checkoutModal.show();
+
+        setTimeout(() => {
+            document.getElementById('cashTenderedInput')?.focus();
+        }, 400);
+    }
+
+    // Modal Quick Cash Helper
+    function setQuickCash(val) {
+        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const cashInput = document.getElementById('cashTenderedInput');
+        if (val === 'pas') {
+            cashInput.value = grandTotal;
+        } else {
+            cashInput.value = val;
+        }
+        calculateChange();
+    }
+
+    // Modal Change Calculator
+    function calculateChange() {
+        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const cashInput = document.getElementById('cashTenderedInput');
+        const cashTendered = parseFloat(cashInput?.value) || 0;
+        const change = cashTendered - grandTotal;
+
+        const changeTextEl = document.getElementById('changeAmountText');
+        if (!changeTextEl) return;
+
+        if (change >= 0) {
+            changeTextEl.textContent = formatRupiah(change);
+            changeTextEl.className = 'fs-4 fw-bold text-success';
+        } else {
+            changeTextEl.textContent = `Uang Kurang (${formatRupiah(Math.abs(change))})`;
+            changeTextEl.className = 'fs-5 fw-bold text-danger';
+        }
+    }
+    document.getElementById('cashTenderedInput')?.addEventListener('input', calculateChange);
+
+    // Modal Payment Method Radio Change
+    document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            const cashSection = document.getElementById('sectionCashPayment');
+            if (this.value === 'tunai') {
+                cashSection.style.display = 'block';
+                document.getElementById('cashTenderedInput').focus();
+            } else {
+                cashSection.style.display = 'none';
+            }
+        });
+    });
+
     // Wire Up Checkout Buttons
     document.getElementById('btnMobileGoToCheckout')?.addEventListener('click', showCheckoutView);
     document.getElementById('btnSheetProceedPayment')?.addEventListener('click', showCheckoutView);
-    document.getElementById('btnOpenCheckout')?.addEventListener('click', showCheckoutView);
+    document.getElementById('btnOpenCheckout')?.addEventListener('click', function() {
+        if (window.innerWidth >= 992) {
+            openCheckoutModal();
+        } else {
+            showCheckoutView();
+        }
+    });
     document.getElementById('btnBackToCatalog')?.addEventListener('click', showCatalogView);
 
     // Screen Payment Method Radio Change
@@ -1709,11 +1790,15 @@
             e.preventDefault();
             document.getElementById('posSearchInput')?.focus();
         }
-        // F9 to open checkout
+        // F9 to open checkout (Modal on desktop, Dedicated Screen on mobile)
         if (e.key === 'F9') {
             e.preventDefault();
             if (cart.length > 0) {
-                document.getElementById('btnOpenCheckout')?.click();
+                if (window.innerWidth >= 992) {
+                    openCheckoutModal();
+                } else {
+                    showCheckoutView();
+                }
             }
         }
     });

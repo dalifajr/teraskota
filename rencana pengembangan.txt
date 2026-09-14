@@ -1,6 +1,7 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
 1. menu Pembayaran Transaksi pada perangkat desktop buat tetap menjadi popup.
+2. elemen <div class="offcanvas-backdrop fade show"></div> menghalangi tombol bayar dan lain-lain. mungkin karena pelevelannya yang salah.
 
 
 
