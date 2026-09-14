@@ -1,10 +1,8 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. menu update sistem error 'git' is not recognized as an internal or external command, operable program or batch file.
-2. saya akan mengunggah aplikasi website ini pada cpanel infinityfree apakah bisa command git dijalankan?
-3. buat laman admin menjadi responsif pada perangkat smartphone, tambahkan navbar dll yang mempermudah penggunakan pada perangkat berlayar kecil. kecuali untuk halaman POS. halaman pos harus dibuka dalam mode desktop/landscape.
-4. buat seluruh tabel pada aplikasi ini dapat digulir ke kanan dan kiri.
-5. error gagal memproses transaksi 404 pada mode pos
+1. elemen body > main > aside pada pos ketika dibuka pada perangkat mobile sebaiknya muncul ketika user memilih menu yang dijual. elemen tersebut digantikan dengan tombol bayar yang melayang dengan tombol keranjang dengan dot angka pesanan disampingnya yang menyatu. ketika tombol keranjang dibuka akan muncul tampilan slide card dari bawah ke atas dengan animasi yang halus menampilkan daftar menu yang ditambahkan ke keranjang. ketika tombol bayar diklik maka akan mengarahkan user ke laman bayar bukan popup.
+
+2. 
 
 
 catat untuk kamu;

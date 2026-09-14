@@ -27,16 +27,11 @@
 </head>
 <body>
 
-    <!-- Sidebar -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-brand d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2 text-truncate">
-                <i class="fa-solid fa-mug-hot text-warning"></i>
-                <span class="text-truncate">Teras Kota</span>
-            </div>
-            <button type="button" class="btn btn-sm text-white d-lg-none p-1" id="sidebarCloseBtn" aria-label="Tutup Menu">
-                <i class="fa-solid fa-xmark fs-5"></i>
-            </button>
+    <!-- Desktop Sidebar (Visible on >= 992px) -->
+    <div class="sidebar d-none d-lg-block" id="sidebar">
+        <div class="sidebar-brand d-flex align-items-center gap-2 text-truncate">
+            <i class="fa-solid fa-mug-hot text-warning"></i>
+            <span class="text-truncate">Teras Kota</span>
         </div>
         <ul class="sidebar-menu">
             <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
@@ -111,19 +106,110 @@
         </ul>
     </div>
 
-    <!-- Sidebar Mobile Backdrop -->
-    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+    <!-- Mobile Offcanvas Drawer (< 992px) -->
+    <div class="offcanvas offcanvas-start offcanvas-sidebar d-lg-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+        <div class="offcanvas-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 text-white">
+                <i class="fa-solid fa-mug-hot text-warning fs-4"></i>
+                <span class="fw-bold fs-5" id="sidebarOffcanvasLabel">Teras Kota</span>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+        </div>
+        <div class="offcanvas-body">
+            <!-- Mini User Card -->
+            <div class="offcanvas-user-card">
+                <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()?->name ?? 'User') }}&background=11361b&color=ffffff" alt="Avatar" class="offcanvas-user-avatar">
+                <div class="text-truncate">
+                    <div class="fw-bold text-white text-truncate">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
+                    <small class="text-warning text-uppercase fw-bold" style="font-size: 0.7rem; letter-spacing: 0.5px;">{{ Auth::user()?->role ?? 'User' }}</small>
+                </div>
+            </div>
+
+            <!-- Full Navigation Menu -->
+            <ul class="sidebar-menu mb-0">
+                <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
+                    <a href="{{ route('dashboard') }}" class="sidebar-link">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <span>Dashboard</span>
+                    </a>
+                </li>
+                <li class="sidebar-item mb-2">
+                    <a href="{{ route('pos.index') }}" class="sidebar-link btn-light-accent text-dark fw-bold py-2 shadow-sm" target="_blank">
+                        <i class="fa-solid fa-cash-register text-success"></i>
+                        <span>Buka Kasir POS <i class="fa-solid fa-arrow-up-right-from-square small ms-1"></i></span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('transactions.index') || Request::routeIs('transactions.show') || Request::routeIs('transactions.edit') ? 'active' : '' }}">
+                    <a href="{{ route('transactions.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-history"></i>
+                        <span>Riwayat Transaksi</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
+                    <a href="{{ route('menus.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-coffee"></i>
+                        <span>Data Menu</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('categories.*') ? 'active' : '' }}">
+                    <a href="{{ route('categories.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-tags"></i>
+                        <span>Kategori</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('reports.*') ? 'active' : '' }}">
+                    <a href="{{ route('reports.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                        <span>Laporan</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('settings.profit.*') ? 'active' : '' }}">
+                    <a href="{{ route('settings.profit.edit') }}" class="sidebar-link">
+                        <i class="fa-solid fa-percent"></i>
+                        <span>Pengaturan Profit</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('users.*') ? 'active' : '' }}">
+                    <a href="{{ route('users.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <span>Kelola Pengguna</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('settings.update.*') ? 'active' : '' }}">
+                    <a href="{{ route('settings.update.index') }}" class="sidebar-link">
+                        <i class="fa-brands fa-github"></i>
+                        <span>Update Sistem</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('profile.edit') ? 'active' : '' }}">
+                    <a href="{{ route('profile.edit') }}" class="sidebar-link">
+                        <i class="fa-solid fa-user-gear"></i>
+                        <span>Profil Akun</span>
+                    </a>
+                </li>
+                <li class="sidebar-item mt-3 pt-3 border-top border-white border-opacity-10">
+                    <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="sidebar-link text-danger">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Logout</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
 
     <!-- Main Wrapper -->
     <div class="main-wrapper">
         
-        <!-- Top Navbar -->
+        <!-- Top Sticky Navbar -->
         <div class="top-navbar">
             <div class="d-flex align-items-center">
-                <button class="btn btn-outline-secondary d-lg-none me-2" id="sidebarToggle" aria-label="Buka Menu">
+                <button class="btn btn-outline-secondary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Buka Menu">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-                <h4 class="m-0 fw-semibold text-dark text-truncate">@yield('page_title', 'Teras Kota Berlian Makmur')</h4>
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-mug-hot text-success d-lg-none"></i>
+                    <h4 class="m-0 fw-semibold text-dark text-truncate">@yield('page_title', 'Teras Kota Berlian Makmur')</h4>
+                </div>
             </div>
             
             <div class="d-flex align-items-center gap-2 gap-sm-3">
@@ -179,8 +265,8 @@
             </div>
         </footer>
 
-        <!-- Mobile Bottom Navigation Bar (Visible only on < 768px) -->
-        <nav class="mobile-bottom-nav d-md-none">
+        <!-- Mobile Bottom Navigation Bar (Visible on < 992px) -->
+        <nav class="mobile-bottom-nav d-lg-none">
             <a href="{{ route('dashboard') }}" class="mobile-nav-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
                 <i class="fa-solid fa-chart-line"></i>
                 <span>Dashboard</span>
@@ -199,40 +285,22 @@
                 <i class="fa-solid fa-clock-rotate-left"></i>
                 <span>Transaksi</span>
             </a>
-            <a href="javascript:void(0)" class="mobile-nav-item" id="mobileSidebarToggle">
+            <button type="button" class="mobile-nav-item" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas" aria-controls="sidebarOffcanvas" aria-label="Menu Lengkap">
                 <i class="fa-solid fa-bars"></i>
                 <span>Lainnya</span>
-            </a>
+            </button>
         </nav>
     </div>
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Sidebar Toggle & Mobile Scripts -->
+    <!-- Service Worker Registration -->
     <script>
-        const sidebarEl = document.getElementById('sidebar');
-        const backdropEl = document.getElementById('sidebarBackdrop');
-
-        function toggleSidebar() {
-            sidebarEl?.classList.toggle('active');
-            backdropEl?.classList.toggle('active');
-        }
-
-        function closeSidebar() {
-            sidebarEl?.classList.remove('active');
-            backdropEl?.classList.remove('active');
-        }
-
-        document.getElementById('sidebarToggle')?.addEventListener('click', toggleSidebar);
-        document.getElementById('mobileSidebarToggle')?.addEventListener('click', toggleSidebar);
-        document.getElementById('sidebarCloseBtn')?.addEventListener('click', closeSidebar);
-        backdropEl?.addEventListener('click', closeSidebar);
-
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', function () {
                 navigator.serviceWorker
-                    .register('/service-worker.js')
+                    .register("{{ asset('service-worker.js') }}")
                     .then(function (registration) {
                         console.log('Service Worker terdaftar:', registration.scope);
                     })
