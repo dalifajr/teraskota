@@ -1,12 +1,10 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. saya ingin agar aplikasi ini memiliki 2 user, user admin dan kasir pos.
-2. sesuai nama, user kasir pos bertugas untuk melayani pembayaran transaksi
-3. user admin bertugas untuk mengelola data menu, kategori, laporan, dan profit 
-4. saya ingin agar user pos memiliki tampilan dedicated untuk menunjang fungsionalitasnya sebagai kasir.
-5. identifikasi kelengkapan fitur berdasarkan best practices pada aplikasi sejenis
-6. berikan sentuhan animasi, baik pada transisi, loading, popup dll.
-7. tambahkan fitur update sistem, dimana menu tersebut berguna untuk mengupdate keseluruhan website diambil dari repositori github. jadi silakan lakukan git init pada folder teraskota dan uploadlah ke remote ini https://github.com/dalifajr/teraskota.git.
+1. menu update sistem error 'git' is not recognized as an internal or external command, operable program or batch file.
+2. saya akan mengunggah aplikasi website ini pada cpanel infinityfree apakah bisa command git dijalankan?
+3. buat laman admin menjadi responsif pada perangkat smartphone, tambahkan navbar dll yang mempermudah penggunakan pada perangkat berlayar kecil. kecuali untuk halaman POS. halaman pos harus dibuka dalam mode desktop/landscape.
+4. buat seluruh tabel pada aplikasi ini dapat digulir ke kanan dan kiri.
+5. error gagal memproses transaksi 404 pada mode pos
 
 
 catat untuk kamu;

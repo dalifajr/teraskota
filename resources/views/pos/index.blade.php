@@ -661,15 +661,19 @@
     // Render Cart HTML & Calculations
     function renderCart() {
         const cartList = document.getElementById('posCartList');
-        const emptyState = document.getElementById('posCartEmpty');
         const countText = document.getElementById('cartItemCountText');
         const totalQtyEl = document.getElementById('posTotalQty');
         const grandTotalEl = document.getElementById('posGrandTotal');
         const payBtn = document.getElementById('btnOpenCheckout');
 
         if (cart.length === 0) {
-            cartList.innerHTML = '';
-            cartList.appendChild(emptyState);
+            cartList.innerHTML = `
+                <div class="text-center py-5 text-muted" id="posCartEmpty">
+                    <i class="fa-solid fa-basket-shopping fs-1 mb-3 text-secondary opacity-50"></i>
+                    <h6 class="fw-semibold text-secondary">Keranjang Kosong</h6>
+                    <p class="small text-muted mb-0">Klik menu di katalog sebelah kiri untuk menambahkan pesanan.</p>
+                </div>
+            `;
             countText.textContent = '0 item';
             totalQtyEl.textContent = '0 pcs';
             grandTotalEl.textContent = 'Rp0';

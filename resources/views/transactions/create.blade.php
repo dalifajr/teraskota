@@ -192,7 +192,6 @@
 
     function renderCart() {
         const container = document.getElementById('cartContainer');
-        const emptyState = document.getElementById('cartEmptyState');
         const hiddenInputs = document.getElementById('hiddenInputs');
         
         // Reset view
@@ -200,7 +199,13 @@
         hiddenInputs.innerHTML = '';
 
         if (cart.length === 0) {
-            container.appendChild(emptyState);
+            container.innerHTML = `
+                <div class="text-center text-muted py-5" id="cartEmptyState">
+                    <i class="fa-solid fa-cart-shopping fs-1 mb-3 text-secondary"></i>
+                    <p class="m-0">Keranjang masih kosong</p>
+                    <small>Klik menu di katalog untuk menambahkan</small>
+                </div>
+            `;
             document.getElementById('totalQtyVal').innerText = '0 pcs';
             document.getElementById('estimatedCostVal').innerText = 'Rp0';
             document.getElementById('totalProfitVal').innerText = 'Rp0';
