@@ -1,0 +1,15 @@
+RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
+
+1. saya ingin agar aplikasi ini memiliki 2 user, user admin dan kasir pos.
+2. sesuai nama, user kasir pos bertugas untuk melayani pembayaran transaksi
+3. user admin bertugas untuk mengelola data menu, kategori, laporan, dan profit 
+4. saya ingin agar user pos memiliki tampilan dedicated untuk menunjang fungsionalitasnya sebagai kasir.
+5. identifikasi kelengkapan fitur berdasarkan best practices pada aplikasi sejenis
+6. berikan sentuhan animasi, baik pada transisi, loading, popup dll.
+7. tambahkan fitur update sistem, dimana menu tersebut berguna untuk mengupdate keseluruhan website diambil dari repositori github. jadi silakan lakukan git init pada folder teraskota dan uploadlah ke remote ini https://github.com/dalifajr/teraskota.git.
+
+
+catat untuk kamu;
+- lakukan brainstroming sebelum melakukan eksekusi, tak lupa pula lakukan analisa kritik dan saran.
+- pastikan untuk melakukan test pada setiap perubahan yang kamu buat. agar tidak ada error yang terlewatkan.
+- jangan pernah ragu untuk meminta arahan lebih detail.

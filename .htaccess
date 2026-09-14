@@ -1,0 +1,11 @@
+RewriteEngine On
+
+# Paksa HTTPS
+RewriteCond %{HTTPS} !=on
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Aktifkan ini jika aplikasi menggunakan storage/app/public
+RewriteRule ^storage/(.*)$ /storage/app/public/$1 [END]
+
+# Arahkan seluruh request ke folder public Laravel
+RewriteRule (.*) /public/$1 [L]
