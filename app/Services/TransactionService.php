@@ -44,6 +44,16 @@ class TransactionService
      */
     public function createTransaction(array $data, int $userId): Transaction
     {
+        // Idempotency check: if sync_id already exists, return existing transaction
+        if (!empty($data['sync_id'])) {
+            $existing = Transaction::where('sync_id', $data['sync_id'])
+                ->with(['details', 'cashier'])
+                ->first();
+            if ($existing) {
+                return $existing;
+            }
+        }
+
         return DB::transaction(function () use ($data, $userId) {
             $transactionDate = $data['transaction_date'];
             $transactionTime = $data['transaction_time'] ?? now()->format('H:i:s');
@@ -53,6 +63,7 @@ class TransactionService
 
             // Create placeholder transaction
             $transaction = Transaction::create([
+                'sync_id' => $data['sync_id'] ?? null,
                 'transaction_number' => $transactionNumber,
                 'transaction_date' => $transactionDate,
                 'transaction_time' => $transactionTime,
@@ -60,6 +71,9 @@ class TransactionService
                 'total_sales' => 0,
                 'total_profit' => 0,
                 'estimated_cost' => 0,
+                'source_device_id' => $data['source_device_id'] ?? null,
+                'sync_status' => $data['sync_status'] ?? 'synced',
+                'synced_at' => $data['synced_at'] ?? now(),
                 'notes' => $data['notes'] ?? null,
                 'created_by' => $userId,
             ]);

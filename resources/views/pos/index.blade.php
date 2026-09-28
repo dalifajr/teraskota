@@ -1449,8 +1449,8 @@
     }
     document.getElementById('screenCashInput')?.addEventListener('input', calculateScreenChange);
 
-    // Shared Process Payment Checkout Function
-    function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn) {
+    // Shared Process Payment Checkout Function (Offline-First Universal Architecture)
+    async function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn) {
         const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
         if (paymentMethod === 'tunai') {
@@ -1465,82 +1465,85 @@
             }
         }
 
-        const payload = {
-            items: cart.map(i => ({ menu_id: i.id, quantity: i.qty })),
-            payment_method: paymentMethod,
-            cash_tendered: paymentMethod === 'tunai' ? cashTendered : grandTotal,
-            customer_name: customerName,
-            notes: notes,
-        };
-
         const originalBtnHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Memproses...';
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
 
-        fetch("{{ route('pos.checkout') }}", {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': csrfToken,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        })
-        .then(async res => {
-            if (!res.ok) {
-                if (res.status === 419) {
-                    throw new Error('Sesi atau token CSRF telah kedaluwarsa. Silakan muat ulang (refresh) halaman.');
-                }
-                const errData = await res.json().catch(() => null);
-                if (errData) {
-                    let errMsg = errData.message || 'Gagal memproses transaksi.';
-                    if (errData.errors) {
-                        const errList = Object.values(errData.errors).flat();
-                        if (errList.length > 0) errMsg = errList[0];
-                    }
-                    throw new Error(errMsg);
-                }
-                throw new Error(`Server mengembalikan respon error (Status ${res.status}).`);
+        try {
+            const syncId = (crypto.randomUUID ? crypto.randomUUID() : 'offline-' + Date.now());
+            const deviceId = await OfflineDB.getDeviceId();
+            const now = new Date();
+            const txDate = now.toISOString().split('T')[0];
+            const txTime = now.toTimeString().split(' ')[0];
+            const cashGiven = paymentMethod === 'tunai' ? cashTendered : grandTotal;
+            const changeRet = Math.max(0, cashGiven - grandTotal);
+
+            const localTx = {
+                sync_id: syncId,
+                source_device_id: deviceId,
+                transaction_date: txDate,
+                transaction_time: txTime,
+                payment_method: paymentMethod,
+                cash_tendered: cashGiven,
+                change_returned: changeRet,
+                customer_name: customerName || null,
+                notes: notes || null,
+                total_quantity: cart.reduce((sum, item) => sum + item.qty, 0),
+                total_sales: grandTotal,
+                cashier_name: "{{ Auth::user()->name }}",
+                items: cart.map(i => ({
+                    menu_id: i.id,
+                    name: i.name,
+                    price: i.price,
+                    quantity: i.qty,
+                    subtotal: i.price * i.qty,
+                })),
+                details: cart.map(i => ({
+                    menu_id: i.id,
+                    menu_name_snapshot: i.name,
+                    price_snapshot: i.price,
+                    quantity: i.qty,
+                    subtotal: i.price * i.qty,
+                })),
+                sync_status: 'pending_sync'
+            };
+
+            // 1. Simpan durable di IndexedDB
+            const savedTx = await OfflineDB.saveTransaction(localTx);
+            window.currentReceiptTransaction = savedTx;
+
+            // 2. Render struk instan (offline receipt generator)
+            showCatalogView();
+            checkoutModal.hide();
+
+            const receiptBody = document.getElementById('receiptModalBody');
+            if (receiptBody) {
+                receiptBody.innerHTML = ReceiptRenderer.renderHTML(savedTx);
             }
-            return res.json();
-        })
-        .then(data => {
+            receiptModal.show();
+
+            // 3. Reset keranjang
+            cart = [];
+            renderCart();
+
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnHtml;
 
-            if (data.success) {
-                // Return screen back to catalog view
-                showCatalogView();
-                checkoutModal.hide();
+            // 4. Update badge antrean & jalankan sync di background jika online
+            await SyncManager.updateQueueBadge();
+            SyncManager.triggerSync();
 
-                // Show receipt modal with generated HTML
-                document.getElementById('receiptModalBody').innerHTML = data.receipt_html;
-                receiptModal.show();
-
-                // Clear active cart safely
-                cart = [];
-                renderCart();
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal Memproses Transaksi',
-                    text: data.message || 'Terjadi kesalahan pada sistem.',
-                    confirmButtonColor: '#11361b'
-                });
-            }
-        })
-        .catch(err => {
+        } catch (err) {
             submitBtn.disabled = false;
             submitBtn.innerHTML = originalBtnHtml;
-
-            const isConnectionErr = err.name === 'TypeError' && err.message.includes('fetch');
+            console.error('[POS] Local checkout error:', err);
             Swal.fire({
                 icon: 'error',
-                title: isConnectionErr ? 'Error Koneksi' : 'Gagal Memproses Transaksi',
-                text: isConnectionErr ? 'Gagal menghubungi server. Periksa jaringan Anda.' : err.message,
+                title: 'Gagal Menyimpan Transaksi',
+                text: err.message || 'Terjadi kesalahan pada database lokal perangkat.',
                 confirmButtonColor: '#11361b'
             });
-        });
+        }
     }
 
     // Submit Payment from Dedicated Screen
@@ -1563,136 +1566,15 @@
         executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this);
     });
 
-    // Print Receipt Button in Modal (Isolated Hidden Iframe Method)
+    // Print Receipt Button in Modal (Offline-Compatible Thermal Printing)
     document.getElementById('btnPrintReceiptBtn')?.addEventListener('click', function() {
-        const receiptCard = document.getElementById('printableReceipt');
-        if (!receiptCard) {
-            window.print();
+        if (window.currentReceiptTransaction && window.ReceiptRenderer) {
+            ReceiptRenderer.printReceipt(window.currentReceiptTransaction);
             return;
         }
 
-        const printFrame = document.getElementById('receiptPrintFrame');
-        if (!printFrame) {
-            window.print();
-            return;
-        }
-
-        try {
-            const frameDoc = printFrame.contentDocument || printFrame.contentWindow.document;
-            frameDoc.open();
-            frameDoc.write(`
-                <!DOCTYPE html>
-                <html lang="id">
-                <head>
-                    <meta charset="UTF-8">
-                    <title>Struk Pembayaran</title>
-                    <style>
-                        * {
-                            margin: 0;
-                            padding: 0;
-                            box-sizing: border-box;
-                            font-family: 'Courier New', Courier, monospace !important;
-                            font-size: 12px;
-                            color: #000000;
-                        }
-                        body {
-                            width: 80mm;
-                            margin: 0 auto;
-                            padding: 2mm 3mm;
-                            background: #ffffff;
-                        }
-                        .receipt-card {
-                            width: 100% !important;
-                            max-width: 80mm !important;
-                            background: #ffffff;
-                            padding: 0 !important;
-                            box-shadow: none !important;
-                            border: none !important;
-                        }
-                        .receipt-header {
-                            text-align: center;
-                            margin-bottom: 8px;
-                            padding-bottom: 6px;
-                            border-bottom: 1px dashed #000000;
-                        }
-                        .receipt-header h1 {
-                            font-size: 14px;
-                            font-weight: bold;
-                            text-transform: uppercase;
-                            margin-bottom: 2px;
-                        }
-                        .receipt-header p {
-                            font-size: 10px;
-                            margin: 0;
-                        }
-                        .receipt-meta {
-                            margin-bottom: 8px;
-                            font-size: 11px;
-                            padding-bottom: 6px;
-                            border-bottom: 1px dashed #000000;
-                        }
-                        .receipt-row {
-                            display: flex;
-                            justify-content: space-between;
-                            margin-bottom: 2px;
-                        }
-                        .receipt-items {
-                            margin-bottom: 8px;
-                            padding-bottom: 6px;
-                            border-bottom: 1px dashed #000000;
-                        }
-                        .item-row {
-                            margin-bottom: 4px;
-                        }
-                        .item-name {
-                            font-weight: bold;
-                            font-size: 11px;
-                        }
-                        .item-calc {
-                            display: flex;
-                            justify-content: space-between;
-                            font-size: 11px;
-                        }
-                        .receipt-totals {
-                            margin-bottom: 8px;
-                            padding-bottom: 6px;
-                            border-bottom: 1px dashed #000000;
-                            font-size: 11px;
-                        }
-                        .receipt-totals .receipt-row.grand-total {
-                            font-size: 13px;
-                            font-weight: bold;
-                            margin: 3px 0;
-                            padding-top: 3px;
-                            border-top: 1px dotted #000000;
-                        }
-                        .receipt-footer {
-                            text-align: center;
-                            font-size: 10px;
-                            margin-top: 8px;
-                        }
-                        .no-print {
-                            display: none !important;
-                        }
-                        @page {
-                            size: 80mm auto;
-                            margin: 0;
-                        }
-                    </style>
-                </head>
-                <body>
-                    ${receiptCard.outerHTML}
-                </body>
-                </html>
-            `);
-            frameDoc.close();
-
-            setTimeout(() => {
-                printFrame.contentWindow.focus();
-                printFrame.contentWindow.print();
-            }, 250);
-        } catch (e) {
-            console.error('Iframe printing error:', e);
+        const receiptCard = document.getElementById('printableReceipt') || document.querySelector('#receiptModalBody .receipt-card');
+        if (receiptCard) {
             window.print();
         }
     });
@@ -1803,8 +1685,8 @@
         filterCatalog();
     }
 
-    // Cashier Summary Modal
-    document.getElementById('btnOpenSummary')?.addEventListener('click', function() {
+    // Cashier Summary Modal (Offline-First Hybrid: Server + Pending Local Transactions)
+    document.getElementById('btnOpenSummary')?.addEventListener('click', async function() {
         summaryModal.show();
         const bodyEl = document.getElementById('summaryModalBody');
         bodyEl.innerHTML = `
@@ -1814,76 +1696,243 @@
             </div>
         `;
 
-        fetch("{{ route('pos.summary') }}", {
-            headers: { 'Accept': 'application/json' }
-        })
-        .then(res => res.json())
-        .then(data => {
-            let trHtml = '';
-            if (data.transactions.length === 0) {
-                trHtml = '<tr><td colspan="4" class="text-center text-muted py-3">Belum ada transaksi hari ini</td></tr>';
-            } else {
-                data.transactions.slice(0, 5).forEach(t => {
-                    trHtml += `
-                        <tr>
-                            <td><small class="fw-bold">${t.transaction_number}</small></td>
-                            <td><small>${t.transaction_time.substring(0, 5)}</small></td>
-                            <td><span class="badge bg-secondary text-uppercase" style="font-size:0.7rem;">${t.payment_method || 'tunai'}</span></td>
-                            <td class="text-end fw-bold text-success">${formatRupiah(t.total_sales)}</td>
-                        </tr>
-                    `;
-                });
+        const todayDateStr = new Date().toISOString().split('T')[0];
+        let localTxs = [];
+        try {
+            if (window.OfflineDB) {
+                localTxs = await OfflineDB.getTodayTransactions(todayDateStr);
             }
+        } catch (e) {
+            console.warn('[Summary] Failed to load local transactions:', e);
+        }
 
-            bodyEl.innerHTML = `
-                <div class="mb-3 text-center">
-                    <h6 class="fw-bold text-dark mb-0">${data.cashier_name}</h6>
-                    <small class="text-muted">${data.date}</small>
-                </div>
+        const localPendingTxs = localTxs.filter(t => t.sync_status !== 'synced');
 
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded-3 text-center border">
-                            <small class="text-muted">Total Transaksi</small>
-                            <h4 class="fw-bold text-dark m-0">${data.total_transactions}</h4>
-                        </div>
+        // Fetch data server jika ada koneksi
+        let serverData = null;
+        try {
+            const res = await fetch("{{ route('pos.summary') }}", {
+                headers: { 'Accept': 'application/json' },
+                cache: 'no-store'
+            });
+            if (res.ok) {
+                serverData = await res.json();
+            }
+        } catch (e) {
+            // Berjalan dalam mode offline murni
+        }
+
+        let cashierName = "{{ Auth::user()->name }}";
+        let dateFormatted = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        let totalTransactions = 0;
+        let totalQty = 0;
+        let totalSales = 0;
+        let totalTunai = 0;
+        let totalNonTunai = 0;
+        let combinedRecent = [];
+
+        if (serverData) {
+            cashierName = serverData.cashier_name || cashierName;
+            dateFormatted = serverData.date || dateFormatted;
+            totalTransactions = Number(serverData.total_transactions || 0);
+            totalQty = Number(serverData.total_qty || 0);
+            totalSales = Number(serverData.total_sales || 0);
+            totalTunai = Number(serverData.total_tunai || 0);
+            totalNonTunai = Number(serverData.total_non_tunai || 0);
+            combinedRecent = Array.isArray(serverData.transactions) ? [...serverData.transactions] : [];
+        } else {
+            // Ringkasan murni offline dari IndexedDB
+            localTxs.forEach(t => {
+                totalTransactions++;
+                totalQty += Number(t.total_quantity || 0);
+                totalSales += Number(t.total_sales || 0);
+                if ((t.payment_method || 'tunai') === 'tunai') {
+                    totalTunai += Number(t.total_sales || 0);
+                } else {
+                    totalNonTunai += Number(t.total_sales || 0);
+                }
+            });
+        }
+
+        // Gabungkan transaksi pending yang belum masuk rekapan server
+        if (serverData && localPendingTxs.length > 0) {
+            localPendingTxs.forEach(lp => {
+                totalTransactions++;
+                totalQty += Number(lp.total_quantity || 0);
+                totalSales += Number(lp.total_sales || 0);
+                if ((lp.payment_method || 'tunai') === 'tunai') {
+                    totalTunai += Number(lp.total_sales || 0);
+                } else {
+                    totalNonTunai += Number(lp.total_sales || 0);
+                }
+                combinedRecent.unshift({
+                    transaction_number: lp.local_number || 'OFFLINE',
+                    transaction_time: lp.transaction_time || '--:--',
+                    payment_method: lp.payment_method || 'tunai',
+                    total_sales: lp.total_sales,
+                    is_pending: true
+                });
+            });
+        } else if (!serverData) {
+            combinedRecent = localTxs.map(lp => ({
+                transaction_number: lp.transaction_number || lp.local_number || 'OFFLINE',
+                transaction_time: lp.transaction_time || '--:--',
+                payment_method: lp.payment_method || 'tunai',
+                total_sales: lp.total_sales,
+                is_pending: lp.sync_status !== 'synced'
+            }));
+        }
+
+        let trHtml = '';
+        if (combinedRecent.length === 0) {
+            trHtml = '<tr><td colspan="4" class="text-center text-muted py-3">Belum ada transaksi hari ini</td></tr>';
+        } else {
+            combinedRecent.slice(0, 5).forEach(t => {
+                const pendingBadge = t.is_pending 
+                    ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Pending</span>' 
+                    : '';
+                trHtml += `
+                    <tr>
+                        <td><small class="fw-bold">${t.transaction_number || 'TRX-OFF'}${pendingBadge}</small></td>
+                        <td><small>${(t.transaction_time || '').substring(0, 5)}</small></td>
+                        <td><span class="badge bg-secondary text-uppercase" style="font-size:0.7rem;">${t.payment_method || 'tunai'}</span></td>
+                        <td class="text-end fw-bold text-success">${formatRupiah(t.total_sales)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        const pendingNotice = localPendingTxs.length > 0
+            ? `<div class="alert alert-warning py-2 px-3 mb-3 small d-flex align-items-center justify-content-between">
+                <span><i class="fa-solid fa-cloud-arrow-up me-1"></i> <strong>${localPendingTxs.length}</strong> transaksi lokal belum disinkronkan.</span>
+                <button type="button" class="btn btn-sm btn-dark py-0 px-2" onclick="SyncManager.triggerSync()">Sync Sekarang</button>
+               </div>`
+            : '';
+
+        bodyEl.innerHTML = `
+            <div class="mb-3 text-center">
+                <h6 class="fw-bold text-dark mb-0">${cashierName}</h6>
+                <small class="text-muted">${dateFormatted}</small>
+            </div>
+
+            ${pendingNotice}
+
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 text-center border">
+                        <small class="text-muted">Total Transaksi</small>
+                        <h4 class="fw-bold text-dark m-0">${totalTransactions}</h4>
                     </div>
-                    <div class="col-6">
-                        <div class="p-3 bg-light rounded-3 text-center border">
-                            <small class="text-muted">Produk Terjual</small>
-                            <h4 class="fw-bold text-dark m-0">${data.total_qty} pcs</h4>
-                        </div>
+                </div>
+                <div class="col-6">
+                    <div class="p-3 bg-light rounded-3 text-center border">
+                        <small class="text-muted">Produk Terjual</small>
+                        <h4 class="fw-bold text-dark m-0">${totalQty} pcs</h4>
                     </div>
                 </div>
+            </div>
 
-                <div class="p-3 rounded-3 text-white mb-3" style="background: var(--primary-green);">
-                    <small class="opacity-75">Total Penjualan Kasir Hari Ini</small>
-                    <h3 class="fw-bold m-0" style="color: var(--light-accent);">${formatRupiah(data.total_sales)}</h3>
-                    <div class="d-flex justify-content-between mt-2 pt-2 border-top border-white border-opacity-25 small opacity-90">
-                        <span>Tunai: ${formatRupiah(data.total_tunai)}</span>
-                        <span>Non-Tunai: ${formatRupiah(data.total_non_tunai)}</span>
-                    </div>
+            <div class="p-3 rounded-3 text-white mb-3" style="background: var(--primary-green);">
+                <small class="opacity-75">Total Penjualan Kasir Hari Ini</small>
+                <h3 class="fw-bold m-0" style="color: var(--light-accent);">${formatRupiah(totalSales)}</h3>
+                <div class="d-flex justify-content-between mt-2 pt-2 border-top border-white border-opacity-25 small opacity-90">
+                    <span>Tunai: ${formatRupiah(totalTunai)}</span>
+                    <span>Non-Tunai: ${formatRupiah(totalNonTunai)}</span>
                 </div>
+            </div>
 
-                <h6 class="fw-bold text-dark small mb-2">5 Transaksi Terakhir:</h6>
-                <div class="table-responsive border rounded-3">
-                    <table class="table table-sm table-striped mb-0">
-                        <thead>
-                            <tr class="table-light">
-                                <th>No. Nota</th>
-                                <th>Jam</th>
-                                <th>Metode</th>
-                                <th class="text-end">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>${trHtml}</tbody>
-                    </table>
-                </div>
-            `;
-        })
-        .catch(() => {
-            bodyEl.innerHTML = '<div class="alert alert-danger mb-0">Gagal memuat data ringkasan.</div>';
+            <h6 class="fw-bold text-dark small mb-2">5 Transaksi Terakhir:</h6>
+            <div class="table-responsive border rounded-3">
+                <table class="table table-sm table-striped mb-0">
+                    <thead>
+                        <tr class="table-light">
+                            <th>No. Nota</th>
+                            <th>Jam</th>
+                            <th>Metode</th>
+                            <th class="text-end">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>${trHtml}</tbody>
+                </table>
+            </div>
+        `;
+    });
+
+    // SyncManager Event: Auto-update receipt modal if open when transaction sync finishes
+    if (window.SyncManager) {
+        SyncManager.on('syncComplete', (data) => {
+            if (window.currentReceiptTransaction && data.results && Array.isArray(data.results)) {
+                const match = data.results.find(r => r.sync_id === window.currentReceiptTransaction.sync_id && r.status === 'synced');
+                if (match) {
+                    window.currentReceiptTransaction.sync_status = 'synced';
+                    window.currentReceiptTransaction.transaction_number = match.transaction_number;
+                    window.currentReceiptTransaction.server_id = match.server_id;
+                    const receiptBody = document.getElementById('receiptModalBody');
+                    const modalEl = document.getElementById('posReceiptModal');
+                    if (receiptBody && modalEl && modalEl.classList.contains('show')) {
+                        receiptBody.innerHTML = ReceiptRenderer.renderHTML(window.currentReceiptTransaction);
+                    }
+                }
+            }
         });
+    }
+
+    // Initialize Offline-First Engine on DOM Ready
+    document.addEventListener('DOMContentLoaded', async function() {
+        if (window.SyncManager) {
+            await SyncManager.init();
+        }
+
+        // Cache initial master data rendered by Blade into IndexedDB
+        if (window.OfflineDB) {
+            try {
+                const domCards = document.querySelectorAll('.pos-product-card');
+                if (domCards.length > 0) {
+                    const extractedMenus = [];
+                    domCards.forEach(card => {
+                        const id = Number(card.getAttribute('data-product-id'));
+                        const catId = Number(card.getAttribute('data-category-id'));
+                        const name = card.getAttribute('data-product-name');
+                        const price = parseFloat(card.getAttribute('data-product-price') || 0);
+                        if (id && name) {
+                            extractedMenus.push({
+                                id: id,
+                                category_id: catId,
+                                name: name,
+                                price: price,
+                                status: true
+                            });
+                        }
+                    });
+
+                    const domCats = document.querySelectorAll('.pos-cat-btn[data-category]');
+                    const extractedCats = [];
+                    domCats.forEach(btn => {
+                        const catVal = btn.getAttribute('data-category');
+                        if (catVal && catVal !== 'all') {
+                            extractedCats.push({
+                                id: Number(catVal),
+                                name: btn.textContent.trim(),
+                                status: true
+                            });
+                        }
+                    });
+
+                    if (extractedMenus.length > 0) {
+                        await OfflineDB.saveMasterData({
+                            categories: extractedCats,
+                            menus: extractedMenus,
+                            cashier: {
+                                name: "{{ Auth::user()->name }}",
+                                role: "{{ Auth::user()->role }}"
+                            }
+                        });
+                    }
+                }
+            } catch (err) {
+                console.warn('[POS] Failed to seed initial master data to IndexedDB:', err);
+            }
+        }
     });
 
     // Keyboard Shortcuts

@@ -10,6 +10,7 @@ class Transaction extends Model
     use SoftDeletes;
 
     protected $fillable = [
+        'sync_id',
         'transaction_number',
         'transaction_date',
         'transaction_time',
@@ -21,12 +22,16 @@ class Transaction extends Model
         'cash_tendered',
         'change_returned',
         'customer_name',
+        'source_device_id',
+        'sync_status',
+        'synced_at',
         'notes',
         'created_by',
     ];
 
     protected $casts = [
         'transaction_date' => 'date',
+        'synced_at' => 'datetime',
         'total_quantity' => 'integer',
         'total_sales' => 'decimal:2',
         'total_profit' => 'decimal:2',

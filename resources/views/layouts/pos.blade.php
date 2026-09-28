@@ -88,6 +88,35 @@
             border: 1px solid rgba(163, 230, 53, 0.3);
         }
 
+        .pos-badge-status {
+            padding: 0.35rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .pos-badge-status.online {
+            background: rgba(34, 197, 94, 0.2);
+            color: #86efac;
+            border: 1px solid rgba(34, 197, 94, 0.4);
+        }
+
+        .pos-badge-status.offline {
+            background: rgba(239, 68, 68, 0.25);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.5);
+            animation: pulse-offline 2s infinite;
+        }
+
+        @keyframes pulse-offline {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
         .pos-btn-nav {
             background: rgba(255, 255, 255, 0.12);
             color: #ffffff;
@@ -230,6 +259,12 @@
                 <i class="fa-solid fa-user-tag"></i>
                 <span>{{ Auth::user()->name }}</span>
             </div>
+
+            <!-- Network Status Badge -->
+            <div id="posNetworkBadge" class="pos-badge-status online" title="Status Jaringan POS">
+                <i class="fa-solid fa-wifi" id="posNetworkIcon"></i>
+                <span class="d-none d-sm-inline" id="posNetworkText">Online</span>
+            </div>
         </div>
 
         <!-- Middle: Digital Live Clock -->
@@ -242,6 +277,12 @@
 
         <!-- Right: Actions -->
         <div class="d-flex align-items-center gap-2">
+            <!-- Sync Queue Button -->
+            <button type="button" class="pos-btn-nav position-relative" id="btnSyncQueue" title="Antrean Sinkronisasi Transaksi">
+                <i class="fa-solid fa-cloud-arrow-up text-info" id="posSyncIcon"></i>
+                <span class="d-none d-sm-inline">Sync</span>
+                <span id="posSyncQueueBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="display: none; font-size: 0.7rem;">0</span>
+            </button>
             <!-- Summary Modal Button -->
             <button type="button" class="pos-btn-nav" id="btnOpenSummary" title="Ringkasan Penjualan Kasir Hari Ini">
                 <i class="fa-solid fa-chart-pie text-warning"></i>
@@ -324,7 +365,25 @@
                 }
             });
         });
+
+        // Register PWA Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then((reg) => {
+                        console.log('[PWA] Service Worker registered:', reg.scope);
+                    })
+                    .catch((err) => {
+                        console.warn('[PWA] Service Worker registration failed:', err);
+                    });
+            });
+        }
     </script>
+
+    <!-- Offline-First POS Engine Scripts -->
+    <script src="{{ asset('assets/js/offline-db.js') }}"></script>
+    <script src="{{ asset('assets/js/sync-manager.js') }}"></script>
+    <script src="{{ asset('assets/js/receipt.js') }}"></script>
 
     @yield('scripts')
 </body>

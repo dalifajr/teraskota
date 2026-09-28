@@ -34,6 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
     Route::get('/pos/receipt/{transaction}', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/pos/summary-today', [PosController::class, 'summaryToday'])->name('pos.summary');
+    Route::get('/pos/bootstrap', [\App\Http\Controllers\OfflineSyncController::class, 'bootstrap'])->name('pos.bootstrap');
+    Route::post('/pos/sync', [\App\Http\Controllers\OfflineSyncController::class, 'sync'])->name('pos.sync');
 
     // Profile Settings (Accessible by both Kasir and Admin)
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

@@ -1,13 +1,13 @@
 {
-    "id": "/",
-    "name": "Dashboard Penjualan Teras Kota",
-    "short_name": "Teras Kota",
-    "description": "Aplikasi pencatatan dan dashboard penjualan Teras Kota",
-    "start_url": "/",
+    "id": "/pos",
+    "name": "POS Kasir Teras Kota",
+    "short_name": "Teras Kota POS",
+    "description": "Terminal Kasir Offline-First Teras Kota Berlian Makmur",
+    "start_url": "/pos",
     "scope": "/",
     "display": "standalone",
-    "orientation": "portrait-primary",
-    "background_color": "#f8faf7",
+    "orientation": "any",
+    "background_color": "#14532d",
     "theme_color": "#14532d",
     "icons": [
         {
