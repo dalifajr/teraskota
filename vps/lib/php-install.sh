@@ -5,8 +5,8 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# Target PHP version — Ubuntu 26 ships 8.3, acceptable for Laravel 12 (requires ^8.2)
-TARGET_PHP="8.3"
+# Target PHP version — auto-detected below. Laravel 12 requires ^8.2
+TARGET_PHP=""
 
 # ── Required Extensions ──────────────────────────────────────────────────────
 # php-dom is bundled inside php-xml on Ubuntu
@@ -14,11 +14,24 @@ PHP_EXTENSIONS=(
     fpm mysql mbstring xml curl zip gd bcmath tokenizer fileinfo intl readline
 )
 
+# ── Detect available PHP version ─────────────────────────────────────────────
+# Scans apt-cache for php*-fpm packages, picks the highest version >= 8.2
+detect_available_php() {
+    local ver
+    # Search for available php-fpm packages in repo
+    for ver in 8.6 8.5 8.4 8.3 8.2; do
+        if apt-cache show "php${ver}-fpm" &>/dev/null 2>&1; then
+            echo "$ver"
+            return 0
+        fi
+    done
+    echo ""
+}
+
 # ── Strategy Selection ────────────────────────────────────────────────────────
 # Priority:
-#   1. Ubuntu default repo (PHP 8.3 on Ubuntu 26) — works on x86 AND arm64
+#   1. Ubuntu default repo — works on x86 AND arm64
 #   2. Sury APT direct (not PPA) — works on x86 AND arm64
-#   3. Ondrej PPA — x86 only, fallback
 select_php_source() {
     local arch codename
     arch=$(detect_arch)
@@ -26,15 +39,17 @@ select_php_source() {
 
     log_info "Arsitektur: ${arch}, Codename: ${codename}"
 
-    # Check if default repo has PHP 8.2+
-    if apt-cache show "php${TARGET_PHP}-fpm" &>/dev/null 2>&1; then
+    # Auto-detect available PHP version from default repos
+    TARGET_PHP=$(detect_available_php)
+
+    if [ -n "$TARGET_PHP" ]; then
         log_ok "PHP ${TARGET_PHP} tersedia di repo default Ubuntu"
         echo "default"
         return 0
     fi
 
-    # Sury direct (works on both architectures)
-    log_warn "PHP ${TARGET_PHP} tidak ada di repo default, mencoba Sury APT..."
+    # Nothing in default repo — try Sury
+    log_warn "PHP 8.2+ tidak ada di repo default, mencoba Sury APT..."
     echo "sury"
 }
 
@@ -74,7 +89,7 @@ setup_sury_repo() {
 
     # Sury may not support newest Ubuntu codenames yet — fallback to latest known
     local sury_codename="$codename"
-    local known_codenames=("focal" "jammy" "noble" "oracular" "plucky")
+    local known_codenames=("focal" "jammy" "noble" "oracular" "plucky" "resolute")
     local found=false
     for kc in "${known_codenames[@]}"; do
         if [ "$kc" = "$codename" ]; then
@@ -95,22 +110,26 @@ setup_sury_repo() {
     log_substep "Updating apt cache..."
     apt-get update -y 2>&1 | tail -1
 
-    # Verify PHP is now available
-    if apt-cache show "php${TARGET_PHP}-fpm" &>/dev/null 2>&1; then
-        log_ok "Sury repo berhasil ditambahkan"
+    # Re-detect PHP version after adding Sury repo
+    TARGET_PHP=$(detect_available_php)
+
+    if [ -n "$TARGET_PHP" ]; then
+        log_ok "Sury repo berhasil — PHP ${TARGET_PHP} tersedia"
         return 0
     else
-        log_error "PHP ${TARGET_PHP} tetap tidak tersedia setelah menambah Sury repo"
+        log_error "PHP 8.2+ tetap tidak tersedia setelah menambah Sury repo"
         return 1
     fi
 }
 
 # ── Install PHP + Extensions ──────────────────────────────────────────────────
 install_php() {
-    log_step "[3/7] Install PHP ${TARGET_PHP} + Extensions"
+    log_step "[3/7] Detect & Install PHP"
 
     local source
     source=$(select_php_source)
+
+    log_info "PHP version target: ${TARGET_PHP}"
 
     case "$source" in
         default)
