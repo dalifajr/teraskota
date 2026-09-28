@@ -7,6 +7,9 @@ RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
 periksa dependency dan package yang digunakan serta dibutubkan untuk menjalankan website, termasuk pula setup domain dan https. buatkan juga kontrol panel pada terminal vps untuk manajemen website seperti informasi website, serta command dan menu yang dibutuhkan seperti start, restart, stop, change domain, fix cert, update via github repo, dll.
 
+user installasi harus memberikan dialog kepada user untuk mengatur domain website.
+installasi php sering error pada 
+
 
 
 catat untuk kamu;

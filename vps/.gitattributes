@@ -1,0 +1,7 @@
+# Force LF line endings for all shell scripts in vps/
+# Critical: bash scripts with CRLF will fail on Linux
+
+*.sh text eol=lf
+teraskota-ctl text eol=lf
+*.cnf text eol=lf
+*.template text eol=lf
