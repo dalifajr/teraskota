@@ -1,0 +1,33 @@
+# Teras Kota POS - Low-Memory Database Tuning for 1GB RAM / 1 vCPU VPS
+# Compatible with MariaDB 10.x/11.x and MySQL 8.x (Ubuntu x86_64 & ARM64)
+
+[mysqld]
+# Disable Performance Schema to save ~300MB RAM (Essential for MySQL 8)
+performance_schema = OFF
+
+# InnoDB Memory Optimization
+innodb_buffer_pool_size = 128M
+innodb_log_buffer_size = 16M
+innodb_file_per_table = 1
+innodb_flush_log_at_trx_commit = 2
+innodb_flush_method = O_DIRECT
+
+# Connection & Thread Limits
+max_connections = 35
+thread_cache_size = 8
+table_open_cache = 300
+table_definition_cache = 300
+
+# Per-Thread Buffers (Low memory footprint)
+key_buffer_size = 16M
+sort_buffer_size = 512K
+read_buffer_size = 256K
+read_rnd_buffer_size = 512K
+join_buffer_size = 512K
+net_buffer_length = 16K
+max_allowed_packet = 32M
+
+# General limits
+tmp_table_size = 16M
+max_heap_table_size = 16M
+slow_query_log = 0
