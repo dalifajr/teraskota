@@ -28,7 +28,7 @@ long_query_time         = 2
 
 # ── Safety ────────────────────────────────────────────────────────────────────
 max_allowed_packet      = 16M
-skip_name_resolve       = 1
+# skip_name_resolve     = 1  # Disabled to avoid 1130 host issues on loopback/localhost
 
 # ── Character Set ─────────────────────────────────────────────────────────────
 character_set_server    = utf8mb4

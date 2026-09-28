@@ -224,7 +224,17 @@ CREATE DATABASE IF NOT EXISTS \`${db_name}\`
     COLLATE utf8mb4_unicode_ci;
 
 CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
 GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+
+CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';
+
+CREATE USER IF NOT EXISTS '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'::1';
+
 FLUSH PRIVILEGES;
 EOSQL
 
@@ -397,6 +407,33 @@ setup_application() {
     # Generate app key if missing
     if ! grep -q "^APP_KEY=base64:" .env 2>/dev/null; then
         php artisan key:generate --force
+    fi
+
+    # Ensure database user permissions (covers 127.0.0.1, localhost, ::1)
+    mariadb -u root <<-EOSQL 2>/dev/null || true
+CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';
+CREATE USER IF NOT EXISTS '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
+ALTER USER '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'::1';
+FLUSH PRIVILEGES;
+EOSQL
+
+    # Disable skip_name_resolve if present in tuning configs (fixes 1130 error)
+    local restart_mariadb=0
+    for cnf in /etc/mysql/mariadb.conf.d/99-teraskota.cnf /etc/mysql/mysql.conf.d/99-teraskota.cnf /etc/mysql/conf.d/99-teraskota.cnf; do
+        if [ -f "$cnf" ] && grep -q "^skip_name_resolve" "$cnf"; then
+            sed -i 's/^skip_name_resolve/# skip_name_resolve/' "$cnf"
+            restart_mariadb=1
+        fi
+    done
+    if [ "$restart_mariadb" -eq 1 ]; then
+        systemctl restart mariadb
     fi
 
     # Run migrations
