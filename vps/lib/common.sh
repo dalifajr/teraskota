@@ -2,6 +2,10 @@
 # language: bash, file: vps/lib/common.sh, target: Ubuntu 24/26 x86_64/arm64
 # Shared functions for Teras Kota VPS installer and control panel
 
+# Include guard — prevent double-source (readonly fails on re-declaration)
+[[ -n "${_TERASKOTA_COMMON_LOADED:-}" ]] && return 0
+_TERASKOTA_COMMON_LOADED=1
+
 set -euo pipefail
 
 # ── Colors ────────────────────────────────────────────────────────────────────
