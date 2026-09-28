@@ -234,13 +234,16 @@ cmd_update() {
     # Node build (if package.json changed or build dir missing)
     if [ ! -d "${TERASKOTA_ROOT}/public/build" ] || git diff HEAD~1 --name-only 2>/dev/null | grep -q "package"; then
         log_substep "Rebuilding assets..."
-        if check_command node; then
-            npm ci 2>&1 | tail -3
+        if ! check_command npm; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -2
+        fi
+        if check_command node && check_command npm; then
+            npm ci 2>&1 || npm install 2>&1 | tail -3
             npm run build 2>&1 | tail -3
             rm -rf node_modules
             log_ok "Assets rebuilt"
         else
-            log_warn "Node.js tidak tersedia — skip asset build"
+            log_warn "Node.js/npm tidak lengkap — skip asset build"
         fi
     fi
 

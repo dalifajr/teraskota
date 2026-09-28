@@ -10,15 +10,27 @@ NODE_MAJOR=20  # LTS
 install_node() {
     log_step "[6/7] Install Node.js ${NODE_MAJOR} LTS"
 
-    # Skip if already installed with correct version
+    # Skip if already installed with correct version AND npm is available
     if check_command node; then
         local current_major
         current_major=$(node -v 2>/dev/null | sed 's/v//' | cut -d. -f1)
         if [ "$current_major" -ge "$NODE_MAJOR" ] 2>/dev/null; then
             log_ok "Node.js $(node -v) sudah terinstall"
-            return 0
+
+            # Check if npm is also installed
+            if ! check_command npm; then
+                log_substep "Menginstall npm..."
+                DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -2
+            fi
+
+            if check_command npm; then
+                log_ok "npm $(npm -v) terinstall"
+                return 0
+            fi
+            log_warn "npm tidak ditemukan, melanjutkan setup repository Node.js..."
+        else
+            log_warn "Node.js $(node -v) terlalu lama, upgrade ke v${NODE_MAJOR}..."
         fi
-        log_warn "Node.js $(node -v) terlalu lama, upgrade ke v${NODE_MAJOR}..."
     fi
 
     # Install prerequisites
@@ -45,8 +57,8 @@ install_node() {
         # Fallback: try apt directly (Ubuntu may have nodejs in universe)
         log_warn "Fallback: install nodejs dari repo Ubuntu..."
         DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm 2>&1 | tail -1
-        if check_command node; then
-            log_ok "Node.js $(node -v) terinstall dari repo Ubuntu"
+        if check_command node && check_command npm; then
+            log_ok "Node.js $(node -v) dan npm $(npm -v) terinstall dari repo Ubuntu"
             return 0
         fi
         log_error "Semua metode instalasi Node.js gagal"
@@ -57,13 +69,17 @@ install_node() {
         > /etc/apt/sources.list.d/nodesource.list
 
     apt-get update -y 2>&1 | tail -1
-    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs 2>&1 | tail -1
+    DEBIAN_FRONTEND=noninteractive apt-get install -y nodejs npm 2>&1 | tail -1
 
-    if check_command node; then
+    if ! check_command npm; then
+        DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -1
+    fi
+
+    if check_command node && check_command npm; then
         log_ok "Node.js $(node -v) terinstall"
-        log_ok "npm $(npm -v)"
+        log_ok "npm $(npm -v) terinstall"
     else
-        log_error "Node.js gagal terinstall"
+        log_error "Node.js atau npm gagal terinstall"
         exit 1
     fi
 }
@@ -71,6 +87,12 @@ install_node() {
 # Build Vite assets — runs in the app directory
 build_assets() {
     local app_dir="${1:-$TERASKOTA_ROOT}"
+
+    # Ensure npm exists
+    if ! check_command npm; then
+        log_substep "Menginstall npm..."
+        DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -2
+    fi
 
     log_substep "Install npm dependencies (production build)..."
     cd "$app_dir"
