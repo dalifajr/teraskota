@@ -538,9 +538,20 @@ EOF
 main() {
     print_banner
 
-    # Update apt cache first
+    # Purge broken/unsupported PPA entries (common: ondrej/php on Ubuntu 26+)
+    # Our PHP installer uses Sury direct repo or Ubuntu default — PPA not needed
+    log_info "Membersihkan PPA yang tidak didukung..."
+    for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*sury* \
+             /etc/apt/sources.list.d/*ppa_ondrej*; do
+        if [ -f "$f" ]; then
+            log_warn "Menghapus: $(basename "$f")"
+            rm -f "$f"
+        fi
+    done
+
+    # Update apt cache — tolerate individual repo failures
     log_info "Updating package cache..."
-    apt-get update -y 2>&1 | tail -1
+    apt-get update -y 2>&1 | tail -3 || true
 
     # Install whiptail for dialogs if not available
     if ! check_command whiptail; then
