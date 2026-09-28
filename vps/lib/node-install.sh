@@ -76,7 +76,7 @@ build_assets() {
     cd "$app_dir"
 
     # Install all deps (need devDeps for build)
-    npm ci 2>&1 | tail -5
+    npm ci 2>&1 || npm install 2>&1 | tail -5
 
     log_substep "Building Vite + Tailwind CSS v4..."
     npm run build 2>&1 | tail -5

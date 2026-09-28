@@ -8,6 +8,10 @@ _TERASKOTA_COMMON_LOADED=1
 
 set -euo pipefail
 
+# Allow composer to run as root without warnings/prompts
+export COMPOSER_ALLOW_SUPERUSER=1
+
+
 # ── Colors ────────────────────────────────────────────────────────────────────
 readonly C_RED='\033[0;31m'
 readonly C_GREEN='\033[0;32m'

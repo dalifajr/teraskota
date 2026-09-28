@@ -211,6 +211,10 @@ cmd_fix_ssl() {
 cmd_update() {
     log_info "Updating Teras Kota dari GitHub..."
 
+    git config --global --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
+    git config --system --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
+    export COMPOSER_ALLOW_SUPERUSER=1
+
     cd "${TERASKOTA_ROOT}"
 
     # Stash any local changes

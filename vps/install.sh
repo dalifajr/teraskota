@@ -334,10 +334,15 @@ setup_application() {
     # Install unzip (needed by composer)
     DEBIAN_FRONTEND=noninteractive apt-get install -y unzip 2>&1 | tail -1
 
+    # Fix git dubious ownership (root vs www-data)
+    git config --global --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
+    git config --system --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
+
     # Clone repository
     if [ -d "${TERASKOTA_ROOT}/.git" ]; then
         log_info "Repository sudah ada, pulling update..."
         cd "${TERASKOTA_ROOT}"
+        git stash 2>/dev/null || true
         git fetch origin
         git checkout "$branch"
         git pull origin "$branch"
@@ -355,7 +360,9 @@ setup_application() {
 
     # Configure .env
     log_substep "Mengkonfigurasi .env..."
-    cp .env.example .env
+    if [ ! -f .env ]; then
+        cp .env.example .env
+    fi
 
     local domain db_name db_user db_pass
     domain=$(load_config "DOMAIN")
@@ -387,12 +394,18 @@ setup_application() {
     tmp_env=$(mktemp)
     tac .env | awk -F= '!seen[$1]++' | tac > "$tmp_env" && mv "$tmp_env" .env
 
-    # Generate app key
-    php artisan key:generate --force
+    # Generate app key if missing
+    if ! grep -q "^APP_KEY=base64:" .env 2>/dev/null; then
+        php artisan key:generate --force
+    fi
 
     # Run migrations
     log_substep "Menjalankan database migrations..."
     php artisan migrate --force
+
+    # Seed initial data (admin, categories, menus, settings)
+    log_substep "Seeding database default..."
+    php artisan db:seed --force
 
     # Storage symlink (public/storage → storage/app/public)
     php artisan storage:link --force 2>/dev/null || true
