@@ -252,7 +252,7 @@
         <!-- Brand -->
         <div class="d-flex align-items-center gap-3">
             <a href="{{ route('pos.index') }}" class="pos-brand">
-                <i class="fa-solid fa-mug-hot text-warning"></i>
+                <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm" style="width: 32px; height: 32px; object-fit: cover; background: #fff;">
                 <span>Teras Kota</span> <small class="text-white opacity-75 fw-normal d-none d-md-inline">POS</small>
             </a>
             <div class="pos-user-badge">
@@ -381,6 +381,7 @@
     </script>
 
     <!-- Offline-First POS Engine Scripts -->
+    <script src="{{ asset('assets/js/qrcode.min.js') }}"></script>
     <script src="{{ asset('assets/js/offline-db.js') }}"></script>
     <script src="{{ asset('assets/js/sync-manager.js') }}"></script>
     <script src="{{ asset('assets/js/receipt.js') }}"></script>

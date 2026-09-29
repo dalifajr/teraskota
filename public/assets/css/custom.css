@@ -87,6 +87,42 @@ body {
     text-align: center;
 }
 
+/* Submenu Styling */
+.submenu {
+    list-style: none;
+    padding-left: 2.2rem;
+    margin: 0.2rem 0;
+}
+.submenu-item {
+    margin: 0.2rem 0;
+}
+.submenu-link {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 0.8rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    font-size: 0.88rem;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+.submenu-link:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+.submenu-item.active .submenu-link {
+    color: var(--light-accent);
+    font-weight: 600;
+    background-color: rgba(163, 230, 53, 0.12);
+}
+.sidebar-link .sub-arrow {
+    transition: transform 0.2s ease;
+    font-size: 0.75rem;
+}
+.sidebar-link[aria-expanded="true"] .sub-arrow {
+    transform: rotate(180deg);
+}
+
 /* Main Content Area */
 .main-wrapper {
     margin-left: 280px;

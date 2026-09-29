@@ -13,6 +13,12 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\PosController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SystemUpdateController;
+use App\Http\Controllers\PaymentListenerController;
+use App\Http\Controllers\QrisSettingController;
+
+// Android Payment Listener Webhook Routes (Exempted from CSRF)
+Route::post('/listener/payment', [PaymentListenerController::class, 'payment']);
+Route::post('/listener/test-connection', [PaymentListenerController::class, 'testConnection']);
 
 // Authentication Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
@@ -32,6 +38,9 @@ Route::middleware('auth')->group(function () {
     // Dedicated POS Cashier Routes (Accessible by both Kasir and Admin)
     Route::get('/pos', [PosController::class, 'index'])->name('pos.index');
     Route::post('/pos/checkout', [PosController::class, 'checkout'])->name('pos.checkout');
+    Route::post('/pos/qris/generate', [PosController::class, 'generateQris'])->name('pos.qris.generate');
+    Route::get('/pos/qris/check-status/{transaction}', [PosController::class, 'checkQrisStatus'])->name('pos.qris.check-status');
+    Route::post('/pos/qris/mark-paid/{transaction}', [PosController::class, 'markQrisPaid'])->name('pos.qris.mark-paid');
     Route::get('/pos/receipt/{transaction}', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/pos/summary-today', [PosController::class, 'summaryToday'])->name('pos.summary');
     Route::get('/pos/bootstrap', [\App\Http\Controllers\OfflineSyncController::class, 'bootstrap'])->name('pos.bootstrap');
@@ -60,6 +69,14 @@ Route::middleware('auth')->group(function () {
         // Settings (Profit)
         Route::get('/settings/profit', [SettingController::class, 'editProfit'])->name('settings.profit.edit');
         Route::put('/settings/profit', [SettingController::class, 'updateProfit'])->name('settings.profit.update');
+
+        // Settings (QRIS & Webhook)
+        Route::get('/settings/qris', [QrisSettingController::class, 'index'])->name('settings.qris.index');
+        Route::put('/settings/qris', [QrisSettingController::class, 'update'])->name('settings.qris.update');
+        Route::post('/settings/qris/regenerate-secret', [QrisSettingController::class, 'regenerateSecret'])->name('settings.qris.regenerate-secret');
+
+        // Admin Browser Desktop Notifications Polling
+        Route::get('/notifications/unread-transactions', [DashboardController::class, 'unreadTransactions'])->name('notifications.unread');
 
         // Settings (System Update via GitHub)
         Route::get('/settings/update', [SystemUpdateController::class, 'index'])->name('settings.update.index');

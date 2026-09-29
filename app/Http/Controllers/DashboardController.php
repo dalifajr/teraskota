@@ -230,4 +230,37 @@ class DashboardController extends Controller
             'groupBy'
         ));
     }
+
+    /**
+     * Poll unnotified paid transactions for Admin browser push notifications.
+     */
+    public function unreadTransactions(Request $request)
+    {
+        $transactions = Transaction::where('status', 'paid')
+            ->whereNull('notified_at')
+            ->where('created_at', '>=', now()->subHours(24))
+            ->latest()
+            ->take(5)
+            ->get();
+
+        if ($transactions->isNotEmpty()) {
+            $ids = $transactions->pluck('id')->toArray();
+            Transaction::whereIn('id', $ids)->update(['notified_at' => now()]);
+        }
+
+        return response()->json([
+            'count' => $transactions->count(),
+            'items' => $transactions->map(function ($tx) {
+                return [
+                    'id' => $tx->id,
+                    'transaction_number' => $tx->transaction_number,
+                    'total_sales' => (float) ($tx->final_amount ?: $tx->total_sales),
+                    'payment_method' => strtoupper($tx->payment_method),
+                    'customer_name' => $tx->customer_name ?: 'Pelanggan',
+                    'time' => $tx->transaction_time ? substr((string) $tx->transaction_time, 0, 5) : now()->format('H:i'),
+                    'url' => route('transactions.show', $tx->id),
+                ];
+            }),
+        ]);
+    }
 }

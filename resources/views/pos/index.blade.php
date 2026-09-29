@@ -767,22 +767,16 @@
                     <!-- Payment Methods -->
                     <label class="form-label fw-bold text-dark small mb-2">Pilih Metode Pembayaran</label>
                     <div class="row g-2 mb-3">
-                        <div class="col-4">
+                        <div class="col-6">
                             <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayCash" value="tunai" checked>
                             <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayCash">
                                 <i class="fa-solid fa-money-bill-wave d-block mb-1 fs-4"></i> Tunai
                             </label>
                         </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayQris" value="qris">
                             <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayQris">
                                 <i class="fa-solid fa-qrcode d-block mb-1 fs-4"></i> QRIS
-                            </label>
-                        </div>
-                        <div class="col-4">
-                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayTransfer" value="transfer">
-                            <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayTransfer">
-                                <i class="fa-solid fa-building-columns d-block mb-1 fs-4"></i> Transfer
                             </label>
                         </div>
                     </div>
@@ -854,22 +848,16 @@
                 <div class="mb-3">
                     <label class="form-label fw-bold text-dark small">Metode Pembayaran</label>
                     <div class="row g-2">
-                        <div class="col-4">
+                        <div class="col-6">
                             <input type="radio" class="btn-check" name="payment_method" id="payMethodCash" value="tunai" checked>
                             <label class="btn btn-outline-success w-100 py-2 fw-semibold small" for="payMethodCash">
                                 <i class="fa-solid fa-money-bill-wave d-block mb-1 fs-5"></i> Tunai
                             </label>
                         </div>
-                        <div class="col-4">
+                        <div class="col-6">
                             <input type="radio" class="btn-check" name="payment_method" id="payMethodQris" value="qris">
                             <label class="btn btn-outline-success w-100 py-2 fw-semibold small" for="payMethodQris">
                                 <i class="fa-solid fa-qrcode d-block mb-1 fs-5"></i> QRIS
-                            </label>
-                        </div>
-                        <div class="col-4">
-                            <input type="radio" class="btn-check" name="payment_method" id="payMethodTransfer" value="transfer">
-                            <label class="btn btn-outline-success w-100 py-2 fw-semibold small" for="payMethodTransfer">
-                                <i class="fa-solid fa-building-columns d-block mb-1 fs-5"></i> Transfer
                             </label>
                         </div>
                     </div>
@@ -927,6 +915,64 @@
                 <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
                 <button type="button" class="btn btn-primary-green px-4 fw-bold" id="btnSubmitPayment">
                     <i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran
+                </button>
+            </div>
+<!-- Modal QRIS Dinamis Interaktif -->
+<div class="modal fade" id="posQrisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posQrisModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <div class="modal-header bg-dark text-white border-0 py-3" style="background-color: var(--primary-green) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-qrcode text-warning fs-5"></i>
+                    <h5 class="modal-title fw-bold mb-0" id="posQrisModalLabel">Pembayaran QRIS Dinamis</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" id="btnCloseQrisModalTop" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body p-4 text-center">
+                <!-- Merchant info badge -->
+                <div class="mb-2">
+                    <span class="badge bg-light text-success border px-3 py-2 rounded-pill fw-bold" id="qrisMerchantBadge">
+                        <i class="fa-solid fa-store me-1"></i> <span id="qrisMerchantName">Teras Kota</span>
+                    </span>
+                </div>
+
+                <!-- Invoice & Nominal -->
+                <div class="p-3 my-2 rounded-4" style="background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">Total Bayar (Termasuk Kode Unik)</div>
+                    <div class="fs-1 fw-bold text-success" id="qrisFinalAmountDisplay">Rp0</div>
+                    <div class="small text-muted mt-1" id="qrisBreakdownDisplay">
+                        Harga: <span id="qrisBaseAmountDisplay">Rp0</span> + Kode Unik: <span class="fw-bold text-dark" id="qrisUniqueCodeDisplay">000</span>
+                    </div>
+                </div>
+
+                <!-- QR Code Canvas Container -->
+                <div class="d-flex justify-content-center my-3">
+                    <div class="p-3 bg-white border rounded-4 shadow-sm position-relative" style="display: inline-block;">
+                        <div id="qrisCodeContainer" style="min-width: 220px; min-height: 220px; display: flex; align-items: center; justify-content: center;">
+                            <span class="spinner-border text-success"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Indicator & Countdown -->
+                <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                    <div class="spinner-grow spinner-grow-sm text-success" id="qrisSpinner" role="status"></div>
+                    <span class="fw-bold text-dark small" id="qrisStatusText">Menunggu pembayaran pelanggan...</span>
+                    <span class="badge bg-secondary-subtle text-secondary rounded-pill small" id="qrisTimerBadge">10:00</span>
+                </div>
+
+                <div class="alert alert-warning py-2 px-3 small rounded-3 mb-0 text-start">
+                    <i class="fa-solid fa-circle-info me-1 text-warning"></i>
+                    Pastikan pelanggan mentransfer <strong>nominal pas</strong> sesuai angka di atas. Notifikasi pembayaran dari Android Listener akan otomatis menyelesaikan pesanan.
+                </div>
+            </div>
+
+            <div class="modal-footer bg-light border-top d-flex justify-content-between p-3">
+                <button type="button" class="btn btn-outline-danger fw-semibold btn-sm" id="btnCancelQrisModal">
+                    <i class="fa-solid fa-xmark me-1"></i> Batalkan
+                </button>
+                <button type="button" class="btn btn-success fw-bold px-3 py-2 rounded-3 btn-sm" id="btnManualConfirmQris">
+                    <i class="fa-solid fa-check-double me-1"></i> Konfirmasi Manual
                 </button>
             </div>
         </div>
@@ -995,6 +1041,7 @@
     const checkoutModal = new bootstrap.Modal(document.getElementById('posCheckoutModal'));
     const receiptModal = new bootstrap.Modal(document.getElementById('posReceiptModal'));
     const summaryModal = new bootstrap.Modal(document.getElementById('posSummaryModal'));
+    const qrisModal = new bootstrap.Modal(document.getElementById('posQrisModal'));
 
     // Format Rupiah Helper
     function formatRupiah(number) {
@@ -1449,6 +1496,295 @@
     }
     document.getElementById('screenCashInput')?.addEventListener('input', calculateScreenChange);
 
+    // ==========================================
+    // Dynamic QRIS + Webhook Auto-Verification Engine
+    // ==========================================
+    let qrisPollInterval = null;
+    let qrisCountdownInterval = null;
+    let currentQrisTransactionId = null;
+    let currentQrisData = null;
+
+    function stopQrisTracking() {
+        if (qrisPollInterval) {
+            clearInterval(qrisPollInterval);
+            qrisPollInterval = null;
+        }
+        if (qrisCountdownInterval) {
+            clearInterval(qrisCountdownInterval);
+            qrisCountdownInterval = null;
+        }
+    }
+
+    async function startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml) {
+        if (cart.length === 0) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Keranjang Kosong',
+                text: 'Silakan pilih menu terlebih dahulu.',
+                confirmButtonColor: '#11361b'
+            });
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyiapkan QRIS...';
+
+        try {
+            const payload = {
+                items: cart.map(i => ({
+                    menu_id: i.id,
+                    quantity: i.qty
+                })),
+                customer_name: customerName || null,
+                notes: notes || null
+            };
+
+            const response = await fetch("{{ route('pos.qris.generate') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+
+            if (!response.ok || data.status !== 'success') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Gagal Menghasilkan QRIS',
+                    text: data.message || 'Pastikan Payload QRIS sudah dikonfigurasi di menu Pengaturan.',
+                    confirmButtonColor: '#11361b'
+                });
+                return;
+            }
+
+            currentQrisTransactionId = data.transaction_id;
+            currentQrisData = data;
+
+            // Fill UI Fields
+            document.getElementById('qrisMerchantName').innerText = data.merchant_name || 'Teras Kota';
+            document.getElementById('qrisFinalAmountDisplay').innerText = formatRupiah(data.final_amount);
+            document.getElementById('qrisBaseAmountDisplay').innerText = formatRupiah(data.base_amount);
+            document.getElementById('qrisUniqueCodeDisplay').innerText = data.unique_code;
+
+            const statusText = document.getElementById('qrisStatusText');
+            statusText.innerText = 'Menunggu pembayaran pelanggan...';
+            statusText.className = 'fw-bold text-dark small';
+            document.getElementById('qrisSpinner').style.display = 'inline-block';
+
+            // Generate QR Code into container
+            const container = document.getElementById('qrisCodeContainer');
+            container.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(container, {
+                    text: data.qris_payload,
+                    width: 220,
+                    height: 220,
+                    colorDark: "#000000",
+                    colorLight: "#ffffff",
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+            } else {
+                container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.qris_payload)}" alt="QRIS Dinamis" class="img-fluid rounded">`;
+            }
+
+            // Close checkout modal if open
+            if (typeof checkoutModal !== 'undefined') {
+                checkoutModal.hide();
+            }
+            showCatalogView();
+
+            // Show QRIS Modal
+            qrisModal.show();
+
+            // Countdown Timer
+            let remainingSeconds = data.expires_in_seconds || 600;
+            const timerBadge = document.getElementById('qrisTimerBadge');
+            
+            function updateTimerDisplay() {
+                const mins = Math.floor(remainingSeconds / 60);
+                const secs = remainingSeconds % 60;
+                timerBadge.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+            }
+            updateTimerDisplay();
+
+            stopQrisTracking();
+
+            qrisCountdownInterval = setInterval(() => {
+                remainingSeconds--;
+                updateTimerDisplay();
+                if (remainingSeconds <= 0) {
+                    stopQrisTracking();
+                    statusText.innerText = 'Waktu pembayaran telah habis (Kadaluarsa).';
+                    statusText.className = 'fw-bold text-danger small';
+                    document.getElementById('qrisSpinner').style.display = 'none';
+                }
+            }, 1000);
+
+            // Poll Transaction Status every 2.5s
+            qrisPollInterval = setInterval(async () => {
+                if (!currentQrisTransactionId) return;
+
+                try {
+                    const checkUrl = `/pos/qris/check-status/${currentQrisTransactionId}`;
+                    const chkRes = await fetch(checkUrl, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+                    if (chkRes.ok) {
+                        const statusData = await chkRes.json();
+                        if (statusData.status === 'paid') {
+                            stopQrisTracking();
+                            handleQrisSuccess(data);
+                        } else if (statusData.status === 'expired') {
+                            stopQrisTracking();
+                            statusText.innerText = 'Transaksi telah kadaluarsa.';
+                            statusText.className = 'fw-bold text-danger small';
+                            document.getElementById('qrisSpinner').style.display = 'none';
+                        }
+                    }
+                } catch(e) {}
+            }, 2500);
+
+        } catch (err) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnHtml;
+            console.error('[POS QRIS] Error:', err);
+            Swal.fire({
+                icon: 'error',
+                title: 'Koneksi Terganggu',
+                text: 'Gagal terhubung ke server untuk proses QRIS dinamis.',
+                confirmButtonColor: '#11361b'
+            });
+        }
+    }
+
+    async function handleQrisSuccess(qrisData) {
+        const statusText = document.getElementById('qrisStatusText');
+        statusText.innerText = 'Pembayaran Berhasil Diverifikasi!';
+        statusText.className = 'fw-bold text-success fs-6';
+        document.getElementById('qrisSpinner').style.display = 'none';
+
+        // Play audio chime
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(1318.51, now);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.5);
+        } catch(e) {}
+
+        setTimeout(() => {
+            qrisModal.hide();
+
+            const now = new Date();
+            const receiptTx = {
+                transaction_number: qrisData.transaction_number,
+                transaction_date: now.toISOString().split('T')[0],
+                transaction_time: now.toTimeString().split(' ')[0],
+                payment_method: 'qris',
+                cash_tendered: qrisData.final_amount,
+                change_returned: 0,
+                customer_name: document.getElementById('posScreenCustomerName')?.value || document.getElementById('posCustomerName')?.value || null,
+                notes: document.getElementById('posScreenNotes')?.value || document.getElementById('posNotes')?.value || null,
+                total_quantity: cart.reduce((sum, item) => sum + item.qty, 0),
+                total_sales: qrisData.final_amount,
+                cashier_name: "{{ Auth::user()->name }}",
+                details: cart.map(i => ({
+                    menu_name_snapshot: i.name,
+                    price_snapshot: i.price,
+                    quantity: i.qty,
+                    subtotal: i.price * i.qty,
+                }))
+            };
+
+            window.currentReceiptTransaction = receiptTx;
+
+            // Render receipt modal
+            const receiptBody = document.getElementById('receiptModalBody');
+            if (receiptBody && window.ReceiptRenderer) {
+                receiptBody.innerHTML = ReceiptRenderer.renderHTML(receiptTx);
+            }
+            receiptModal.show();
+
+            // Reset cart
+            cart = [];
+            renderCart();
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Pembayaran QRIS Lunas!',
+                text: `Nominal Rp ${new Intl.NumberFormat('id-ID').format(qrisData.final_amount)} berhasil diterima.`,
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }, 800);
+    }
+
+    // Modal QRIS button bindings
+    document.getElementById('btnCloseQrisModalTop')?.addEventListener('click', () => {
+        stopQrisTracking();
+        qrisModal.hide();
+    });
+    document.getElementById('btnCancelQrisModal')?.addEventListener('click', () => {
+        stopQrisTracking();
+        qrisModal.hide();
+    });
+    document.getElementById('btnManualConfirmQris')?.addEventListener('click', async () => {
+        if (!currentQrisTransactionId || !currentQrisData) return;
+
+        const result = await Swal.fire({
+            title: 'Konfirmasi Manual?',
+            text: `Apakah Anda yakin pelanggan sudah membayar Rp ${new Intl.NumberFormat('id-ID').format(currentQrisData.final_amount)} via QRIS?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#16a34a',
+            cancelButtonColor: '#6b7280',
+            confirmButtonText: 'Ya, Tandai Lunas',
+            cancelButtonText: 'Batal'
+        });
+
+        if (result.isConfirmed) {
+            try {
+                const res = await fetch(`/pos/qris/mark-paid/${currentQrisTransactionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    }
+                });
+                const resData = await res.json();
+                if (res.ok && resData.status === 'success') {
+                    stopQrisTracking();
+                    handleQrisSuccess(currentQrisData);
+                } else {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: resData.message || 'Gagal mengubah status transaksi.'
+                    });
+                }
+            } catch (e) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Terjadi kesalahan saat memproses konfirmasi manual.'
+                });
+            }
+        }
+    });
+
     // Shared Process Payment Checkout Function (Offline-First Universal Architecture)
     async function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn) {
         const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -1466,6 +1802,12 @@
         }
 
         const originalBtnHtml = submitBtn.innerHTML;
+
+        // If QRIS selected and online, start dynamic QRIS interactive flow
+        if (paymentMethod === 'qris' && navigator.onLine) {
+            startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml);
+            return;
+        }
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
 

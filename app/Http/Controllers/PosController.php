@@ -66,7 +66,7 @@ class PosController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_id' => ['required', 'exists:menus,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
-            'payment_method' => ['required', 'in:tunai,qris,transfer'],
+            'payment_method' => ['required', 'in:tunai,qris'],
             'cash_tendered' => ['nullable', 'numeric', 'min:0'],
             'customer_name' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:500'],
@@ -151,6 +151,134 @@ class PosController extends Controller
             'total_tunai' => $totalTunai,
             'total_non_tunai' => $totalNonTunai,
             'transactions' => $transactions,
+        ]);
+    }
+
+    /**
+     * Generate dynamic QRIS with unique code for POS checkout.
+     */
+    public function generateQris(Request $request, \App\Services\QrisService $qrisService)
+    {
+        $validated = $request->validate([
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.menu_id' => ['required', 'exists:menus,id'],
+            'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'customer_name' => ['nullable', 'string', 'max:100'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $staticPayload = $qrisService->getStaticPayload();
+        if (empty($staticPayload)) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'QRIS belum dikonfigurasi. Silakan atur Payload QRIS di menu Pengaturan QRIS terlebih dahulu.',
+            ], 422);
+        }
+
+        // Calculate base amount
+        $menuIds = collect($validated['items'])->pluck('menu_id');
+        $menus = Menu::whereIn('id', $menuIds)->get()->keyBy('id');
+        $baseAmount = 0;
+        foreach ($validated['items'] as $item) {
+            $menu = $menus->get($item['menu_id']);
+            if ($menu) {
+                $baseAmount += $menu->price * $item['quantity'];
+            }
+        }
+
+        // Generate unique code & dynamic amount
+        $codeData = $qrisService->generateUniqueCode($baseAmount);
+        $uniqueCode = $codeData['code'];
+        $finalAmount = $codeData['final_amount'];
+
+        // Build dynamic QRIS payload
+        $dynamicPayload = $qrisService->makeDynamic($staticPayload, $finalAmount);
+        $expiryMinutes = $qrisService->getExpiryMinutes();
+        $expiredAt = now()->addMinutes($expiryMinutes);
+
+        // Create transaction in pending status
+        $data = [
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_time' => now()->format('H:i:s'),
+            'payment_method' => 'qris',
+            'status' => 'pending',
+            'unique_code' => $uniqueCode,
+            'final_amount' => $finalAmount,
+            'qris_payload' => $dynamicPayload,
+            'qris_expired_at' => $expiredAt,
+            'customer_name' => $validated['customer_name'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+            'items' => $validated['items'],
+        ];
+
+        $transaction = $this->transactionService->createTransaction($data, Auth::id());
+        $transaction->update([
+            'status' => 'pending',
+            'unique_code' => $uniqueCode,
+            'final_amount' => $finalAmount,
+            'qris_payload' => $dynamicPayload,
+            'qris_expired_at' => $expiredAt,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'transaction_id' => $transaction->id,
+            'transaction_number' => $transaction->transaction_number,
+            'base_amount' => $baseAmount,
+            'unique_code' => $uniqueCode,
+            'final_amount' => $finalAmount,
+            'qris_payload' => $dynamicPayload,
+            'expired_at' => $expiredAt->toIso8601String(),
+            'expires_in_seconds' => $expiryMinutes * 60,
+            'merchant_name' => Setting::getValue('qris_merchant_name', 'Teras Kota'),
+            'merchant_city' => Setting::getValue('qris_merchant_city', ''),
+        ]);
+    }
+
+    /**
+     * Check status of a pending QRIS transaction.
+     */
+    public function checkQrisStatus(Transaction $transaction)
+    {
+        if ($transaction->status === 'pending' && $transaction->qris_expired_at && now()->isAfter($transaction->qris_expired_at)) {
+            $transaction->update(['status' => 'expired']);
+        }
+
+        return response()->json([
+            'status' => $transaction->status, // 'pending', 'paid', 'expired'
+            'transaction_id' => $transaction->id,
+            'transaction_number' => $transaction->transaction_number,
+            'paid_at' => $transaction->paid_at ? $transaction->paid_at->toIso8601String() : null,
+            'source_app' => $transaction->payment_source_app,
+        ]);
+    }
+
+    /**
+     * Cashier manual force confirmation if customer has paid.
+     */
+    public function markQrisPaid(Transaction $transaction)
+    {
+        if ($transaction->status === 'paid') {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Transaksi sudah berstatus lunas.',
+                'transaction_id' => $transaction->id,
+            ]);
+        }
+
+        $transaction->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'payment_reference' => 'MANUAL-' . strtoupper(uniqid()),
+            'payment_source_app' => 'Kasir (Manual)',
+            'notified_at' => null,
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Transaksi berhasil dikonfirmasi lunas secara manual.',
+            'transaction_id' => $transaction->id,
+            'transaction_number' => $transaction->transaction_number,
         ]);
     }
 }

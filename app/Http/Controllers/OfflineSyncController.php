@@ -121,7 +121,7 @@ class OfflineSyncController extends Controller
                 'items' => ['required', 'array', 'min:1'],
                 'items.*.menu_id' => ['required', 'integer', 'exists:menus,id'],
                 'items.*.quantity' => ['required', 'integer', 'min:1'],
-                'payment_method' => ['nullable', 'string', 'in:tunai,qris,transfer'],
+                'payment_method' => ['nullable', 'string', 'in:tunai,qris'],
                 'cash_tendered' => ['nullable', 'numeric', 'min:0'],
                 'change_returned' => ['nullable', 'numeric', 'min:0'],
                 'customer_name' => ['nullable', 'string', 'max:100'],

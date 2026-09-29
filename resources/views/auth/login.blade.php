@@ -59,12 +59,12 @@
     <div class="login-card">
         <!-- Brand Header -->
         <div class="text-center mb-4">
-            <div class="login-brand-icon">
-                <i class="fa-solid fa-mug-hot"></i>
+            <div class="mb-3">
+                <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Indonesia" class="rounded-circle shadow" style="width: 100px; height: 100px; object-fit: cover; background: #fff; border: 3px solid rgba(20, 83, 45, 0.2);">
             </div>
             <h3 class="fw-bold text-dark mb-1">Teras Kota</h3>
             <span class="badge bg-success bg-opacity-10 text-success fw-medium px-3 py-1 rounded-pill mb-2">
-                Berlian Makmur
+                Berlian Makmur · Indonesia
             </span>
             <p class="text-muted small mb-0">Masuk untuk mengakses sistem penjualan & POS kasir</p>
         </div>

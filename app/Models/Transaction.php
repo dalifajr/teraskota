@@ -19,6 +19,15 @@ class Transaction extends Model
         'total_profit',
         'estimated_cost',
         'payment_method',
+        'status',
+        'unique_code',
+        'final_amount',
+        'qris_payload',
+        'qris_expired_at',
+        'paid_at',
+        'payment_reference',
+        'payment_source_app',
+        'notified_at',
         'cash_tendered',
         'change_returned',
         'customer_name',
@@ -32,8 +41,13 @@ class Transaction extends Model
     protected $casts = [
         'transaction_date' => 'date',
         'synced_at' => 'datetime',
+        'qris_expired_at' => 'datetime',
+        'paid_at' => 'datetime',
+        'notified_at' => 'datetime',
+        'unique_code' => 'integer',
         'total_quantity' => 'integer',
         'total_sales' => 'decimal:2',
+        'final_amount' => 'decimal:2',
         'total_profit' => 'decimal:2',
         'estimated_cost' => 'decimal:2',
         'cash_tendered' => 'decimal:2',
@@ -53,5 +67,10 @@ class Transaction extends Model
     public function cashier()
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function paymentListenerLogs()
+    {
+        return $this->hasMany(PaymentListenerLog::class, 'matched_transaction_id');
     }
 }
