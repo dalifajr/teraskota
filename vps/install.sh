@@ -524,11 +524,44 @@ EOFBACKUP
 
     chmod 700 /usr/local/bin/teraskota-backup
 
-    # Daily cron at 02:00
-    local cron_line="0 2 * * * /usr/local/bin/teraskota-backup"
-    (crontab -l 2>/dev/null | grep -v teraskota-backup; echo "$cron_line") | crontab -
+    # Ensure cron or systemd timer is used
+    if ! check_command crontab; then
+        log_substep "Menginstall cron..."
+        DEBIAN_FRONTEND=noninteractive apt-get install -y cron 2>&1 | tail -1
+        systemctl enable --now cron 2>/dev/null || true
+    fi
 
-    log_ok "Auto-backup daily at 02:00 (retain 7 days)"
+    if check_command crontab; then
+        local cron_line="0 2 * * * /usr/local/bin/teraskota-backup"
+        (crontab -l 2>/dev/null | grep -v teraskota-backup; echo "$cron_line") | crontab -
+        log_ok "Auto-backup daily at 02:00 via cron (retain 7 days)"
+    else
+        # Fallback: systemd timer (always supported)
+        cat > /etc/systemd/system/teraskota-backup.service <<EOFSVC
+[Unit]
+Description=Teras Kota Daily Backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/teraskota-backup
+EOFSVC
+
+        cat > /etc/systemd/system/teraskota-backup.timer <<EOFTMR
+[Unit]
+Description=Daily Backup Timer for Teras Kota
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOFTMR
+
+        systemctl daemon-reload
+        systemctl enable --now teraskota-backup.timer 2>/dev/null || true
+        log_ok "Auto-backup daily at 02:00 via systemd timer (retain 7 days)"
+    fi
 }
 
 install_control_panel() {
@@ -540,8 +573,10 @@ install_control_panel() {
     if [ -f "$ctl_src" ]; then
         cp "$ctl_src" "$ctl_dst"
         chmod +x "$ctl_dst"
-        log_ok "teraskota-ctl terinstall di ${ctl_dst}"
-        echo -e "  ${C_DIM}Gunakan: ${C_CYAN}sudo teraskota-ctl${C_RESET}"
+        # Also symlink teraskota-cli for convenience
+        ln -sf "$ctl_dst" /usr/local/bin/teraskota-cli
+        log_ok "teraskota-ctl (dan teraskota-cli) terinstall di ${ctl_dst}"
+        echo -e "  ${C_DIM}Gunakan: ${C_CYAN}sudo teraskota-ctl${C_RESET} atau ${C_CYAN}sudo teraskota-cli${C_RESET}"
     else
         log_warn "File teraskota-ctl tidak ditemukan di ${ctl_src}"
     fi
