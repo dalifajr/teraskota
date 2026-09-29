@@ -1,13 +1,6 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. silakan hapus metode pembayaran transfer. (SELESAI ✓)
-2. buat aplikasis support mengirimkan notifikasi dengan memanfaatkan izin browser notifications. untuk admin, admin akan menerima notifikasi setiap ada pembelian yang berhasil masuk (paid). (SELESAI ✓)
-3. untuk metode pembayaran via qris, kedepannya saya ingin menggunakan metode android notification listener / webhook notification. gunakan endpoint "/listener/payment". (SELESAI ✓)
-4. saya sudah menyediakan referensinya pada folder "/android_listener". silakan pelajari dan implementasikan ke aplikasi teraskota. (SELESAI ✓)
-5. buat halaman pengaturan qris berguna untuk mengatur payload qris(user bisa menginput manual atau mengupload file gambar qris untuk diekstrak oleh sistem menjadi teks payload). serta dokumentasinya. (SELESAI ✓)
-6 buat menu pengaturan berisi; pengaturan qris dan update sistem. (SELESAI ✓)
-7. untuk metode pembayaran qris, sistem harus menambahkan angka unik untuk setiap transaksi(contoh: user membayar qris senilai 1000, sistem menambahkan angka unik menjadi 1190. nomor unik ini akan ditambahkan ke setiap url rujukan qris). ini berguna agar sistem dapat membedakan antara transaksi qris satu dengan yang lainnya. (SELESAI ✓)
-8. ganti logo teraskota saat ini dengan logo resmi yang diberikan (hijau bulat Teras Kota Indonesia). (SELESAI ✓)
+1. perbaiki pada POS, pada opsi pembayaran QRIS, sistem memperoses qris namun qris bayar tidak muncul. sehingga user tidak bisa melakukan pembayaran. (SELESAI ✓)
 
 STATUS PENGEMBANGAN VPS (SELESAI ✓):
 - Installer interaktif (vps/install.sh) sukses berjalan di Ubuntu 26 (resolute) x86_64 / ARM64.

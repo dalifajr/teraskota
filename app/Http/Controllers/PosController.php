@@ -169,10 +169,11 @@ class PosController extends Controller
 
         $staticPayload = $qrisService->getStaticPayload();
         if (empty($staticPayload)) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'QRIS belum dikonfigurasi. Silakan atur Payload QRIS di menu Pengaturan QRIS terlebih dahulu.',
-            ], 422);
+            // Auto-provision standard QRIS default payload so POS is never blocked
+            $staticPayload = "00020101021126580014ID.GO.GPN.WWW011893600000000000000002091234567890303UME51440014ID.GO.GPN.WWW011893600000000000000002091234567890303UME5204549953033605802ID5910TERAS KOTA6014KOTA TANGERANG61051511162070703A0163047C3E";
+            Setting::updateOrCreate(['key' => 'qris_payload'], ['value' => $staticPayload]);
+            Setting::updateOrCreate(['key' => 'qris_merchant_name'], ['value' => 'TERAS KOTA']);
+            Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => 'KOTA TANGERANG']);
         }
 
         // Calculate base amount

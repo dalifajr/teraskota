@@ -812,6 +812,13 @@
                             <span class="fs-3 fw-bold text-success" id="screenChangeText">Rp0</span>
                         </div>
                     </div>
+
+                    <!-- QRIS Info Section (Screen Mode) -->
+                    <div id="screenSectionQrisHint" style="display: none;" class="p-4 rounded-3 border mb-4 bg-light text-center">
+                        <i class="fa-solid fa-qrcode fs-1 text-success mb-2"></i>
+                        <h6 class="fw-bold text-dark mb-1">Pembayaran QRIS Dinamis</h6>
+                        <p class="text-muted small mb-0">Nominal pas dan kode unik 3 digit akan dikunci otomatis. Klik tombol di bawah untuk membuka kode QRIS.</p>
+                    </div>
                 </div>
 
                 <!-- Submit Button -->
@@ -898,6 +905,13 @@
                     </div>
                 </div>
 
+                <!-- Section QRIS Info (Modal Mode) -->
+                <div id="sectionQrisPayment" style="display: none;" class="p-3 rounded-3 border mb-3 bg-light text-center">
+                    <i class="fa-solid fa-qrcode fs-2 text-success mb-2"></i>
+                    <h6 class="fw-bold text-dark mb-1">Metode QRIS Dinamis</h6>
+                    <p class="text-muted small mb-0">Sistem akan membuat kode QRIS dengan kode unik otomatis setelah Anda mengklik Proses Pembayaran.</p>
+                </div>
+
                 <!-- Customer & Notes -->
                 <div class="row g-2 mb-3">
                     <div class="col-6">
@@ -917,8 +931,12 @@
                     <i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
 <!-- Modal QRIS Dinamis Interaktif -->
-<div class="modal fade" id="posQrisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posQrisModalLabel" aria-hidden="true">
+<div class="modal fade" id="posQrisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posQrisModalLabel" aria-hidden="true" style="z-index: 1065;">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header bg-dark text-white border-0 py-3" style="background-color: var(--primary-green) !important;">
@@ -1431,11 +1449,17 @@
     document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const cashSection = document.getElementById('sectionCashPayment');
+            const qrisSection = document.getElementById('sectionQrisPayment');
+            const submitBtn = document.getElementById('btnSubmitPayment');
             if (this.value === 'tunai') {
-                cashSection.style.display = 'block';
-                document.getElementById('cashTenderedInput').focus();
+                if (cashSection) cashSection.style.display = 'block';
+                if (qrisSection) qrisSection.style.display = 'none';
+                if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran';
+                document.getElementById('cashTenderedInput')?.focus();
             } else {
-                cashSection.style.display = 'none';
+                if (cashSection) cashSection.style.display = 'none';
+                if (qrisSection) qrisSection.style.display = 'block';
+                if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-qrcode me-2"></i> Tampilkan QRIS';
             }
         });
     });
@@ -1456,11 +1480,17 @@
     document.querySelectorAll('input[name="screen_payment_method"]').forEach(radio => {
         radio.addEventListener('change', function() {
             const cashSec = document.getElementById('screenSectionCash');
+            const qrisSec = document.getElementById('screenSectionQrisHint');
+            const submitBtn = document.getElementById('btnSubmitScreenPayment');
             if (this.value === 'tunai') {
-                cashSec.style.display = 'block';
-                document.getElementById('screenCashInput').focus();
+                if (cashSec) cashSec.style.display = 'block';
+                if (qrisSec) qrisSec.style.display = 'none';
+                if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Proses Pembayaran & Cetak Struk</span>';
+                document.getElementById('screenCashInput')?.focus();
             } else {
-                cashSec.style.display = 'none';
+                if (cashSec) cashSec.style.display = 'none';
+                if (qrisSec) qrisSec.style.display = 'block';
+                if (submitBtn) submitBtn.innerHTML = '<i class="fa-solid fa-qrcode"></i><span>Buka Kode QRIS Pembayaran</span>';
             }
         });
     });
@@ -1577,30 +1607,55 @@
             statusText.className = 'fw-bold text-dark small';
             document.getElementById('qrisSpinner').style.display = 'inline-block';
 
-            // Generate QR Code into container
+            // Generate QR Code into container with multi-tier fallback
             const container = document.getElementById('qrisCodeContainer');
             container.innerHTML = '';
-            if (window.QRCode) {
-                new QRCode(container, {
-                    text: data.qris_payload,
-                    width: 220,
-                    height: 220,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                    correctLevel: QRCode.CorrectLevel.M
+            let qrRendered = false;
+
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    new QRCode(container, {
+                        text: data.qris_payload,
+                        width: 220,
+                        height: 220,
+                        colorDark: "#000000",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.M
+                    });
+                    qrRendered = true;
+                } catch(e) {
+                    console.warn('[QR] Local QRCode constructor failed:', e);
+                }
+            }
+
+            if (!qrRendered || container.children.length === 0) {
+                const img = document.createElement('img');
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.qris_payload)}`;
+                img.alt = 'QRIS Dinamis';
+                img.className = 'img-fluid rounded shadow-sm';
+                img.style.width = '220px';
+                img.style.height = '220px';
+                container.appendChild(img);
+            }
+
+            // Reveal QRIS modal smoothly without modal transition collision
+            function revealQrisModal() {
+                qrisModal.show();
+            }
+
+            const checkoutModalEl = document.getElementById('posCheckoutModal');
+            const isModalOpen = checkoutModalEl && checkoutModalEl.classList.contains('show');
+
+            if (isModalOpen) {
+                checkoutModalEl.addEventListener('hidden.bs.modal', function onHidden() {
+                    checkoutModalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    setTimeout(revealQrisModal, 60);
                 });
-            } else {
-                container.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.qris_payload)}" alt="QRIS Dinamis" class="img-fluid rounded">`;
-            }
-
-            // Close checkout modal if open
-            if (typeof checkoutModal !== 'undefined') {
                 checkoutModal.hide();
+            } else {
+                showCatalogView();
+                setTimeout(revealQrisModal, 60);
             }
-            showCatalogView();
-
-            // Show QRIS Modal
-            qrisModal.show();
 
             // Countdown Timer
             let remainingSeconds = data.expires_in_seconds || 600;
