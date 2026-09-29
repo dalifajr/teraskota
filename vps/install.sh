@@ -524,20 +524,17 @@ EOFBACKUP
 
     chmod 700 /usr/local/bin/teraskota-backup
 
-    # Ensure cron or systemd timer is used
-    if ! check_command crontab; then
-        log_substep "Menginstall cron..."
-        DEBIAN_FRONTEND=noninteractive apt-get install -y cron 2>&1 | tail -1
-        systemctl enable --now cron 2>/dev/null || true
+    # 1. Setup cron.d entry (works with any cron daemon without crontab pipe)
+    if [ -d /etc/cron.d ]; then
+        cat > /etc/cron.d/teraskota-backup <<'EOFCRON'
+# Daily backup for Teras Kota at 02:00 AM
+0 2 * * * root /usr/local/bin/teraskota-backup >/dev/null 2>&1
+EOFCRON
+        chmod 644 /etc/cron.d/teraskota-backup
     fi
 
-    if check_command crontab; then
-        local cron_line="0 2 * * * /usr/local/bin/teraskota-backup"
-        (crontab -l 2>/dev/null | grep -v teraskota-backup; echo "$cron_line") | crontab -
-        log_ok "Auto-backup daily at 02:00 via cron (retain 7 days)"
-    else
-        # Fallback: systemd timer (always supported)
-        cat > /etc/systemd/system/teraskota-backup.service <<EOFSVC
+    # 2. Setup native systemd timer (always supported on Ubuntu 24/26)
+    cat > /etc/systemd/system/teraskota-backup.service <<'EOFSVC'
 [Unit]
 Description=Teras Kota Daily Backup
 
@@ -546,7 +543,7 @@ Type=oneshot
 ExecStart=/usr/local/bin/teraskota-backup
 EOFSVC
 
-        cat > /etc/systemd/system/teraskota-backup.timer <<EOFTMR
+    cat > /etc/systemd/system/teraskota-backup.timer <<'EOFTMR'
 [Unit]
 Description=Daily Backup Timer for Teras Kota
 
@@ -558,10 +555,10 @@ Persistent=true
 WantedBy=timers.target
 EOFTMR
 
-        systemctl daemon-reload
-        systemctl enable --now teraskota-backup.timer 2>/dev/null || true
-        log_ok "Auto-backup daily at 02:00 via systemd timer (retain 7 days)"
-    fi
+    systemctl daemon-reload 2>/dev/null || true
+    systemctl enable --now teraskota-backup.timer 2>/dev/null || true
+
+    log_ok "Auto-backup daily at 02:00 aktif (cron.d & systemd timer, retain 7 days)"
 }
 
 install_control_panel() {
