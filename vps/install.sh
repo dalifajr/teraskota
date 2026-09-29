@@ -578,9 +578,10 @@ install_control_panel() {
     if [ -n "$ctl_src" ]; then
         cp "$ctl_src" /usr/local/bin/teraskota-ctl
         chmod +x /usr/local/bin/teraskota-ctl
-        ln -sf /usr/local/bin/teraskota-ctl /usr/bin/teraskota-ctl
+        cp "$ctl_src" /usr/bin/teraskota-ctl
+        chmod +x /usr/bin/teraskota-ctl
+        ln -sf /usr/bin/teraskota-ctl /usr/bin/teraskota-cli
         ln -sf /usr/local/bin/teraskota-ctl /usr/local/bin/teraskota-cli
-        ln -sf /usr/local/bin/teraskota-ctl /usr/bin/teraskota-cli
         hash -r 2>/dev/null || true
         log_ok "teraskota-ctl (dan teraskota-cli) terinstall di /usr/bin dan /usr/local/bin"
         echo -e "  ${C_DIM}Gunakan: ${C_CYAN}sudo teraskota-ctl${C_RESET} atau ${C_CYAN}sudo teraskota-cli${C_RESET}"

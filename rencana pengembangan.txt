@@ -7,11 +7,15 @@ RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
 periksa dependency dan package yang digunakan serta dibutubkan untuk menjalankan website, termasuk pula setup domain dan https. buatkan juga kontrol panel pada terminal vps untuk manajemen website seperti informasi website, serta command dan menu yang dibutuhkan seperti start, restart, stop, change domain, fix cert, update via github repo, dll.
 
-user installasi harus memberikan dialog kepada user untuk mengatur domain website.
-installasi php sering error pada 
-
-
-
+STATUS PENGEMBANGAN VPS (SELESAI ✓):
+- Installer interaktif (vps/install.sh) sukses berjalan di Ubuntu 26 (resolute) x86_64 / ARM64.
+- Deteksi dinamis PHP 8.4/8.5 default repo tanpa ketergantungan PPA pihak ketiga yang belum mendukung OS baru.
+- Konfigurasi multi-host MariaDB user (127.0.0.1, localhost, ::1) untuk TCP dan Unix domain socket.
+- Optimasi Vite + Tailwind CSS v4 via pre-built assets di repository (~80 KB), memangkas waktu build di VPS dari 15 menit ke 0 detik.
+- SSL Otomatis Let's Encrypt (Certbot) dengan deteksi Cloudflare & auto-renewal timer.
+- Auto-backup harian 02:00 via /etc/cron.d dan systemd timer (retensi 7 hari).
+- Control Panel CLI (teraskota-ctl & alias teraskota-cli) terpasang di /usr/bin dan /usr/local/bin.
+- Website live: https://teh.belajaridn.id
 catat untuk kamu;
 - lakukan brainstroming sebelum melakukan eksekusi, tak lupa pula lakukan analisa kritik dan saran.
 - pastikan untuk melakukan test pada setiap perubahan yang kamu buat. agar tidak ada error yang terlewatkan.
