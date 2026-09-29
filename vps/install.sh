@@ -564,18 +564,28 @@ EOFTMR
 install_control_panel() {
     log_step "Install Control Panel"
 
-    local ctl_src="${SCRIPT_DIR}/teraskota-ctl"
-    local ctl_dst="/usr/local/bin/teraskota-ctl"
+    local ctl_src=""
+    for candidate in \
+        "${SCRIPT_DIR}/teraskota-ctl" \
+        "${TERASKOTA_ROOT}/vps/teraskota-ctl" \
+        "/tmp/teraskota-installer/vps/teraskota-ctl"; do
+        if [ -f "$candidate" ]; then
+            ctl_src="$candidate"
+            break
+        fi
+    done
 
-    if [ -f "$ctl_src" ]; then
-        cp "$ctl_src" "$ctl_dst"
-        chmod +x "$ctl_dst"
-        # Also symlink teraskota-cli for convenience
-        ln -sf "$ctl_dst" /usr/local/bin/teraskota-cli
-        log_ok "teraskota-ctl (dan teraskota-cli) terinstall di ${ctl_dst}"
+    if [ -n "$ctl_src" ]; then
+        cp "$ctl_src" /usr/local/bin/teraskota-ctl
+        chmod +x /usr/local/bin/teraskota-ctl
+        ln -sf /usr/local/bin/teraskota-ctl /usr/bin/teraskota-ctl
+        ln -sf /usr/local/bin/teraskota-ctl /usr/local/bin/teraskota-cli
+        ln -sf /usr/local/bin/teraskota-ctl /usr/bin/teraskota-cli
+        hash -r 2>/dev/null || true
+        log_ok "teraskota-ctl (dan teraskota-cli) terinstall di /usr/bin dan /usr/local/bin"
         echo -e "  ${C_DIM}Gunakan: ${C_CYAN}sudo teraskota-ctl${C_RESET} atau ${C_CYAN}sudo teraskota-cli${C_RESET}"
     else
-        log_warn "File teraskota-ctl tidak ditemukan di ${ctl_src}"
+        log_warn "File teraskota-ctl tidak ditemukan"
     fi
 }
 
