@@ -15,4 +15,4 @@ catat untuk kamu;
 - lakukan brainstroming sebelum melakukan eksekusi, tak lupa pula lakukan analisa kritik dan saran.
 - pastikan untuk melakukan test pada setiap perubahan yang kamu buat. agar tidak ada error yang terlewatkan.
 - jangan pernah ragu untuk meminta arahan lebih detail.
-- tidak usah melakukan uji menggunakan browser agent.
+- lakukan uji menggunakan browser agent. user: kasir pwd: kasir123 (SELESAI ✓)
