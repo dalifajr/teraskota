@@ -10,6 +10,13 @@ NODE_MAJOR=20  # LTS
 install_node() {
     log_step "[6/7] Install Node.js ${NODE_MAJOR} LTS"
 
+    # If assets are already pre-built in repository, skip Node.js & npm completely
+    if [ -f "${TERASKOTA_ROOT}/public/build/manifest.json" ]; then
+        log_ok "Assets pre-built terdeteksi (public/build/manifest.json)"
+        log_ok "Skip instalasi Node.js & npm (menghemat ~15 menit & RAM)"
+        return 0
+    fi
+
     # Skip if already installed with correct version AND npm is available
     if check_command node; then
         local current_major
@@ -87,6 +94,12 @@ install_node() {
 # Build Vite assets — runs in the app directory
 build_assets() {
     local app_dir="${1:-$TERASKOTA_ROOT}"
+
+    # If assets are already pre-built, skip compile
+    if [ -f "${app_dir}/public/build/manifest.json" ]; then
+        log_ok "Assets pre-built sudah tersedia (public/build) — skip compile"
+        return 0
+    fi
 
     # Ensure npm exists
     if ! check_command npm; then

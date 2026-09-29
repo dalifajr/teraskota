@@ -588,6 +588,9 @@ EOF
 main() {
     print_banner
 
+    # Fix any interrupted dpkg states (e.g. if user aborted apt with Ctrl+C)
+    dpkg --configure -a 2>/dev/null || true
+
     # Purge broken/unsupported PPA entries (common: ondrej/php on Ubuntu 26+)
     # Our PHP installer uses Sury direct repo or Ubuntu default — PPA not needed
     log_info "Membersihkan PPA yang tidak didukung..."
