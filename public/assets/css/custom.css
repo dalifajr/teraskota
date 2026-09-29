@@ -539,3 +539,20 @@ body {
     animation: badgeBounce 0.3s ease-in-out;
 }
 
+/* Ensure SweetAlert2 is ALWAYS in front of all Bootstrap modals and backdrops */
+.swal2-container {
+    z-index: 99999 !important;
+}
+
+.swal2-topmost {
+    z-index: 99999 !important;
+}
+
+/* When SweetAlert2 is nested inside a Bootstrap modal via target option */
+.modal .swal2-container {
+    position: absolute !important;
+    z-index: 1070 !important;
+    inset: 0 !important;
+    border-radius: inherit;
+}
+

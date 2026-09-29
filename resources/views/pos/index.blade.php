@@ -538,7 +538,14 @@
             box-shadow: none !important;
         }
     }
+
+    /* Ensure SweetAlert2 is ALWAYS in front of all Bootstrap modals and backdrops */
+    .swal2-container,
+    .swal2-topmost {
+        z-index: 99999 !important;
+    }
 </style>
+
 @endsection
 
 @section('content')
@@ -832,7 +839,9 @@
         </div>
     </div>
 </div>
+@endsection
 
+@section('modals')
 <!-- Modal 1: Checkout & Pembayaran POS -->
 <div class="modal fade" id="posCheckoutModal" tabindex="-1" aria-labelledby="posCheckoutModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -936,7 +945,7 @@
 </div>
 
 <!-- Modal QRIS Dinamis Interaktif -->
-<div class="modal fade" id="posQrisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posQrisModalLabel" aria-hidden="true" style="z-index: 1065;">
+<div class="modal fade" id="posQrisModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="posQrisModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 440px;">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
             <div class="modal-header bg-dark text-white border-0 py-3" style="background-color: var(--primary-green) !important;">
@@ -964,11 +973,16 @@
                 </div>
 
                 <!-- QR Code Canvas Container -->
-                <div class="d-flex justify-content-center my-3">
-                    <div class="p-3 bg-white border rounded-4 shadow-sm position-relative" style="display: inline-block;">
-                        <div id="qrisCodeContainer" style="min-width: 220px; min-height: 220px; display: flex; align-items: center; justify-content: center;">
+                <div class="d-flex flex-column align-items-center my-2">
+                    <div class="p-3 bg-white border rounded-4 shadow-sm position-relative text-center" style="display: inline-block;">
+                        <div id="qrisCodeContainer" style="min-width: 260px; min-height: 260px; display: flex; align-items: center; justify-content: center; background: #ffffff;">
                             <span class="spinner-border text-success"></span>
                         </div>
+                    </div>
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-3 rounded-pill text-muted small" id="btnCopyQrisPayload" title="Salin Kode Payload QRIS">
+                            <i class="fa-regular fa-copy me-1"></i> <span>Salin Teks QRIS</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1607,7 +1621,7 @@
             statusText.className = 'fw-bold text-dark small';
             document.getElementById('qrisSpinner').style.display = 'inline-block';
 
-            // Generate QR Code into container with multi-tier fallback
+            // Generate QR Code into container with multi-tier fallback (high-res 260x260 with quiet zone)
             const container = document.getElementById('qrisCodeContainer');
             container.innerHTML = '';
             let qrRendered = false;
@@ -1616,8 +1630,8 @@
                 try {
                     new QRCode(container, {
                         text: data.qris_payload,
-                        width: 220,
-                        height: 220,
+                        width: 260,
+                        height: 260,
                         colorDark: "#000000",
                         colorLight: "#ffffff",
                         correctLevel: QRCode.CorrectLevel.M
@@ -1630,13 +1644,36 @@
 
             if (!qrRendered || container.children.length === 0) {
                 const img = document.createElement('img');
-                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(data.qris_payload)}`;
+                img.src = `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(data.qris_payload)}`;
                 img.alt = 'QRIS Dinamis';
                 img.className = 'img-fluid rounded shadow-sm';
-                img.style.width = '220px';
-                img.style.height = '220px';
+                img.style.width = '260px';
+                img.style.height = '260px';
                 container.appendChild(img);
             }
+
+            // Bind Copy QRIS payload button
+            const btnCopyPayload = document.getElementById('btnCopyQrisPayload');
+            if (btnCopyPayload) {
+                btnCopyPayload.onclick = function() {
+                    const qrisModalEl = document.getElementById('posQrisModal');
+                    navigator.clipboard.writeText(data.qris_payload).then(() => {
+                        Swal.fire({
+                            target: qrisModalEl || document.body,
+                            toast: true,
+                            position: 'top-end',
+                            icon: 'success',
+                            title: 'Teks payload QRIS berhasil disalin!',
+                            showConfirmButton: false,
+                            timer: 2000,
+                            customClass: { container: 'swal2-topmost' }
+                        });
+                    }).catch(() => {
+                        prompt('Salin string QRIS berikut:', data.qris_payload);
+                    });
+                };
+            }
+
 
             // Reveal QRIS modal smoothly without modal transition collision
             function revealQrisModal() {
@@ -1799,7 +1836,9 @@
     document.getElementById('btnManualConfirmQris')?.addEventListener('click', async () => {
         if (!currentQrisTransactionId || !currentQrisData) return;
 
+        const qrisModalEl = document.getElementById('posQrisModal');
         const result = await Swal.fire({
+            target: qrisModalEl || document.body,
             title: 'Konfirmasi Manual?',
             text: `Apakah Anda yakin pelanggan sudah membayar Rp ${new Intl.NumberFormat('id-ID').format(currentQrisData.final_amount)} via QRIS?`,
             icon: 'question',
@@ -1807,7 +1846,10 @@
             confirmButtonColor: '#16a34a',
             cancelButtonColor: '#6b7280',
             confirmButtonText: 'Ya, Tandai Lunas',
-            cancelButtonText: 'Batal'
+            cancelButtonText: 'Batal',
+            customClass: {
+                container: 'swal2-topmost'
+            }
         });
 
         if (result.isConfirmed) {
@@ -1825,16 +1867,24 @@
                     handleQrisSuccess(currentQrisData);
                 } else {
                     Swal.fire({
+                        target: qrisModalEl || document.body,
                         icon: 'error',
                         title: 'Gagal',
-                        text: resData.message || 'Gagal mengubah status transaksi.'
+                        text: resData.message || 'Gagal mengubah status transaksi.',
+                        customClass: {
+                            container: 'swal2-topmost'
+                        }
                     });
                 }
             } catch (e) {
                 Swal.fire({
+                    target: qrisModalEl || document.body,
                     icon: 'error',
                     title: 'Error',
-                    text: 'Terjadi kesalahan saat memproses konfirmasi manual.'
+                    text: 'Terjadi kesalahan saat memproses konfirmasi manual.',
+                    customClass: {
+                        container: 'swal2-topmost'
+                    }
                 });
             }
         }

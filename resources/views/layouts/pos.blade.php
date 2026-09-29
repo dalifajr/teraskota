@@ -19,7 +19,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <!-- Custom Style -->
-    <link href="{{ asset('assets/css/custom.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/css/custom.css') }}?v={{ filemtime(public_path('assets/css/custom.css')) }}" rel="stylesheet">
 
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -241,7 +241,21 @@
             }
         }
 
+        /* Ensure SweetAlert2 is ALWAYS in front of all Bootstrap modals and backdrops */
+        .swal2-container,
+        .swal2-topmost {
+            z-index: 99999 !important;
+        }
+
+        /* When SweetAlert2 is nested inside a Bootstrap modal via target option */
+        .modal .swal2-container {
+            position: absolute !important;
+            z-index: 1070 !important;
+            inset: 0 !important;
+            border-radius: inherit;
+        }
     </style>
+
 
     @yield('styles')
 </head>
@@ -317,6 +331,9 @@
     <main class="pos-content-wrapper">
         @yield('content')
     </main>
+
+    <!-- Top-level Modals (Outside flex/overflow container to avoid stacking-context clipping) -->
+    @yield('modals')
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

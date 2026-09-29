@@ -96,59 +96,109 @@ class QrisService
 
     /**
      * Convert static QRIS payload into dynamic with transaction amount.
+     * Uses EMVCo MPM TLV reconstruction to preserve all merchant account information,
+     * tags (including Tip Tag 55), subtags, and spacing.
      */
     public function makeDynamic(string $staticPayload, int|float $amount): string
     {
-        $payload = trim($staticPayload);
+        // Strip only outer whitespace, line breaks, and tabs. PRESERVE internal spaces!
+        $payload = trim($staticPayload, " \t\n\r\0\x0B");
+        $payload = str_replace(["\r\n", "\r", "\n", "\t"], '', $payload);
         if (empty($payload)) {
             return '';
         }
 
-        // 1. Remove existing Tag 63 (Checksum) if present: 6304XXXX
-        $data = preg_replace('/6304[0-9A-Fa-f]{4}$/', '', $payload);
-
-        // 2. Change Tag 01 from 11 (static) to 12 (dynamic)
-        $data = preg_replace('/^000201010211/', '000201010212', $data);
-
-        // 3. Remove existing Tag 54 if already present in payload
-        // TLV parsing ensures accurate removal without touching sub-tags
-        $tags = $this->parse($data);
-        $cleanData = '';
         $amountStr = (string) (int) $amount;
-        $tag54 = '54' . str_pad(strlen($amountStr), 2, '0', STR_PAD_LEFT) . $amountStr;
-        $inserted54 = false;
+        $tags = $this->parse($payload);
 
-        foreach ($tags as $item) {
-            $t = $item['tag'];
-            $v = $item['value'];
+        // If parsed into valid TLV tags, reconstruct via strict EMVCo TLV engine
+        if (!empty($tags) && count($tags) >= 4) {
+            $tag54Obj = [
+                'tag' => '54',
+                'length' => strlen($amountStr),
+                'value' => $amountStr,
+            ];
 
-            if ($t === '54') {
-                // Skip old amount
-                continue;
+            $newTags = [];
+            $inserted54 = false;
+
+            foreach ($tags as $item) {
+                $t = $item['tag'];
+                $v = $item['value'];
+
+                // Drop existing CRC Tag 63
+                if ($t === '63') {
+                    continue;
+                }
+
+                // Change Tag 01 from static "11" to dynamic "12"
+                if ($t === '01') {
+                    $v = '12';
+                }
+
+                // Drop old amount tag if present
+                if ($t === '54') {
+                    continue;
+                }
+
+                // Insert Tag 54 immediately after Currency Tag 53, or before Tag >= 55
+                if (!$inserted54 && (int)$t > 53) {
+                    $newTags[] = $tag54Obj;
+                    $inserted54 = true;
+                }
+
+                $newTags[] = [
+                    'tag' => $t,
+                    'length' => strlen($v),
+                    'value' => $v,
+                ];
             }
 
-            if ($t === '01' && $v === '11') {
-                $v = '12';
+            if (!$inserted54) {
+                $newTags[] = $tag54Obj;
             }
 
-            // Insert Tag 54 right before Tag 58 (Country Code) or other upper tags
-            if (!$inserted54 && (int)$t >= 58) {
-                $cleanData .= $tag54;
-                $inserted54 = true;
+            $body = '';
+            foreach ($newTags as $item) {
+                $body .= $item['tag'] . str_pad((string)$item['length'], 2, '0', STR_PAD_LEFT) . $item['value'];
             }
 
-            $cleanData .= $t . str_pad(strlen($v), 2, '0', STR_PAD_LEFT) . $v;
+            $toChecksum = $body . '6304';
+            return $toChecksum . $this->calculateCrc16($toChecksum);
         }
 
-        if (!$inserted54) {
-            $cleanData .= $tag54;
+        // Fallback for non-standard payloads
+        if (preg_match('/6304[0-9A-Fa-f]{4}$/', $payload)) {
+            $qris = substr($payload, 0, -4);
+        } else {
+            $qris = $payload;
+            if (!str_ends_with($qris, '6304')) {
+                $qris .= '6304';
+            }
         }
 
-        // 4. Append Tag 6304 + calculated CRC16
-        $toChecksum = $cleanData . '6304';
-        $checksum = $this->calculateCrc16($toChecksum);
+        $qris = preg_replace('/^(000201)?010211/', '${1}010212', $qris);
+        $lenStr = str_pad((string) strlen($amountStr), 2, '0', STR_PAD_LEFT);
+        $tag54 = '54' . $lenStr . $amountStr;
 
-        return $toChecksum . $checksum;
+        if (strpos($qris, '5303360') !== false && strpos($qris, '5802ID') !== false) {
+            $pattern = '/5303360(.*?)5802ID/';
+            $qris = preg_replace($pattern, '5303360' . $tag54 . '5802ID', $qris, 1);
+        } else {
+            $parts = explode('5802ID', $qris, 2);
+            if (count($parts) === 2) {
+                $parts[0] = preg_replace('/54[0-9]{2}[0-9]+(\.[0-9]+)?$/', '', $parts[0]);
+                $qris = $parts[0] . $tag54 . '5802ID' . $parts[1];
+            } else {
+                $qris = preg_replace('/6304$/', $tag54 . '6304', $qris);
+            }
+        }
+
+        if (!str_ends_with($qris, '6304')) {
+            $qris = preg_replace('/6304.*$/', '', $qris) . '6304';
+        }
+
+        return $qris . $this->calculateCrc16($qris);
     }
 
     /**

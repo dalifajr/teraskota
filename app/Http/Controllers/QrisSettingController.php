@@ -78,7 +78,17 @@ class QrisSettingController extends Controller
             'qris_expiry_minutes' => ['required', 'integer', 'min:1', 'max:120'],
         ]);
 
-        $payload = trim($validated['qris_payload'] ?? '');
+        $payload = trim($validated['qris_payload'] ?? '', " \t\n\r\0\x0B");
+        $payload = str_replace(["\r\n", "\r", "\n", "\t"], '', $payload);
+
+        // Auto-validate and auto-repair CRC16 if standard EMVCo payload format is detected
+        if (!empty($payload) && str_starts_with($payload, '000201')) {
+            if (str_contains($payload, '6304')) {
+                $body = preg_replace('/6304[0-9A-Fa-f]{0,4}$/', '6304', $payload);
+                $calculatedCrc = $this->qrisService->calculateCrc16($body);
+                $payload = $body . $calculatedCrc;
+            }
+        }
 
         Setting::updateOrCreate(['key' => 'qris_payload'], ['value' => $payload]);
         Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => trim($validated['qris_secret'])]);
@@ -111,4 +121,33 @@ class QrisSettingController extends Controller
         return redirect()->route('settings.qris.index')
             ->with('success', 'Secret Key Webhook berhasil diperbarui: ' . $newSecret);
     }
+
+    /**
+     * Update webhook shared secret key with a custom user-defined value.
+     */
+    public function updateCustomSecret(Request $request)
+    {
+        $validated = $request->validate([
+            'custom_secret' => ['required', 'string', 'min:8', 'max:128'],
+        ], [
+            'custom_secret.required' => 'Secret key tidak boleh kosong.',
+            'custom_secret.min' => 'Secret key minimal 8 karakter demi keamanan.',
+            'custom_secret.max' => 'Secret key maksimal 128 karakter.',
+        ]);
+
+        $newSecret = trim($validated['custom_secret']);
+        Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => $newSecret]);
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Secret Key Webhook berhasil diperbarui!',
+                'secret' => $newSecret,
+            ]);
+        }
+
+        return redirect()->route('settings.qris.index')
+            ->with('success', 'Secret Key Webhook berhasil diperbarui: ' . $newSecret);
+    }
 }
+

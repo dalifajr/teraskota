@@ -1,6 +1,10 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-1. perbaiki pada POS, pada opsi pembayaran QRIS, sistem memperoses qris namun qris bayar tidak muncul. sehingga user tidak bisa melakukan pembayaran. (SELESAI ✓)
+1. popup sweetalert untuk konfirmasi manual pembayaran berada dibelakang popup qris pada pos. sehingga popup dialog konfirmasi tidak dapat saya klik. mungkin terdapat kesalahan dalam pelevelan elemen. (SELESAI ✓)
+   - Solusi: Memperbaiki pelevelan elemen DOM dengan memindahkan seluruh modal ke `@section('modals')` di root `<body>` (di luar container flex/overflow layout POS). Menghapus inline z-index 1065 pada `#posQrisModal` dan menyematkan parameter `target: document.getElementById('posQrisModal')` pada `Swal.fire` sehingga dialog konfirmasi terinjeksi langsung di dalam hierarki modal QRIS dan berada di atas backdrop serta lolos dari focus-trap Bootstrap.
+2. tambahkan dukungan untuk mengubah secret key webhook listener secara custom pada laman pengaturan di role admin. (SELESAI ✓)
+   - Solusi: Menyediakan modal khusus `#modalCustomSecret` dan endpoint `POST /settings/qris/custom-secret` untuk mengubah Secret Key secara manual/custom (minimal 8 karakter). Dilengkapi tombol "Acak Kunci" otomatis, fitur intip password (toggle eye), verifikasi HMAC-SHA256, serta update instan via AJAX tanpa perlu reload halaman.
+
 
 STATUS PENGEMBANGAN VPS (SELESAI ✓):
 - Installer interaktif (vps/install.sh) sukses berjalan di Ubuntu 26 (resolute) x86_64 / ARM64.
@@ -15,4 +19,4 @@ catat untuk kamu;
 - lakukan brainstroming sebelum melakukan eksekusi, tak lupa pula lakukan analisa kritik dan saran.
 - pastikan untuk melakukan test pada setiap perubahan yang kamu buat. agar tidak ada error yang terlewatkan.
 - jangan pernah ragu untuk meminta arahan lebih detail.
-- lakukan uji menggunakan browser agent. user: kasir pwd: kasir123 (SELESAI ✓)
+- tidak usah melakukan uji menggunakan browser agent. user: kasir pwd: kasir123 (SELESAI ✓)

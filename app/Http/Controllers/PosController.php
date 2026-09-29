@@ -169,8 +169,8 @@ class PosController extends Controller
 
         $staticPayload = $qrisService->getStaticPayload();
         if (empty($staticPayload)) {
-            // Auto-provision standard QRIS default payload so POS is never blocked
-            $staticPayload = "00020101021126580014ID.GO.GPN.WWW011893600000000000000002091234567890303UME51440014ID.GO.GPN.WWW011893600000000000000002091234567890303UME5204549953033605802ID5910TERAS KOTA6014KOTA TANGERANG61051511162070703A0163047C3E";
+            // Auto-provision standard valid EMVCo QRIS default payload so POS is never blocked
+            $staticPayload = "00020101021126590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME51590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME5204549953033605802ID5910TERAS KOTA6014KOTA TANGERANG61051511162070703A01630448B3";
             Setting::updateOrCreate(['key' => 'qris_payload'], ['value' => $staticPayload]);
             Setting::updateOrCreate(['key' => 'qris_merchant_name'], ['value' => 'TERAS KOTA']);
             Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => 'KOTA TANGERANG']);

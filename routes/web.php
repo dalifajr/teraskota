@@ -74,6 +74,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/settings/qris', [QrisSettingController::class, 'index'])->name('settings.qris.index');
         Route::put('/settings/qris', [QrisSettingController::class, 'update'])->name('settings.qris.update');
         Route::post('/settings/qris/regenerate-secret', [QrisSettingController::class, 'regenerateSecret'])->name('settings.qris.regenerate-secret');
+        Route::post('/settings/qris/custom-secret', [QrisSettingController::class, 'updateCustomSecret'])->name('settings.qris.custom-secret');
 
         // Admin Browser Desktop Notifications Polling
         Route::get('/notifications/unread-transactions', [DashboardController::class, 'unreadTransactions'])->name('notifications.unread');

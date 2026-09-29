@@ -180,8 +180,13 @@
                                                 id="qris_secret" 
                                                 class="form-control font-monospace @error('qris_secret') is-invalid @enderror" 
                                                 value="{{ old('qris_secret', $secret) }}" 
+                                                minlength="8"
+                                                maxlength="128"
                                                 required
                                             >
+                                            <button class="btn btn-outline-secondary" type="button" id="btnToggleSecret" onclick="toggleSecretVisibility()" title="Lihat/Sembunyikan Secret">
+                                                <i class="fa-regular fa-eye" id="iconToggleSecret"></i>
+                                            </button>
                                             <button class="btn btn-outline-secondary" type="button" onclick="copyToClipboard('qris_secret')" title="Salin Secret">
                                                 <i class="fa-regular fa-copy"></i>
                                             </button>
@@ -194,9 +199,12 @@
                                         </div>
                                     </div>
 
-                                    <div class="d-flex justify-content-end">
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-success fw-bold px-3 py-1" data-bs-toggle="modal" data-bs-target="#modalCustomSecret">
+                                            <i class="fa-solid fa-pen-to-square me-1"></i> Ubah Secret Custom
+                                        </button>
                                         <button type="button" class="btn btn-sm btn-outline-danger" onclick="confirmRegenerateSecret()">
-                                            <i class="fa-solid fa-arrows-rotate me-1"></i> Buat Secret Baru
+                                            <i class="fa-solid fa-arrows-rotate me-1"></i> Acak Ulang (Random)
                                         </button>
                                     </div>
                                 </div>
@@ -308,7 +316,12 @@
 
                             <!-- Secret Key Box -->
                             <div class="mb-4">
-                                <label class="form-label fw-bold small text-dark">Shared Secret:</label>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <label class="form-label fw-bold small text-dark mb-0">Shared Secret:</label>
+                                    <button type="button" class="btn btn-sm btn-link text-success p-0 text-decoration-none fw-bold" data-bs-toggle="modal" data-bs-target="#modalCustomSecret">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> Ubah Secret Custom
+                                    </button>
+                                </div>
                                 <div class="code-box d-flex justify-content-between align-items-center">
                                     <span id="textSecretDoc">{{ $secret }}</span>
                                     <button type="button" class="btn btn-sm btn-light py-0 px-2 text-dark" onclick="copyDirect('textSecretDoc')">
@@ -436,10 +449,78 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Ubah Secret Key Webhook Listener Custom -->
+<div class="modal fade" id="modalCustomSecret" tabindex="-1" aria-labelledby="modalCustomSecretLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+            <form action="{{ route('settings.qris.custom-secret') }}" method="POST" id="formCustomSecret">
+                @csrf
+                <div class="modal-header bg-dark text-white border-0 py-3" style="background-color: var(--primary-green) !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-key text-warning fs-5"></i>
+                        <h5 class="modal-title fw-bold mb-0" id="modalCustomSecretLabel">Ubah Secret Key Webhook</h5>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                
+                <div class="modal-body p-4">
+                    <div class="alert alert-warning py-2 px-3 small rounded-3 mb-3 d-flex align-items-start gap-2">
+                        <i class="fa-solid fa-triangle-exclamation text-warning fs-5 flex-shrink-0 mt-1"></i>
+                        <div>
+                            <strong>PENTING:</strong> Mengubah Secret Key akan membuat aplikasi <strong>Android Listener</strong> di HP kasir tidak dapat memverifikasi notifikasi uang masuk sampai Anda memperbarui Secret Key baru ini di aplikasi HP kasir.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="inputCustomSecret" class="form-label small fw-bold text-dark">
+                            Secret Key Baru (Custom):
+                        </label>
+                        <div class="input-group mb-1">
+                            <input 
+                                type="text" 
+                                name="custom_secret" 
+                                id="inputCustomSecret" 
+                                class="form-control font-monospace" 
+                                placeholder="Masukkan secret key custom..." 
+                                minlength="8" 
+                                maxlength="128" 
+                                value="{{ $secret }}" 
+                                required
+                            >
+                            <button class="btn btn-outline-secondary" type="button" onclick="generateRandomCustomSecret()" title="Buat Kunci Acak Baru">
+                                <i class="fa-solid fa-arrows-rotate me-1"></i> Acak
+                            </button>
+                            <button class="btn btn-outline-secondary" type="button" onclick="copyDirect('inputCustomSecret', true)" title="Salin">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                        <div class="form-text small text-muted">
+                            Minimal 8 karakter. Bebas menggunakan kombinasi huruf, angka, atau simbol.
+                        </div>
+                    </div>
+
+                    <div class="p-2 rounded-3 bg-light border text-muted small">
+                        <i class="fa-solid fa-circle-info text-info me-1"></i>
+                        Secret Key ini dipakai oleh HP Android Listener untuk membuat tanda tangan digital (HMAC-SHA256) saat mendeteksi dana QRIS masuk.
+                    </div>
+                </div>
+
+                <div class="modal-footer bg-light border-top d-flex justify-content-between p-3">
+                    <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4 py-2 rounded-3 btn-sm" id="btnSubmitCustomSecret">
+                        <i class="fa-solid fa-floppy-disk me-1"></i> Simpan Secret Key
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('scripts')
-<!-- jsQR for instant client-side QR image decoding -->
+<!-- Multi-engine QR extraction: Html5Qrcode (ZXing) + jsQR fallback -->
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
 <script>
@@ -453,11 +534,45 @@
         showToast('Berhasil disalin ke clipboard!');
     }
 
-    function copyDirect(elementId) {
-        const text = document.getElementById(elementId)?.innerText;
+    function copyDirect(elementId, isInput = false) {
+        let text = '';
+        if (isInput) {
+            text = document.getElementById(elementId)?.value;
+        } else {
+            text = document.getElementById(elementId)?.innerText;
+        }
         if (!text) return;
         navigator.clipboard.writeText(text);
         showToast('Berhasil disalin ke clipboard!');
+    }
+
+    function toggleSecretVisibility() {
+        const input = document.getElementById('qris_secret');
+        const icon = document.getElementById('iconToggleSecret');
+        if (!input || !icon) return;
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        }
+    }
+
+    function generateRandomCustomSecret() {
+        const chars = '0123456789abcdef';
+        let res = '';
+        for (let i = 0; i < 32; i++) {
+            res += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const input = document.getElementById('inputCustomSecret');
+        if (input) {
+            input.value = res;
+            input.focus();
+            showToast('Secret acak 32-karakter berhasil dibuat!');
+        }
     }
 
     function confirmRegenerateSecret() {
@@ -465,6 +580,79 @@
             document.getElementById('formRegenerateSecret').submit();
         }
     }
+
+    // Handle AJAX submission of Custom Secret Modal
+    document.getElementById('formCustomSecret')?.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitCustomSecret');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menyimpan...';
+
+        const secretVal = document.getElementById('inputCustomSecret').value.trim();
+        const token = document.querySelector('input[name="_token"]')?.value;
+
+        try {
+            const response = await fetch("{{ route('settings.qris.custom-secret') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
+                body: JSON.stringify({ custom_secret: secretVal })
+            });
+            const data = await response.json();
+            if (response.ok && data.status === 'success') {
+                // Update input and doc boxes
+                const qrisSecretInput = document.getElementById('qris_secret');
+                if (qrisSecretInput) qrisSecretInput.value = data.secret;
+                const textSecretDoc = document.getElementById('textSecretDoc');
+                if (textSecretDoc) textSecretDoc.textContent = data.secret;
+
+                // Close modal
+                const modalEl = document.getElementById('modalCustomSecret');
+                const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                modalInstance.hide();
+
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Berhasil!',
+                        text: 'Secret Key Webhook berhasil diperbarui secara custom: ' + data.secret,
+                        confirmButtonColor: '#16a34a'
+                    });
+                } else {
+                    alert('Secret Key Webhook berhasil diperbarui!');
+                }
+            } else {
+                if (window.Swal) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal',
+                        text: data.message || 'Gagal menyimpan secret key.',
+                        confirmButtonColor: '#dc2626'
+                    });
+                } else {
+                    alert(data.message || 'Gagal menyimpan secret key.');
+                }
+            }
+        } catch (err) {
+            if (window.Swal) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Terjadi kesalahan jaringan saat memperbarui secret key.',
+                    confirmButtonColor: '#dc2626'
+                });
+            } else {
+                alert('Terjadi kesalahan jaringan.');
+            }
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    });
 
     function showToast(message) {
         if (window.Swal) {
@@ -516,7 +704,7 @@
         });
     }
 
-    function processQRFile(file) {
+    async function processQRFile(file) {
         if (!file.type.startsWith('image/')) {
             alert('Silakan upload file berupa gambar (JPG, PNG, atau WEBP).');
             return;
@@ -524,45 +712,89 @@
 
         statusDiv.style.display = 'block';
         statusDiv.className = 'mt-2 text-center small text-primary fw-semibold';
-        statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Mengekstrak QR Code...';
+        statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Menganalisa & mengekstrak QR Code...';
 
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            const img = new Image();
-            img.onload = function() {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0, img.width, img.height);
+        let extractedPayload = null;
 
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                let code = null;
+        // Engine 1: Html5Qrcode (ZXing Engine - handles real photos, angles, perspective)
+        if (window.Html5Qrcode) {
+            try {
+                const scanner = new Html5Qrcode('qrisDropzone');
+                extractedPayload = await scanner.scanFile(file, false);
+            } catch (err) {
+                // ZXing couldn't lock, fallback to jsQR
+            }
+        }
 
-                if (window.jsQR) {
-                    code = jsQR(imageData.data, imageData.width, imageData.height, {
-                        inversionAttempts: "dontInvert"
-                    });
-                    if (!code) {
-                        code = jsQR(imageData.data, imageData.width, imageData.height, {
-                            inversionAttempts: "attemptBoth"
-                        });
-                    }
-                }
+        // Engine 2: Downscaled Canvas + jsQR
+        if (!extractedPayload) {
+            extractedPayload = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Downscale huge camera photos (e.g. 4000x3000 down to max 1200px)
+                        let w = img.width;
+                        let h = img.height;
+                        const maxDim = 1200;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round((h * maxDim) / w);
+                                w = maxDim;
+                            } else {
+                                w = Math.round((w * maxDim) / h);
+                                h = maxDim;
+                            }
+                        }
 
-                if (code && code.data) {
-                    payloadTextarea.value = code.data;
-                    statusDiv.className = 'mt-2 text-center small text-success fw-bold';
-                    statusDiv.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> QRIS Berhasil Diekstrak!';
-                    showToast('QR Code QRIS berhasil diekstrak ke dalam Payload!');
-                } else {
-                    statusDiv.className = 'mt-2 text-center small text-danger fw-semibold';
-                    statusDiv.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Tidak dapat menemukan barcode QRIS pada gambar ini. Pastikan gambar tajam dan tidak blur.';
-                }
-            };
-            img.src = e.target.result;
-        };
-        reader.readAsDataURL(file);
+                        canvas.width = w;
+                        canvas.height = h;
+                        ctx.drawImage(img, 0, 0, w, h);
+
+                        if (window.jsQR) {
+                            const imgData = ctx.getImageData(0, 0, w, h);
+                            let code = jsQR(imgData.data, w, h, { inversionAttempts: "dontInvert" });
+                            if (!code) {
+                                code = jsQR(imgData.data, w, h, { inversionAttempts: "attemptBoth" });
+                            }
+                            if (code && code.data) {
+                                resolve(code.data);
+                                return;
+                            }
+                        }
+                        resolve(null);
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        if (extractedPayload) {
+            // Clean outer whitespace, tabs, and newlines
+            const cleanPayload = extractedPayload.trim().replace(/[\r\n\t]+/g, '');
+            payloadTextarea.value = cleanPayload;
+
+            // Extract merchant name preview (Tag 59)
+            let merchantName = 'Teras Kota';
+            const mMatch = cleanPayload.match(/59([0-9]{2})([A-Za-z0-9\s\.\,\-\*]+)/);
+            if (mMatch) {
+                const len = parseInt(mMatch[1], 10);
+                merchantName = mMatch[2].substring(0, len).trim();
+            }
+
+            statusDiv.className = 'mt-2 text-center small text-success fw-bold p-2 bg-success-subtle rounded-3';
+            statusDiv.innerHTML = `<i class="fa-solid fa-circle-check me-1"></i> QRIS Berhasil Diekstrak!<div class="text-dark small fw-normal mt-1">Merchant: <strong>${merchantName}</strong> (${cleanPayload.length} karakter)</div>`;
+            showToast('QR Code QRIS berhasil diekstrak ke dalam Payload!');
+        } else {
+            statusDiv.className = 'mt-2 text-center small text-danger fw-semibold p-2 bg-danger-subtle rounded-3';
+            statusDiv.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Tidak dapat menemukan barcode QRIS pada gambar ini. Pastikan gambar tajam, tidak terlalu gelap, dan fokus pada kode QR.';
+        }
     }
 </script>
 @endsection
