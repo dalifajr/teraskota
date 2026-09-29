@@ -551,9 +551,17 @@ install_control_panel() {
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════
 print_summary() {
-    local domain php_ver
+    local domain php_ver site_url ssl_status
     domain=$(load_config "DOMAIN")
     php_ver=$(load_config "PHP_VERSION" "8.3")
+
+    if [ -d "/etc/letsencrypt/live/${domain}" ]; then
+        site_url="https://${domain}"
+        ssl_status="${C_GREEN}Active (Certbot auto-renew)${C_RESET}"
+    else
+        site_url="http://${domain}"
+        ssl_status="${C_YELLOW}Pending (HTTP aktif — setup via teraskota-ctl)${C_RESET}"
+    fi
 
     echo
     echo -e "${C_BOLD}${C_GREEN}"
@@ -565,12 +573,12 @@ print_summary() {
   ╚════════════════════════════════════════════════════╝
 EOF
     echo -e "${C_RESET}"
-    echo -e "  ${C_BOLD}Website${C_RESET}     : https://${domain}"
+    echo -e "  ${C_BOLD}Website${C_RESET}     : ${C_GREEN}${site_url}${C_RESET}"
     echo -e "  ${C_BOLD}Root Dir${C_RESET}    : ${TERASKOTA_ROOT}"
     echo -e "  ${C_BOLD}PHP${C_RESET}         : ${php_ver}-fpm"
     echo -e "  ${C_BOLD}Database${C_RESET}    : MariaDB → $(load_config 'DB_NAME')"
     echo -e "  ${C_BOLD}Web Server${C_RESET}  : Nginx"
-    echo -e "  ${C_BOLD}SSL${C_RESET}         : Certbot (auto-renew)"
+    echo -e "  ${C_BOLD}SSL${C_RESET}         : ${ssl_status}"
     echo -e "  ${C_BOLD}Backup${C_RESET}      : Daily 02:00 → ${TERASKOTA_BACKUP_DIR}"
     echo -e "  ${C_BOLD}Firewall${C_RESET}    : UFW (22, 80, 443)"
     echo
@@ -641,7 +649,7 @@ main() {
 
     # [7/7] SSL
     install_certbot
-    obtain_ssl "$(load_config 'DOMAIN')" "$(load_config 'SSL_EMAIL')"
+    obtain_ssl "$(load_config 'DOMAIN')" "$(load_config 'SSL_EMAIL')" || true
 
     # Post-install
     setup_firewall

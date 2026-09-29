@@ -47,24 +47,28 @@ obtain_ssl() {
     # Attempt to get cert
     if "${certbot_cmd[@]}" 2>&1; then
         log_ok "SSL certificate berhasil didapatkan untuk ${domain}"
-    else
-        log_warn "SSL gagal — mungkin domain belum pointing ke server ini"
-        log_warn "Jalankan ulang nanti: certbot --nginx -d ${domain}"
-        log_warn "Atau gunakan: teraskota-ctl → Fix SSL Certificate"
-        return 1
-    fi
 
-    # Verify auto-renewal timer
-    if systemctl is-enabled certbot.timer &>/dev/null; then
-        log_ok "Auto-renewal sudah aktif (certbot.timer)"
+        # Verify auto-renewal timer
+        if systemctl is-enabled certbot.timer &>/dev/null; then
+            log_ok "Auto-renewal sudah aktif (certbot.timer)"
+        else
+            systemctl enable --now certbot.timer 2>/dev/null || {
+                # Fallback: cron
+                log_warn "certbot.timer tidak tersedia, setup cron..."
+                local cron_line="0 3 * * * /usr/bin/certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
+                (crontab -l 2>/dev/null | grep -v certbot; echo "$cron_line") | crontab -
+                log_ok "Cron auto-renewal ditambahkan (03:00 daily)"
+            }
+        fi
     else
-        systemctl enable --now certbot.timer 2>/dev/null || {
-            # Fallback: cron
-            log_warn "certbot.timer tidak tersedia, setup cron..."
-            local cron_line="0 3 * * * /usr/bin/certbot renew --quiet --deploy-hook 'systemctl reload nginx'"
-            (crontab -l 2>/dev/null | grep -v certbot; echo "$cron_line") | crontab -
-            log_ok "Cron auto-renewal ditambahkan (03:00 daily)"
-        }
+        log_warn "SSL belum berhasil didapatkan untuk ${domain}"
+        log_warn "Penyebab umum: Domain diproxy Cloudflare (Orange Cloud) atau DNS belum propagasi."
+        log_warn "Website tetap aktif via HTTP (port 80)."
+        log_warn "Cara setup SSL nanti:"
+        log_warn "  1. Di dashboard Cloudflare: ubah awan ke 'DNS Only' (Grey) sementara"
+        log_warn "  2. Jalankan: sudo teraskota-ctl -> pilih menu 'Fix SSL Certificate'"
+        log_warn "  3. Setelah sukses, ubah kembali Cloudflare ke 'Proxied' (Orange)"
+        return 0
     fi
 }
 
