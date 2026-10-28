@@ -18,6 +18,7 @@ class MigrateLegacyDataCommand extends Command
     protected $signature = 'teraskota:migrate-data 
                             {file? : Path file SQL dump (default: if0_42684462_db_teras_kota.sql)}
                             {--fresh : Hapus data lama di tabel bisnis sebelum import}
+                            {--force : Jalankan tanpa konfirmasi interaktif di mode production}
                             {--generate-sql : Hasilkan juga file database/sql/data_only_teraskota.sql}';
 
     /**
@@ -67,15 +68,17 @@ class MigrateLegacyDataCommand extends Command
 
         $this->info("Ditemukan " . count($statements) . " blok INSERT INTO untuk data bisnis.");
 
-        // Jika opsi --generate-sql aktif, buat file SQL data-only
+        // Jika opsi --generate-sql aktif, buat file SQL data-only (dengan error handling aman)
         if ($this->option('generate-sql')) {
             $this->generateDataOnlySql($statements);
         }
 
         // 2. Konfirmasi eksekusi jika di production
-        if (app()->environment('production') && !$this->confirm('Aplikasi berjalan di mode PRODUCTION. Lanjutkan proses migrasi data?', true)) {
-            $this->warn("Operasi dibatalkan oleh user.");
-            return Command::SUCCESS;
+        if (app()->environment('production') && !$this->option('force')) {
+            if (!$this->confirm('Aplikasi berjalan di mode PRODUCTION. Lanjutkan proses migrasi data?', true)) {
+                $this->warn("Operasi dibatalkan oleh user.");
+                return Command::SUCCESS;
+            }
         }
 
         $this->newLine();
@@ -232,39 +235,43 @@ class MigrateLegacyDataCommand extends Command
      */
     protected function generateDataOnlySql(array $statements): void
     {
-        $sqlDir = base_path('database/sql');
-        if (!File::isDirectory($sqlDir)) {
-            File::makeDirectory($sqlDir, 0755, true);
+        try {
+            $sqlDir = base_path('database/sql');
+            if (!File::isDirectory($sqlDir)) {
+                File::makeDirectory($sqlDir, 0755, true);
+            }
+
+            $outputPath = $sqlDir . '/data_only_teraskota.sql';
+
+            $header = "-- ========================================================\n";
+            $header .= "-- Teras Kota — Data-Only Migration Dump\n";
+            $header .= "-- Generated at: " . date('Y-m-d H:i:s') . "\n";
+            $header .= "-- Berisi HANYA data operasional tanpa merusak skema tabel\n";
+            $header .= "-- ========================================================\n\n";
+            $header .= "SET FOREIGN_KEY_CHECKS = 0;\n";
+            $header .= "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n";
+
+            // Truncate commands
+            $header .= "-- 1. Membersihkan data lama agar ID tidak bentrok\n";
+            foreach (array_reverse($this->targetTables) as $table) {
+                $header .= "TRUNCATE TABLE `{$table}`;\n";
+            }
+            $header .= "\n-- 2. Memasukkan data asli dari InfinityFree\n";
+
+            $body = implode("\n", $statements) . "\n\n";
+
+            $footer = "-- 3. Penyesuaian Kolom Sistem Baru (Role & QRIS)\n";
+            $footer .= "UPDATE `users` SET `role` = 'admin' WHERE `username` = 'admin';\n";
+            $footer .= "UPDATE `transactions` SET `final_amount` = `total_sales` WHERE `final_amount` IS NULL;\n";
+            $footer .= "UPDATE `transactions` SET `status` = 'paid' WHERE `status` IS NULL OR `status` = '';\n";
+            $footer .= "UPDATE `transactions` SET `payment_method` = 'tunai' WHERE `payment_method` IS NULL OR `payment_method` = '';\n";
+            $footer .= "UPDATE `transactions` SET `sync_status` = 'synced' WHERE `sync_status` IS NULL OR `sync_status` = '';\n\n";
+            $footer .= "SET FOREIGN_KEY_CHECKS = 1;\n";
+
+            File::put($outputPath, $header . $body . $footer);
+            $this->info("File SQL data-only tersimpan di: {$outputPath}");
+        } catch (\Throwable $e) {
+            $this->warn("Skip pembuatan file SQL data-only (permission file/direktori terbatas): " . $e->getMessage());
         }
-
-        $outputPath = $sqlDir . '/data_only_teraskota.sql';
-
-        $header = "-- ========================================================\n";
-        $header .= "-- Teras Kota — Data-Only Migration Dump\n";
-        $header .= "-- Generated at: " . date('Y-m-d H:i:s') . "\n";
-        $header .= "-- Berisi HANYA data operasional tanpa merusak skema tabel\n";
-        $header .= "-- ========================================================\n\n";
-        $header .= "SET FOREIGN_KEY_CHECKS = 0;\n";
-        $header .= "SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';\n\n";
-
-        // Truncate commands
-        $header .= "-- 1. Membersihkan data lama agar ID tidak bentrok\n";
-        foreach (array_reverse($this->targetTables) as $table) {
-            $header .= "TRUNCATE TABLE `{$table}`;\n";
-        }
-        $header .= "\n-- 2. Memasukkan data asli dari InfinityFree\n";
-
-        $body = implode("\n", $statements) . "\n\n";
-
-        $footer = "-- 3. Penyesuaian Kolom Sistem Baru (Role & QRIS)\n";
-        $footer .= "UPDATE `users` SET `role` = 'admin' WHERE `username` = 'admin';\n";
-        $footer .= "UPDATE `transactions` SET `final_amount` = `total_sales` WHERE `final_amount` IS NULL;\n";
-        $footer .= "UPDATE `transactions` SET `status` = 'paid' WHERE `status` IS NULL OR `status` = '';\n";
-        $footer .= "UPDATE `transactions` SET `payment_method` = 'tunai' WHERE `payment_method` IS NULL OR `payment_method` = '';\n";
-        $footer .= "UPDATE `transactions` SET `sync_status` = 'synced' WHERE `sync_status` IS NULL OR `sync_status` = '';\n\n";
-        $footer .= "SET FOREIGN_KEY_CHECKS = 1;\n";
-
-        File::put($outputPath, $header . $body . $footer);
-        $this->info("File SQL data-only tersimpan di: {$outputPath}");
     }
 }

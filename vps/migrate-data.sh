@@ -49,15 +49,20 @@ fi
 
 log_info "Menggunakan file data: ${C_BOLD}${SQL_FILE}${C_RESET}"
 
-# 1. Pastikan migrasi skema tabel terbaru sudah berjalan
+# 1. Pastikan permission direktori benar untuk www-data
+log_info "Memastikan permission direktori www-data..."
+chown -R www-data:www-data "${TERASKOTA_ROOT}"
+chmod -R 775 "${TERASKOTA_ROOT}/storage" "${TERASKOTA_ROOT}/bootstrap/cache"
+
+# 2. Pastikan migrasi skema tabel terbaru sudah berjalan
 log_info "Memastikan seluruh skema tabel Laravel sudah up-to-date..."
 sudo -u www-data php artisan migrate --force
 
-# 2. Jalankan command migrasi data teraskota
+# 3. Jalankan command migrasi data teraskota
 log_info "Menjalankan migrasi data bisnis ke database..."
-sudo -u www-data php artisan teraskota:migrate-data "${SQL_FILE}" --generate-sql
+sudo -u www-data php artisan teraskota:migrate-data "${SQL_FILE}" --force
 
-# 3. Refresh cache aplikasi
+# 4. Refresh cache aplikasi
 log_info "Membersihkan dan memperbarui cache aplikasi..."
 sudo -u www-data php artisan optimize:clear
 sudo -u www-data php artisan optimize
