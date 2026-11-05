@@ -52,12 +52,30 @@ const ReceiptRenderer = (function () {
         });
 
         // Use recorded total if available
-        if (transaction.total_sales) {
+        const subtotalAmount = Number(transaction.subtotal_amount || totalSales);
+        const discountAmount = Number(transaction.discount_amount || 0);
+        const discountType = transaction.discount_type || null;
+        const discountValue = Number(transaction.discount_value || 0);
+
+        if (transaction.total_sales !== undefined && transaction.total_sales !== null) {
             totalSales = Number(transaction.total_sales);
+        } else if (discountAmount > 0) {
+            totalSales = Math.max(0, subtotalAmount - discountAmount);
         }
         if (transaction.total_quantity) {
             totalQty = Number(transaction.total_quantity);
         }
+
+        const discountRowsHtml = discountAmount > 0 ? `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <span style="color: #64748b;">Subtotal:</span>
+                <span>${formatRupiah(subtotalAmount)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #b91c1c;">
+                <span>Diskon${discountType === 'percentage' ? ` (${discountValue}%)` : ''}:</span>
+                <span>-${formatRupiah(discountAmount)}</span>
+            </div>
+        ` : '';
 
         const cashTendered = Number(transaction.cash_tendered || totalSales);
         const changeReturned = Number(transaction.change_returned || (cashTendered - totalSales));
@@ -110,6 +128,7 @@ const ReceiptRenderer = (function () {
                         <span style="color: #64748b;">Total Item:</span>
                         <span>${totalQty} pcs</span>
                     </div>
+                    ${discountRowsHtml}
                     <div style="display: flex; justify-content: space-between; margin-bottom: 4px; font-size: 13px; font-weight: 700; color: #0f172a;">
                         <span>TOTAL:</span>
                         <span>${formatRupiah(totalSales)}</span>

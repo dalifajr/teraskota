@@ -55,6 +55,12 @@
                     <span>Riwayat Transaksi</span>
                 </a>
             </li>
+            <li class="sidebar-item {{ Request::routeIs('expenses.*') ? 'active' : '' }}">
+                <a href="{{ route('expenses.index') }}" class="sidebar-link">
+                    <i class="fa-solid fa-money-bill-transfer"></i>
+                    <span>Pengeluaran Kas</span>
+                </a>
+            </li>
             <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
                 <a href="{{ route('menus.index') }}" class="sidebar-link">
                     <i class="fa-solid fa-coffee"></i>
@@ -156,6 +162,12 @@
                     <a href="{{ route('transactions.index') }}" class="sidebar-link">
                         <i class="fa-solid fa-history"></i>
                         <span>Riwayat Transaksi</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('expenses.*') ? 'active' : '' }}">
+                    <a href="{{ route('expenses.index') }}" class="sidebar-link">
+                        <i class="fa-solid fa-money-bill-transfer"></i>
+                        <span>Pengeluaran Kas</span>
                     </a>
                 </li>
                 <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">

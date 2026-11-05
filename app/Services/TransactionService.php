@@ -20,11 +20,12 @@ class TransactionService
         $formattedDate = Carbon::parse($date)->format('Ymd');
         $prefix = "TRX-{$formattedDate}-";
 
-        // Find the latest transaction for that date
+        // Find the latest transaction for that date with row-level lock inside transaction
         $latest = Transaction::withTrashed()
             ->whereDate('transaction_date', $date)
             ->where('transaction_number', 'like', "{$prefix}%")
             ->orderBy('transaction_number', 'desc')
+            ->lockForUpdate()
             ->first();
 
         if ($latest) {
@@ -37,6 +38,45 @@ class TransactionService
         }
 
         return $prefix . $nextCounter;
+    }
+
+    /**
+     * Calculate discount type, value, and Rupiah amount safely against subtotal.
+     */
+    public function resolveDiscount(float $subtotalAmount, array $data, ?Transaction $existing = null): array
+    {
+        $discountType = $data['discount_type'] ?? ($existing?->discount_type ?? null);
+        $discountValue = isset($data['discount_value']) && is_numeric($data['discount_value'])
+            ? (float) $data['discount_value']
+            : (isset($data['discount_amount']) && is_numeric($data['discount_amount']) && empty($discountType)
+                ? (float) $data['discount_amount']
+                : (float) ($existing?->discount_value ?? 0));
+
+        if (empty($discountType) && $discountValue > 0) {
+            $discountType = 'nominal';
+        }
+
+        if ($discountValue <= 0 || !in_array($discountType, ['nominal', 'percentage'], true)) {
+            return [
+                'discount_type' => null,
+                'discount_value' => 0.0,
+                'discount_amount' => 0.0,
+            ];
+        }
+
+        if ($discountType === 'percentage') {
+            $discountValue = min(100.0, max(0.0, $discountValue));
+            $discountAmount = round($subtotalAmount * ($discountValue / 100.0), 2);
+        } else {
+            $discountValue = max(0.0, $discountValue);
+            $discountAmount = min($subtotalAmount, $discountValue);
+        }
+
+        return [
+            'discount_type' => $discountType,
+            'discount_value' => $discountValue,
+            'discount_amount' => $discountAmount,
+        ];
     }
 
     /**
@@ -60,6 +100,11 @@ class TransactionService
             
             $transactionNumber = $this->generateTransactionNumber($transactionDate);
             $globalProfitPercentage = (float) Setting::getValue('global_profit_percentage', 30);
+            $status = $data['status'] ?? 'paid';
+
+            // Pre-fetch all required menus with their categories to prevent N+1 queries
+            $menuIds = collect($data['items'])->pluck('menu_id')->unique()->filter()->values();
+            $menus = Menu::with('category')->whereIn('id', $menuIds)->get()->keyBy('id');
 
             // Create placeholder transaction
             $transaction = Transaction::create([
@@ -71,6 +116,12 @@ class TransactionService
                 'total_sales' => 0,
                 'total_profit' => 0,
                 'estimated_cost' => 0,
+                'status' => $status,
+                'unique_code' => $data['unique_code'] ?? null,
+                'final_amount' => $data['final_amount'] ?? null,
+                'qris_payload' => $data['qris_payload'] ?? null,
+                'qris_expired_at' => $data['qris_expired_at'] ?? null,
+                'paid_at' => $status === 'paid' ? ($data['paid_at'] ?? now()) : null,
                 'source_device_id' => $data['source_device_id'] ?? null,
                 'sync_status' => $data['sync_status'] ?? 'synced',
                 'synced_at' => $data['synced_at'] ?? now(),
@@ -89,7 +140,7 @@ class TransactionService
 
                 if ($quantity <= 0) continue;
 
-                $menu = Menu::findOrFail($menuId);
+                $menu = $menus->get($menuId) ?? Menu::with('category')->findOrFail($menuId);
 
                 // Determine profit percentage
                 $profitPercentage = $menu->use_global_profit 
@@ -120,21 +171,38 @@ class TransactionService
                 $totalEstimatedCost += $estimatedCost;
             }
 
+            $subtotalAmount = $totalSales;
+            $discountData = $this->resolveDiscount($subtotalAmount, $data);
+            $discountAmount = $discountData['discount_amount'];
+            $netSales = max(0.0, $subtotalAmount - $discountAmount);
+            $netProfit = $totalProfit - $discountAmount;
+
             $paymentMethod = $data['payment_method'] ?? 'tunai';
             $cashTendered = isset($data['cash_tendered']) && is_numeric($data['cash_tendered']) ? (float) $data['cash_tendered'] : null;
-            $changeReturned = ($cashTendered !== null && $cashTendered >= $totalSales)
-                ? ($cashTendered - $totalSales)
+
+            if ($paymentMethod === 'tunai' && $cashTendered !== null && $cashTendered < $netSales) {
+                throw new \InvalidArgumentException(
+                    'Nominal uang tunai yang diterima (Rp' . number_format($cashTendered, 0, ',', '.') . ') kurang dari total belanja setelah diskon (Rp' . number_format($netSales, 0, ',', '.') . ').'
+                );
+            }
+
+            $changeReturned = ($cashTendered !== null && $cashTendered >= $netSales)
+                ? ($cashTendered - $netSales)
                 : (isset($data['change_returned']) && is_numeric($data['change_returned']) ? (float) $data['change_returned'] : 0);
             $customerName = $data['customer_name'] ?? null;
 
             // Update main transaction record with aggregates & POS payment data
             $transaction->update([
                 'total_quantity' => $totalQuantity,
-                'total_sales' => $totalSales,
-                'total_profit' => $totalProfit,
+                'subtotal_amount' => $subtotalAmount,
+                'discount_type' => $discountData['discount_type'],
+                'discount_value' => $discountData['discount_value'],
+                'discount_amount' => $discountAmount,
+                'total_sales' => $netSales,
+                'total_profit' => $netProfit,
                 'estimated_cost' => $totalEstimatedCost,
                 'payment_method' => $paymentMethod,
-                'cash_tendered' => $cashTendered ?? $totalSales,
+                'cash_tendered' => $cashTendered ?? ($data['final_amount'] ?? $netSales),
                 'change_returned' => $changeReturned,
                 'customer_name' => $customerName,
             ]);
@@ -164,6 +232,10 @@ class TransactionService
             $transaction->transaction_time = $transactionTime;
             $transaction->notes = $data['notes'] ?? null;
 
+            // Pre-fetch all required menus with their categories to prevent N+1 queries
+            $menuIds = collect($data['items'])->pluck('menu_id')->unique()->filter()->values();
+            $menus = Menu::with('category')->whereIn('id', $menuIds)->get()->keyBy('id');
+
             // Delete old details
             $transaction->details()->delete();
 
@@ -178,7 +250,7 @@ class TransactionService
 
                 if ($quantity <= 0) continue;
 
-                $menu = Menu::findOrFail($menuId);
+                $menu = $menus->get($menuId) ?? Menu::with('category')->findOrFail($menuId);
 
                 // Determine profit percentage
                 $profitPercentage = $menu->use_global_profit 
@@ -209,10 +281,39 @@ class TransactionService
                 $totalEstimatedCost += $estimatedCost;
             }
 
+            $oldTotalSales = (float) $transaction->total_sales;
+            $subtotalAmount = $totalSales;
+            $discountData = $this->resolveDiscount($subtotalAmount, $data, $transaction);
+            $discountAmount = $discountData['discount_amount'];
+            $netSales = max(0.0, $subtotalAmount - $discountAmount);
+            $netProfit = $totalProfit - $discountAmount;
+
             $transaction->total_quantity = $totalQuantity;
-            $transaction->total_sales = $totalSales;
-            $transaction->total_profit = $totalProfit;
+            $transaction->subtotal_amount = $subtotalAmount;
+            $transaction->discount_type = $discountData['discount_type'];
+            $transaction->discount_value = $discountData['discount_value'];
+            $transaction->discount_amount = $discountAmount;
+            $transaction->total_sales = $netSales;
+            $transaction->total_profit = $netProfit;
             $transaction->estimated_cost = $totalEstimatedCost;
+
+            // Reconcile payment fields when transaction items are edited
+            if ($transaction->unique_code) {
+                $transaction->final_amount = $netSales + (int) $transaction->unique_code;
+            }
+            if ($transaction->payment_method === 'tunai') {
+                $currentCash = (float) ($transaction->cash_tendered ?? 0);
+                if ($currentCash <= $oldTotalSales || $currentCash < $netSales) {
+                    $transaction->cash_tendered = $netSales;
+                    $transaction->change_returned = 0;
+                } else {
+                    $transaction->change_returned = $currentCash - $netSales;
+                }
+            } else {
+                $transaction->cash_tendered = $transaction->final_amount ?? $netSales;
+                $transaction->change_returned = 0;
+            }
+
             $transaction->save();
 
             return $transaction;

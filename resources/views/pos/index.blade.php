@@ -747,6 +747,23 @@
                         <span>Total Kuantitas:</span>
                         <strong class="text-dark" id="checkoutScreenTotalQty">0 pcs</strong>
                     </div>
+                    <div class="d-flex justify-content-between text-muted small mb-2">
+                        <span>Subtotal:</span>
+                        <strong class="text-dark" id="checkoutScreenSubtotal">Rp0</strong>
+                    </div>
+
+                    <!-- Diskon / Promo (Screen Mode) -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-dark mb-1"><i class="fa-solid fa-tag text-warning me-1"></i> Diskon / Promo</label>
+                        <div class="input-group input-group-sm">
+                            <select class="form-select fw-semibold" id="screenDiscountType" style="max-width: 110px;">
+                                <option value="nominal">Rp (Nominal)</option>
+                                <option value="percentage">% (Persen)</option>
+                            </select>
+                            <input type="number" id="screenDiscountValue" class="form-control fw-bold" placeholder="0" min="0" value="0">
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center pt-2 border-top">
                         <span class="fw-bold text-dark fs-6">Total Tagihan:</span>
                         <span class="fs-2 fw-bold text-success" id="checkoutScreenGrandTotal">Rp0</span>
@@ -855,9 +872,22 @@
             
             <div class="modal-body p-4">
                 <!-- Grand Total Display -->
-                <div class="text-center p-3 mb-4 rounded-3" style="background: var(--mint-soft);">
+                <div class="text-center p-3 mb-3 rounded-3" style="background: var(--mint-soft);">
                     <small class="text-muted fw-semibold text-uppercase">Total Yang Harus Dibayar</small>
                     <div class="fs-1 fw-bold text-success" id="checkoutModalTotal">Rp0</div>
+                    <div class="small text-muted d-none" id="checkoutModalDiscountInfo"></div>
+                </div>
+
+                <!-- Diskon / Promo (Modal Mode) -->
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark small mb-1"><i class="fa-solid fa-tag text-warning me-1"></i> Diskon / Promo Transaksi</label>
+                    <div class="input-group input-group-sm">
+                        <select class="form-select fw-semibold" id="modalDiscountType" style="max-width: 130px;">
+                            <option value="nominal">Rp (Nominal)</option>
+                            <option value="percentage">% (Persen)</option>
+                        </select>
+                        <input type="number" id="modalDiscountValue" class="form-control fw-bold" placeholder="0" min="0" value="0">
+                    </div>
                 </div>
 
                 <!-- Metode Pembayaran -->
@@ -1369,12 +1399,46 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // Helper: Calculate Discount & Net Total for Screen or Modal
+    function computeCheckoutPricing(mode = 'modal') {
+        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const typeEl = document.getElementById(mode === 'screen' ? 'screenDiscountType' : 'modalDiscountType');
+        const valEl = document.getElementById(mode === 'screen' ? 'screenDiscountValue' : 'modalDiscountValue');
+
+        const discountType = typeEl?.value || 'nominal';
+        let discountValue = parseFloat(valEl?.value) || 0;
+        let discountAmount = 0;
+
+        if (discountValue > 0) {
+            if (discountType === 'percentage') {
+                discountValue = Math.min(100, Math.max(0, discountValue));
+                discountAmount = Math.round(subtotal * (discountValue / 100));
+            } else {
+                discountValue = Math.max(0, discountValue);
+                discountAmount = Math.min(subtotal, discountValue);
+            }
+        } else {
+            discountValue = 0;
+        }
+
+        const netTotal = Math.max(0, subtotal - discountAmount);
+        return {
+            subtotal,
+            discountType: discountAmount > 0 ? discountType : null,
+            discountValue: discountAmount > 0 ? discountValue : 0,
+            discountAmount,
+            netTotal
+        };
+    }
+
     // Populate Data in Dedicated Checkout Screen
     function populateCheckoutScreen() {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const pricing = computeCheckoutPricing('screen');
         const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
 
-        document.getElementById('checkoutScreenGrandTotal').textContent = formatRupiah(grandTotal);
+        const subEl = document.getElementById('checkoutScreenSubtotal');
+        if (subEl) subEl.textContent = formatRupiah(pricing.subtotal);
+        document.getElementById('checkoutScreenGrandTotal').textContent = formatRupiah(pricing.netTotal);
         document.getElementById('checkoutScreenTotalQty').textContent = `${totalQty} pcs`;
         document.getElementById('checkoutScreenItemCount').textContent = `${cart.length} menu`;
 
@@ -1409,10 +1473,9 @@
             return;
         }
 
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        document.getElementById('checkoutModalTotal').textContent = formatRupiah(grandTotal);
-
         // Reset modal inputs
+        if (document.getElementById('modalDiscountType')) document.getElementById('modalDiscountType').value = 'nominal';
+        if (document.getElementById('modalDiscountValue')) document.getElementById('modalDiscountValue').value = '0';
         document.getElementById('cashTenderedInput').value = '';
         document.getElementById('posCustomerName').value = '';
         document.getElementById('posNotes').value = '';
@@ -1429,10 +1492,10 @@
 
     // Modal Quick Cash Helper
     function setQuickCash(val) {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const pricing = computeCheckoutPricing('modal');
         const cashInput = document.getElementById('cashTenderedInput');
         if (val === 'pas') {
-            cashInput.value = grandTotal;
+            cashInput.value = pricing.netTotal;
         } else {
             cashInput.value = val;
         }
@@ -1441,10 +1504,24 @@
 
     // Modal Change Calculator
     function calculateChange() {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const pricing = computeCheckoutPricing('modal');
+        const totalEl = document.getElementById('checkoutModalTotal');
+        if (totalEl) totalEl.textContent = formatRupiah(pricing.netTotal);
+
+        const discInfoEl = document.getElementById('checkoutModalDiscountInfo');
+        if (discInfoEl) {
+            if (pricing.discountAmount > 0) {
+                discInfoEl.classList.remove('d-none');
+                discInfoEl.textContent = `Subtotal: ${formatRupiah(pricing.subtotal)} | Diskon: -${formatRupiah(pricing.discountAmount)}`;
+            } else {
+                discInfoEl.classList.add('d-none');
+                discInfoEl.textContent = '';
+            }
+        }
+
         const cashInput = document.getElementById('cashTenderedInput');
         const cashTendered = parseFloat(cashInput?.value) || 0;
-        const change = cashTendered - grandTotal;
+        const change = cashTendered - pricing.netTotal;
 
         const changeTextEl = document.getElementById('changeAmountText');
         if (!changeTextEl) return;
@@ -1458,6 +1535,8 @@
         }
     }
     document.getElementById('cashTenderedInput')?.addEventListener('input', calculateChange);
+    document.getElementById('modalDiscountType')?.addEventListener('change', calculateChange);
+    document.getElementById('modalDiscountValue')?.addEventListener('input', calculateChange);
 
     // Modal Payment Method Radio Change
     document.querySelectorAll('input[name="payment_method"]').forEach(radio => {
@@ -1511,10 +1590,10 @@
 
     // Screen Quick Cash
     function setScreenQuickCash(val) {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const pricing = computeCheckoutPricing('screen');
         const input = document.getElementById('screenCashInput');
         if (val === 'pas') {
-            input.value = grandTotal;
+            input.value = pricing.netTotal;
         } else {
             input.value = val;
         }
@@ -1522,10 +1601,13 @@
     }
 
     function calculateScreenChange() {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+        const pricing = computeCheckoutPricing('screen');
+        const totalEl = document.getElementById('checkoutScreenGrandTotal');
+        if (totalEl) totalEl.textContent = formatRupiah(pricing.netTotal);
+
         const cashInput = document.getElementById('screenCashInput');
         const cashTendered = parseFloat(cashInput?.value) || 0;
-        const change = cashTendered - grandTotal;
+        const change = cashTendered - pricing.netTotal;
 
         const changeText = document.getElementById('screenChangeText');
         if (!changeText) return;
@@ -1539,6 +1621,8 @@
         }
     }
     document.getElementById('screenCashInput')?.addEventListener('input', calculateScreenChange);
+    document.getElementById('screenDiscountType')?.addEventListener('change', calculateScreenChange);
+    document.getElementById('screenDiscountValue')?.addEventListener('input', calculateScreenChange);
 
     // ==========================================
     // Dynamic QRIS + Webhook Auto-Verification Engine
@@ -1559,7 +1643,7 @@
         }
     }
 
-    async function startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml) {
+    async function startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml, pricing = null) {
         if (cart.length === 0) {
             Swal.fire({
                 icon: 'warning',
@@ -1579,6 +1663,8 @@
                     menu_id: i.id,
                     quantity: i.qty
                 })),
+                discount_type: pricing?.discountType || null,
+                discount_value: pricing?.discountValue || 0,
                 customer_name: customerName || null,
                 notes: notes || null
             };
@@ -1786,6 +1872,10 @@
                 transaction_date: now.toISOString().split('T')[0],
                 transaction_time: now.toTimeString().split(' ')[0],
                 payment_method: 'qris',
+                subtotal_amount: qrisData.subtotal_amount || qrisData.base_amount,
+                discount_type: qrisData.discount_type || null,
+                discount_value: qrisData.discount_value || 0,
+                discount_amount: qrisData.discount_amount || 0,
                 cash_tendered: qrisData.final_amount,
                 change_returned: 0,
                 customer_name: document.getElementById('posScreenCustomerName')?.value || document.getElementById('posCustomerName')?.value || null,
@@ -1824,14 +1914,29 @@
         }, 800);
     }
 
+    async function cancelActiveQrisTransaction() {
+        const txId = currentQrisTransactionId;
+        stopQrisTracking();
+        qrisModal.hide();
+        if (txId) {
+            try {
+                await fetch(`/pos/qris/cancel/${txId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    }
+                });
+            } catch (e) {}
+        }
+    }
+
     // Modal QRIS button bindings
     document.getElementById('btnCloseQrisModalTop')?.addEventListener('click', () => {
-        stopQrisTracking();
-        qrisModal.hide();
+        cancelActiveQrisTransaction();
     });
     document.getElementById('btnCancelQrisModal')?.addEventListener('click', () => {
-        stopQrisTracking();
-        qrisModal.hide();
+        cancelActiveQrisTransaction();
     });
     document.getElementById('btnManualConfirmQris')?.addEventListener('click', async () => {
         if (!currentQrisTransactionId || !currentQrisData) return;
@@ -1891,8 +1996,9 @@
     });
 
     // Shared Process Payment Checkout Function (Offline-First Universal Architecture)
-    async function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn) {
-        const grandTotal = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    async function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn, mode = 'modal') {
+        const pricing = computeCheckoutPricing(mode);
+        const grandTotal = pricing.netTotal;
 
         if (paymentMethod === 'tunai') {
             if (isNaN(cashTendered) || cashTendered < grandTotal) {
@@ -1910,7 +2016,7 @@
 
         // If QRIS selected and online, start dynamic QRIS interactive flow
         if (paymentMethod === 'qris' && navigator.onLine) {
-            startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml);
+            startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml, pricing);
             return;
         }
         submitBtn.disabled = true;
@@ -1931,6 +2037,10 @@
                 transaction_date: txDate,
                 transaction_time: txTime,
                 payment_method: paymentMethod,
+                subtotal_amount: pricing.subtotal,
+                discount_type: pricing.discountType,
+                discount_value: pricing.discountValue,
+                discount_amount: pricing.discountAmount,
                 cash_tendered: cashGiven,
                 change_returned: changeRet,
                 customer_name: customerName || null,
@@ -2000,7 +2110,7 @@
         const customerName = document.getElementById('posScreenCustomerName').value;
         const notes = document.getElementById('posScreenNotes').value;
 
-        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this);
+        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this, 'screen');
     });
 
     // Submit Payment from Modal (for modal fallback if used)
@@ -2010,7 +2120,7 @@
         const customerName = document.getElementById('posCustomerName').value;
         const notes = document.getElementById('posNotes').value;
 
-        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this);
+        executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, this, 'modal');
     });
 
     // Print Receipt Button in Modal (Offline-Compatible Thermal Printing)

@@ -130,22 +130,28 @@
 
 <!-- Secondary metrics cards -->
 <div class="row g-3 mb-4">
-    <div class="col-md-4">
-        <div class="card premium-card border-0 p-3 bg-white shadow-sm">
-            <span class="small text-muted d-block mb-1">Rata-rata Omzet / Hari</span>
-            <strong class="fs-5 text-dark">Rp{{ number_format($average_sales_per_day, 0, ',', '.') }}</strong>
+    <div class="col-md-3">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+            <span class="small text-muted d-block mb-1">Total Diskon Promo</span>
+            <strong class="fs-5 text-warning">Rp{{ number_format($total_discount ?? 0, 0, ',', '.') }}</strong>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card premium-card border-0 p-3 bg-white shadow-sm">
+    <div class="col-md-3">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+            <span class="small text-muted d-block mb-1">Pengeluaran Operasional</span>
+            <strong class="fs-5 text-danger">Rp{{ number_format($total_expenses ?? 0, 0, ',', '.') }}</strong>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100" style="border-left: 4px solid var(--primary-green) !important;">
+            <span class="small text-muted d-block mb-1">Laba Bersih Aktual (Net Profit)</span>
+            <strong class="fs-5 {{ ($net_profit ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($net_profit ?? 0, 0, ',', '.') }}</strong>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
             <span class="small text-muted d-block mb-1"><i class="fa-solid fa-trophy text-warning"></i> Menu Terlaris</span>
-            <strong class="fs-5 text-success text-truncate d-block" title="{{ $best_seller }}">{{ $best_seller }}</strong>
-        </div>
-    </div>
-    <div class="col-md-4">
-        <div class="card premium-card border-0 p-3 bg-white shadow-sm">
-            <span class="small text-muted d-block mb-1"><i class="fa-solid fa-circle-exclamation text-danger"></i> Menu Paling Sedikit Terjual</span>
-            <strong class="fs-5 text-danger text-truncate d-block" title="{{ $least_seller }}">{{ $least_seller }}</strong>
+            <strong class="fs-6 text-success text-truncate d-block" title="{{ $best_seller }}">{{ $best_seller }}</strong>
         </div>
     </div>
 </div>

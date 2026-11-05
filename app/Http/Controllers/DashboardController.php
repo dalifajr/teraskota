@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
 use App\Models\Category;
+use App\Models\Expense;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -80,15 +81,26 @@ class DashboardController extends Controller
         $startStr = $startDate->format('Y-m-d');
         $endStr = $endDate->format('Y-m-d');
 
-        // Fetch transaction summary
-        $transactionsQuery = Transaction::whereBetween('transaction_date', [$startStr, $endStr]);
+        // Auto-expire overdue pending QRIS transactions before aggregating metrics
+        Transaction::expireOverdueQris();
+
+        // Fetch transaction summary (strictly paid transactions only)
+        $transactionsQuery = Transaction::paid()
+            ->whereDate('transaction_date', '>=', $startStr)
+            ->whereDate('transaction_date', '<=', $endStr);
         
-        $totalSales = (float) $transactionsQuery->sum('total_sales');
-        $totalProfit = (float) $transactionsQuery->sum('total_profit');
-        $estimatedCost = (float) $transactionsQuery->sum('estimated_cost');
-        $totalTransactions = $transactionsQuery->count();
-        $totalQuantity = (int) $transactionsQuery->sum('total_quantity');
+        $totalSales = (float) (clone $transactionsQuery)->sum('total_sales');
+        $totalProfit = (float) (clone $transactionsQuery)->sum('total_profit');
+        $estimatedCost = (float) (clone $transactionsQuery)->sum('estimated_cost');
+        $totalDiscount = (float) (clone $transactionsQuery)->sum('discount_amount');
+        $totalTransactions = (clone $transactionsQuery)->count();
+        $totalQuantity = (int) (clone $transactionsQuery)->sum('total_quantity');
         $averageSales = $totalTransactions > 0 ? ($totalSales / $totalTransactions) : 0;
+
+        $totalExpenses = (float) Expense::whereDate('expense_date', '>=', $startStr)
+            ->whereDate('expense_date', '<=', $endStr)
+            ->sum('amount');
+        $netProfit = $totalProfit - $totalExpenses;
 
         // Get grouping for charts
         $groupBy = $request->get('group_by', 'daily');
@@ -99,7 +111,9 @@ class DashboardController extends Controller
         // Group transactions for trend chart
         $trendData = [];
         if ($groupBy === 'daily') {
-            $trendQuery = Transaction::whereBetween('transaction_date', [$startStr, $endStr])
+            $trendQuery = Transaction::paid()
+                ->whereDate('transaction_date', '>=', $startStr)
+                ->whereDate('transaction_date', '<=', $endStr)
                 ->select(
                     DB::raw('DATE(transaction_date) as date_label'),
                     DB::raw('SUM(total_sales) as sales'),
@@ -119,7 +133,9 @@ class DashboardController extends Controller
                 ];
             }
         } elseif ($groupBy === 'weekly') {
-            $trendQuery = Transaction::whereBetween('transaction_date', [$startStr, $endStr])
+            $trendQuery = Transaction::paid()
+                ->whereDate('transaction_date', '>=', $startStr)
+                ->whereDate('transaction_date', '<=', $endStr)
                 ->select(
                     DB::raw('YEAR(transaction_date) as yr'),
                     DB::raw('WEEK(transaction_date) as wk'),
@@ -141,7 +157,9 @@ class DashboardController extends Controller
                 ];
             }
         } elseif ($groupBy === 'monthly') {
-            $trendQuery = Transaction::whereBetween('transaction_date', [$startStr, $endStr])
+            $trendQuery = Transaction::paid()
+                ->whereDate('transaction_date', '>=', $startStr)
+                ->whereDate('transaction_date', '<=', $endStr)
                 ->select(
                     DB::raw('YEAR(transaction_date) as yr'),
                     DB::raw('MONTH(transaction_date) as mth'),
@@ -163,7 +181,9 @@ class DashboardController extends Controller
                 ];
             }
         } else { // yearly
-            $trendQuery = Transaction::whereBetween('transaction_date', [$startStr, $endStr])
+            $trendQuery = Transaction::paid()
+                ->whereDate('transaction_date', '>=', $startStr)
+                ->whereDate('transaction_date', '<=', $endStr)
                 ->select(
                     DB::raw('YEAR(transaction_date) as yr'),
                     DB::raw('SUM(total_sales) as sales'),
@@ -186,7 +206,9 @@ class DashboardController extends Controller
 
         // Top 10 Best Sellers
         $topMenus = TransactionDetail::whereHas('transaction', function ($q) use ($startStr, $endStr) {
-                $q->whereBetween('transaction_date', [$startStr, $endStr]);
+                $q->paid()
+                  ->whereDate('transaction_date', '>=', $startStr)
+                  ->whereDate('transaction_date', '<=', $endStr);
             })
             ->select('menu_name_snapshot', DB::raw('SUM(quantity) as qty'), DB::raw('SUM(subtotal) as sales'), DB::raw('SUM(profit_amount) as profit'))
             ->groupBy('menu_name_snapshot')
@@ -196,7 +218,9 @@ class DashboardController extends Controller
 
         // Least Sold Menus
         $bottomMenus = TransactionDetail::whereHas('transaction', function ($q) use ($startStr, $endStr) {
-                $q->whereBetween('transaction_date', [$startStr, $endStr]);
+                $q->paid()
+                  ->whereDate('transaction_date', '>=', $startStr)
+                  ->whereDate('transaction_date', '<=', $endStr);
             })
             ->select('menu_name_snapshot', DB::raw('SUM(quantity) as qty'))
             ->groupBy('menu_name_snapshot')
@@ -206,7 +230,9 @@ class DashboardController extends Controller
 
         // Sales by Category
         $categorySales = TransactionDetail::whereHas('transaction', function ($q) use ($startStr, $endStr) {
-                $q->whereBetween('transaction_date', [$startStr, $endStr]);
+                $q->paid()
+                  ->whereDate('transaction_date', '>=', $startStr)
+                  ->whereDate('transaction_date', '<=', $endStr);
             })
             ->select('category_name_snapshot as name', DB::raw('SUM(subtotal) as sales'), DB::raw('SUM(quantity) as qty'))
             ->groupBy('category_name_snapshot')
@@ -220,6 +246,9 @@ class DashboardController extends Controller
             'totalSales',
             'totalProfit',
             'estimatedCost',
+            'totalDiscount',
+            'totalExpenses',
+            'netProfit',
             'totalTransactions',
             'totalQuantity',
             'averageSales',

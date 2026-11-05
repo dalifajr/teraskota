@@ -169,6 +169,43 @@
         </div>
     </div>
 
+    <!-- Net Profit & Operational Expenses Banner -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="small text-muted d-block mb-1">Total Diskon Promo</span>
+                        <strong class="fs-5 text-warning">Rp{{ number_format($totalDiscount ?? 0, 0, ',', '.') }}</strong>
+                    </div>
+                    <i class="fa-solid fa-tags fs-3 text-warning opacity-50"></i>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="small text-muted d-block mb-1">Pengeluaran Operasional (Kas Keluar)</span>
+                        <strong class="fs-5 text-danger">Rp{{ number_format($totalExpenses ?? 0, 0, ',', '.') }}</strong>
+                    </div>
+                    <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Kelola</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100" style="border-left: 4px solid var(--primary-green) !important;">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="small text-muted d-block mb-1">Laba Bersih Aktual (Laba Kotor - Pengeluaran)</span>
+                        <strong class="fs-4 {{ ($netProfit ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($netProfit ?? 0, 0, ',', '.') }}</strong>
+                    </div>
+                    <i class="fa-solid fa-sack-dollar fs-3 text-success opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Charts Section -->
     <div class="row mb-4">
         <!-- Sales and Profit Trend Chart -->

@@ -200,4 +200,49 @@ class OfflineSyncTest extends TestCase
 
         $this->assertEquals(0, Transaction::where('sync_id', $syncId)->count());
     }
+
+    public function test_cashier_can_sync_offline_transaction_with_discount(): void
+    {
+        $syncId = (string) Str::uuid();
+        $qty = 5;
+        $subtotal = (float) $this->sampleMenu->price * $qty; // e.g., 5 * 4000 = 20000
+
+        $payload = [
+            'sync_id' => $syncId,
+            'source_device_id' => 'DEV-DISC-01',
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_time' => '15:30:00',
+            'payment_method' => 'tunai',
+            'discount_type' => 'percentage',
+            'discount_value' => 25, // 25% discount
+            'cash_tendered' => $subtotal,
+            'items' => [
+                [
+                    'menu_id' => $this->sampleMenu->id,
+                    'quantity' => $qty,
+                ],
+            ],
+        ];
+
+        $response = $this->actingAs($this->cashier)->postJson('/pos/sync', $payload);
+
+        $expectedDiscount = round($subtotal * 0.25, 2);
+        $expectedNetSales = $subtotal - $expectedDiscount;
+
+        $response->assertStatus(200)
+            ->assertJson([
+                'success' => true,
+                'sync_id' => $syncId,
+                'status' => 'synced',
+            ]);
+
+        $this->assertDatabaseHas('transactions', [
+            'sync_id' => $syncId,
+            'subtotal_amount' => $subtotal,
+            'discount_type' => 'percentage',
+            'discount_value' => 25.00,
+            'discount_amount' => $expectedDiscount,
+            'total_sales' => $expectedNetSales,
+        ]);
+    }
 }

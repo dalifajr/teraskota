@@ -15,6 +15,10 @@ class Transaction extends Model
         'transaction_date',
         'transaction_time',
         'total_quantity',
+        'subtotal_amount',
+        'discount_type',
+        'discount_value',
+        'discount_amount',
         'total_sales',
         'total_profit',
         'estimated_cost',
@@ -46,6 +50,9 @@ class Transaction extends Model
         'notified_at' => 'datetime',
         'unique_code' => 'integer',
         'total_quantity' => 'integer',
+        'subtotal_amount' => 'decimal:2',
+        'discount_value' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'total_sales' => 'decimal:2',
         'final_amount' => 'decimal:2',
         'total_profit' => 'decimal:2',
@@ -72,5 +79,24 @@ class Transaction extends Model
     public function paymentListenerLogs()
     {
         return $this->hasMany(PaymentListenerLog::class, 'matched_transaction_id');
+    }
+
+    /**
+     * Scope a query to only include paid transactions.
+     */
+    public function scopePaid($query)
+    {
+        return $query->where('status', 'paid');
+    }
+
+    /**
+     * Automatically mark overdue pending QRIS transactions as expired.
+     */
+    public static function expireOverdueQris(): int
+    {
+        return static::where('status', 'pending')
+            ->whereNotNull('qris_expired_at')
+            ->where('qris_expired_at', '<', now())
+            ->update(['status' => 'expired']);
     }
 }

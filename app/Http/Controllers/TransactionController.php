@@ -25,11 +25,22 @@ class TransactionController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Transaction::with(['admin']);
+        Transaction::expireOverdueQris();
 
-        // Search by Transaction Number
+        $query = Transaction::with(['admin'])->withCount('details');
+
+        // Search by Transaction Number or Customer Name
         if ($request->filled('search')) {
-            $query->where('transaction_number', 'like', '%' . $request->search . '%');
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('transaction_number', 'like', '%' . $search . '%')
+                  ->orWhere('customer_name', 'like', '%' . $search . '%');
+            });
+        }
+
+        // Filter by Status
+        if ($request->filled('status') && in_array($request->status, ['paid', 'pending', 'expired', 'cancelled'], true)) {
+            $query->where('status', $request->status);
         }
 
         // Filter by Date

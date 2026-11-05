@@ -15,6 +15,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\SystemUpdateController;
 use App\Http\Controllers\PaymentListenerController;
 use App\Http\Controllers\QrisSettingController;
+use App\Http\Controllers\ExpenseController;
 
 // Android Payment Listener Webhook Routes (Exempted from CSRF)
 Route::post('/listener/payment', [PaymentListenerController::class, 'payment']);
@@ -41,6 +42,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/pos/qris/generate', [PosController::class, 'generateQris'])->name('pos.qris.generate');
     Route::get('/pos/qris/check-status/{transaction}', [PosController::class, 'checkQrisStatus'])->name('pos.qris.check-status');
     Route::post('/pos/qris/mark-paid/{transaction}', [PosController::class, 'markQrisPaid'])->name('pos.qris.mark-paid');
+    Route::post('/pos/qris/cancel/{transaction}', [PosController::class, 'cancelQris'])->name('pos.qris.cancel');
     Route::get('/pos/receipt/{transaction}', [PosController::class, 'receipt'])->name('pos.receipt');
     Route::get('/pos/summary-today', [PosController::class, 'summaryToday'])->name('pos.summary');
     Route::get('/pos/bootstrap', [\App\Http\Controllers\OfflineSyncController::class, 'bootstrap'])->name('pos.bootstrap');
@@ -58,6 +60,7 @@ Route::middleware('auth')->group(function () {
 
         // Master Resources
         Route::resource('transactions', TransactionController::class);
+        Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
         Route::resource('menus', MenuController::class);
         Route::resource('categories', CategoryController::class);
 

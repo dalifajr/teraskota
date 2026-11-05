@@ -35,9 +35,11 @@ class PosController extends Controller
         $today = Carbon::today()->format('Y-m-d');
         $nowTime = Carbon::now()->format('H:i');
 
-        // Cashier shift / today statistics
+        Transaction::expireOverdueQris();
+
+        // Cashier shift / today statistics (paid transactions only)
         $user = Auth::user();
-        $todayQuery = Transaction::whereDate('transaction_date', $today);
+        $todayQuery = Transaction::paid()->whereDate('transaction_date', $today);
         
         // If cashier, limit today's stats to this cashier; if admin, show overall today's stats
         if ($user->isKasir()) {
@@ -67,6 +69,8 @@ class PosController extends Controller
             'items.*.menu_id' => ['required', 'exists:menus,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'payment_method' => ['required', 'in:tunai,qris'],
+            'discount_type' => ['nullable', 'in:nominal,percentage'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
             'cash_tendered' => ['nullable', 'numeric', 'min:0'],
             'customer_name' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:500'],
@@ -80,6 +84,8 @@ class PosController extends Controller
             'transaction_time' => $nowTime,
             'items' => $validated['items'],
             'payment_method' => $validated['payment_method'],
+            'discount_type' => $validated['discount_type'] ?? null,
+            'discount_value' => $validated['discount_value'] ?? 0,
             'cash_tendered' => $validated['cash_tendered'] ?? null,
             'customer_name' => $validated['customer_name'] ?? null,
             'notes' => $validated['notes'] ?? null,
@@ -129,7 +135,9 @@ class PosController extends Controller
         $today = Carbon::today()->format('Y-m-d');
         $user = Auth::user();
 
-        $query = Transaction::with(['details'])->whereDate('transaction_date', $today);
+        Transaction::expireOverdueQris();
+
+        $query = Transaction::paid()->with(['details'])->whereDate('transaction_date', $today);
         if ($user->isKasir()) {
             $query->where('created_by', $user->id);
         }
@@ -163,6 +171,8 @@ class PosController extends Controller
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_id' => ['required', 'exists:menus,id'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
+            'discount_type' => ['nullable', 'in:nominal,percentage'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
             'customer_name' => ['nullable', 'string', 'max:100'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
@@ -176,16 +186,23 @@ class PosController extends Controller
             Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => 'KOTA TANGERANG']);
         }
 
-        // Calculate base amount
+        // Calculate subtotal & discount
         $menuIds = collect($validated['items'])->pluck('menu_id');
         $menus = Menu::whereIn('id', $menuIds)->get()->keyBy('id');
-        $baseAmount = 0;
+        $subtotalAmount = 0;
         foreach ($validated['items'] as $item) {
             $menu = $menus->get($item['menu_id']);
             if ($menu) {
-                $baseAmount += $menu->price * $item['quantity'];
+                $subtotalAmount += $menu->price * $item['quantity'];
             }
         }
+
+        $discountData = $this->transactionService->resolveDiscount((float) $subtotalAmount, $validated);
+        $discountAmount = $discountData['discount_amount'];
+        $baseAmount = max(0, (int) round($subtotalAmount - $discountAmount));
+
+        // Expire overdue QRIS first so their unique codes can be reused immediately
+        Transaction::expireOverdueQris();
 
         // Generate unique code & dynamic amount
         $codeData = $qrisService->generateUniqueCode($baseAmount);
@@ -203,6 +220,8 @@ class PosController extends Controller
             'transaction_time' => now()->format('H:i:s'),
             'payment_method' => 'qris',
             'status' => 'pending',
+            'discount_type' => $discountData['discount_type'],
+            'discount_value' => $discountData['discount_value'],
             'unique_code' => $uniqueCode,
             'final_amount' => $finalAmount,
             'qris_payload' => $dynamicPayload,
@@ -213,18 +232,15 @@ class PosController extends Controller
         ];
 
         $transaction = $this->transactionService->createTransaction($data, Auth::id());
-        $transaction->update([
-            'status' => 'pending',
-            'unique_code' => $uniqueCode,
-            'final_amount' => $finalAmount,
-            'qris_payload' => $dynamicPayload,
-            'qris_expired_at' => $expiredAt,
-        ]);
 
         return response()->json([
             'status' => 'success',
             'transaction_id' => $transaction->id,
             'transaction_number' => $transaction->transaction_number,
+            'subtotal_amount' => $subtotalAmount,
+            'discount_type' => $discountData['discount_type'],
+            'discount_value' => $discountData['discount_value'],
+            'discount_amount' => $discountAmount,
             'base_amount' => $baseAmount,
             'unique_code' => $uniqueCode,
             'final_amount' => $finalAmount,
@@ -280,6 +296,25 @@ class PosController extends Controller
             'message' => 'Transaksi berhasil dikonfirmasi lunas secara manual.',
             'transaction_id' => $transaction->id,
             'transaction_number' => $transaction->transaction_number,
+        ]);
+    }
+
+    /**
+     * Cancel a pending QRIS transaction when cashier closes/aborts the QRIS modal.
+     */
+    public function cancelQris(Transaction $transaction)
+    {
+        if ($transaction->status === 'pending') {
+            $transaction->update([
+                'status' => 'cancelled',
+            ]);
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Transaksi QRIS berhasil dibatalkan.',
+            'transaction_id' => $transaction->id,
+            'transaction_status' => $transaction->status,
         ]);
     }
 }

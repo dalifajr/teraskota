@@ -168,12 +168,12 @@
                     <div class="summary-value" style="color: #2c3e50;">{{ number_format($total_transactions, 0, ',', '.') }}</div>
                 </td>
                 <td>
-                    <div class="summary-label">Produk Terjual (Volume)</div>
-                    <div class="summary-value" style="color: #8e44ad;">{{ number_format($total_quantity, 0, ',', '.') }} pcs</div>
+                    <div class="summary-label">Total Pengeluaran Kas</div>
+                    <div class="summary-value danger">Rp{{ number_format($total_expenses ?? 0, 0, ',', '.') }}</div>
                 </td>
                 <td>
-                    <div class="summary-label">Rata-rata Omzet / Hari</div>
-                    <div class="summary-value" style="color: #d35400;">Rp{{ number_format($average_sales_per_day, 0, ',', '.') }}</div>
+                    <div class="summary-label">Laba Bersih Aktual (Net Profit)</div>
+                    <div class="summary-value" style="color: {{ ($net_profit ?? 0) >= 0 ? '#11361b' : '#c0392b' }};">Rp{{ number_format($net_profit ?? 0, 0, ',', '.') }}</div>
                 </td>
             </tr>
         </table>

@@ -1,6 +1,6 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-.
+tolong berikan saya masukan pengembangan fitur dan perbaikan teraskota berdasarkan fitur yang ada saat ini.
 
 
 STATUS PENGEMBANGAN VPS (SELESAI ✓):

@@ -107,7 +107,8 @@ class SystemUpdateController extends Controller
         }
 
         $cwd = $this->getAppPath();
-        $fullCommand = "cd /d \"{$cwd}\" && {$command} 2>&1";
+        $cdCmd = DIRECTORY_SEPARATOR === '\\' ? "cd /d \"{$cwd}\"" : "cd \"{$cwd}\"";
+        $fullCommand = "{$cdCmd} && {$command} 2>&1";
         $output = shell_exec($fullCommand);
 
         return [

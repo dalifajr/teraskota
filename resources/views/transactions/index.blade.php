@@ -13,9 +13,21 @@
     <div class="card-body p-4">
         <form action="{{ route('transactions.index') }}" method="GET" class="row g-3 align-items-end">
             <!-- Search Transaction Number -->
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <label for="search" class="form-label fw-medium text-dark">Cari No. Transaksi</label>
-                <input type="text" name="search" id="search" class="form-control" placeholder="Contoh: TRX-2026..." value="{{ request('search') }}">
+                <input type="text" name="search" id="search" class="form-control" placeholder="TRX-2026... / Nama" value="{{ request('search') }}">
+            </div>
+
+            <!-- Status Filter -->
+            <div class="col-md-2">
+                <label for="status" class="form-label fw-medium text-dark">Status</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">-- Semua Status --</option>
+                    <option value="paid" {{ request('status') === 'paid' ? 'selected' : '' }}>Lunas (Paid)</option>
+                    <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Menunggu (Pending)</option>
+                    <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Kadaluarsa (Expired)</option>
+                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Dibatalkan (Cancelled)</option>
+                </select>
             </div>
             
             <!-- Date Filter -->
@@ -38,10 +50,10 @@
             </div>
 
             <!-- Year Filter -->
-            <div class="col-md-2">
-                <label for="year" class="form-label fw-medium text-dark">Filter Tahun</label>
+            <div class="col-md-1">
+                <label for="year" class="form-label fw-medium text-dark">Tahun</label>
                 <select name="year" id="year" class="form-select">
-                    <option value="">-- Semua Tahun --</option>
+                    <option value="">Semua</option>
                     @for($y = date('Y'); $y >= 2020; $y--)
                         <option value="{{ $y }}" {{ request('year') == $y ? 'selected' : '' }}>{{ $y }}</option>
                     @endfor
@@ -49,7 +61,7 @@
             </div>
 
             <!-- Sort Order -->
-            <div class="col-md-1.5">
+            <div class="col-md-1">
                 <label for="sort" class="form-label fw-medium text-dark">Urutan</label>
                 <select name="sort" id="sort" class="form-select">
                     <option value="desc" {{ request('sort') !== 'asc' ? 'selected' : '' }}>Terbaru</option>
@@ -80,6 +92,7 @@
                         <tr>
                             <th>No. Transaksi</th>
                             <th>Tanggal & Waktu</th>
+                            <th class="text-center">Metode & Status</th>
                             <th class="text-center">Menu Unik</th>
                             <th class="text-center">Qty Terjual</th>
                             <th class="text-end">Total Omzet</th>
@@ -92,10 +105,27 @@
                     <tbody>
                         @foreach($transactions as $trx)
                             <tr>
-                                <td class="fw-bold text-dark">{{ $trx->transaction_number }}</td>
+                                <td class="fw-bold text-dark">
+                                    {{ $trx->transaction_number }}
+                                    @if($trx->customer_name)
+                                        <div class="small fw-normal text-muted"><i class="fa-regular fa-user me-1"></i>{{ $trx->customer_name }}</div>
+                                    @endif
+                                </td>
                                 <td>
                                     <div>{{ $trx->transaction_date->translatedFormat('d M Y') }}</div>
                                     <small class="text-muted"><i class="fa-regular fa-clock me-1"></i> {{ date('H:i', strtotime($trx->transaction_time)) }}</small>
+                                </td>
+                                <td class="text-center">
+                                    <span class="badge bg-light text-dark border text-uppercase">{{ $trx->payment_method ?? 'tunai' }}</span>
+                                    @if(($trx->status ?? 'paid') === 'paid')
+                                        <span class="badge bg-success">Lunas</span>
+                                    @elseif($trx->status === 'pending')
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    @elseif($trx->status === 'expired')
+                                        <span class="badge bg-secondary">Expired</span>
+                                    @elseif($trx->status === 'cancelled')
+                                        <span class="badge bg-danger">Batal</span>
+                                    @endif
                                 </td>
                                 <td class="text-center"><span class="badge bg-secondary">{{ $trx->details_count ?? $trx->details()->count() }}</span></td>
                                 <td class="text-center fw-semibold">{{ $trx->total_quantity }} pcs</td>

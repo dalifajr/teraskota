@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Models\Expense;
 use App\Models\Menu;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
@@ -77,9 +78,12 @@ class ReportController extends Controller
             fputcsv($file, ['RINGKASAN']);
             fputcsv($file, ['Total Transaksi', $data['total_transactions']]);
             fputcsv($file, ['Total Produk Terjual', $data['total_quantity']]);
-            fputcsv($file, ['Total Omzet (Rp)', number_format($data['total_sales'], 0, ',', '.')]);
-            fputcsv($file, ['Total Keuntungan (Rp)', number_format($data['total_profit'], 0, ',', '.')]);
-            fputcsv($file, ['Estimasi Modal (Rp)', number_format($data['estimated_cost'], 0, ',', '.')]);
+            fputcsv($file, ['Total Diskon Promo (Rp)', number_format($data['total_discount'], 0, ',', '.')]);
+            fputcsv($file, ['Total Omzet Bersih (Rp)', number_format($data['total_sales'], 0, ',', '.')]);
+            fputcsv($file, ['Laba Kotor Penjualan (Rp)', number_format($data['total_profit'], 0, ',', '.')]);
+            fputcsv($file, ['Estimasi Modal HPP (Rp)', number_format($data['estimated_cost'], 0, ',', '.')]);
+            fputcsv($file, ['Total Pengeluaran Operasional (Rp)', number_format($data['total_expenses'], 0, ',', '.')]);
+            fputcsv($file, ['Laba Bersih Aktual (Rp)', number_format($data['net_profit'], 0, ',', '.')]);
             fputcsv($file, []);
 
             fputcsv($file, ['RINCIAN TRANSAKSI']);
@@ -144,8 +148,12 @@ class ReportController extends Controller
         $startStr = $startDate->format('Y-m-d');
         $endStr = $endDate->format('Y-m-d');
 
+        // Auto-expire overdue pending QRIS transactions before generating reports
+        Transaction::expireOverdueQris();
+
         $detailsQuery = TransactionDetail::whereHas('transaction', function ($q) use ($startStr, $endStr) {
-            $q->whereDate('transaction_date', '>=', $startStr)
+            $q->paid()
+              ->whereDate('transaction_date', '>=', $startStr)
               ->whereDate('transaction_date', '<=', $endStr);
         });
 
@@ -166,13 +174,35 @@ class ReportController extends Controller
         }
 
         // Total Summary Values
-        $totalSales = (float) $detailsQuery->sum('subtotal');
-        $totalProfit = (float) $detailsQuery->sum('profit_amount');
-        $estimatedCost = (float) $detailsQuery->sum('estimated_cost');
-        $totalQuantity = (int) $detailsQuery->sum('quantity');
+        $hasItemFilter = $request->filled('category_id') || $request->filled('menu_id');
+        if (!$hasItemFilter) {
+            $txSummaryQuery = Transaction::paid()
+                ->whereDate('transaction_date', '>=', $startStr)
+                ->whereDate('transaction_date', '<=', $endStr);
 
-        // Count unique transaction IDs in this selection
-        $totalTransactions = $detailsQuery->distinct('transaction_id')->count('transaction_id');
+            $totalSales = (float) (clone $txSummaryQuery)->sum('total_sales');
+            $totalProfit = (float) (clone $txSummaryQuery)->sum('total_profit');
+            $estimatedCost = (float) (clone $txSummaryQuery)->sum('estimated_cost');
+            $totalDiscount = (float) (clone $txSummaryQuery)->sum('discount_amount');
+            $totalQuantity = (int) (clone $txSummaryQuery)->sum('total_quantity');
+            $totalTransactions = (clone $txSummaryQuery)->count();
+        } else {
+            $totalSales = (float) $detailsQuery->sum('subtotal');
+            $totalProfit = (float) $detailsQuery->sum('profit_amount');
+            $estimatedCost = (float) $detailsQuery->sum('estimated_cost');
+            $totalDiscount = 0.0;
+            $totalQuantity = (int) $detailsQuery->sum('quantity');
+            $totalTransactions = $detailsQuery->distinct('transaction_id')->count('transaction_id');
+        }
+
+        // Operational Expenses in Period
+        $expensesList = Expense::with('creator')
+            ->whereDate('expense_date', '>=', $startStr)
+            ->whereDate('expense_date', '<=', $endStr)
+            ->orderBy('expense_date', 'asc')
+            ->get();
+        $totalExpenses = (float) $expensesList->sum('amount');
+        $netProfit = $totalProfit - $totalExpenses;
 
         // Average sales per day
         $daysCount = $startDate->diffInDays($endDate) + 1;
@@ -219,6 +249,10 @@ class ReportController extends Controller
             'total_sales' => $totalSales,
             'total_profit' => $totalProfit,
             'estimated_cost' => $estimatedCost,
+            'total_discount' => $totalDiscount,
+            'total_expenses' => $totalExpenses,
+            'net_profit' => $netProfit,
+            'expenses_list' => $expensesList,
             'total_quantity' => $totalQuantity,
             'total_transactions' => $totalTransactions,
             'average_sales_per_day' => $averageSalesPerDay,

@@ -235,6 +235,16 @@
                     <span>Total Item:</span>
                     <span>{{ $transaction->total_quantity }} pcs</span>
                 </div>
+                @if(($transaction->discount_amount ?? 0) > 0)
+                    <div class="receipt-row">
+                        <span>Subtotal:</span>
+                        <span>Rp{{ number_format($transaction->subtotal_amount ?: ($transaction->total_sales + $transaction->discount_amount), 0, ',', '.') }}</span>
+                    </div>
+                    <div class="receipt-row">
+                        <span>Diskon{{ $transaction->discount_type === 'percentage' ? ' (' . (float)$transaction->discount_value . '%)' : '' }}:</span>
+                        <span>-Rp{{ number_format($transaction->discount_amount, 0, ',', '.') }}</span>
+                    </div>
+                @endif
                 <div class="receipt-row grand-total">
                     <span>TOTAL:</span>
                     <span>Rp{{ number_format($transaction->total_sales, 0, ',', '.') }}</span>

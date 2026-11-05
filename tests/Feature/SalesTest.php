@@ -498,5 +498,260 @@ class SalesTest extends TestCase
         $response->assertRedirect();
         $response->assertSessionHas('success');
     }
+
+    /**
+     * Test pending, expired, and cancelled QRIS transactions do not pollute financial reports, dashboard, or POS summary.
+     */
+    public function test_pending_and_expired_qris_transactions_are_excluded_from_financial_metrics(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::where('name', 'Jasmine Tea')->first(); // Rp4.000
+
+        // 1. Create a valid PAID transaction (5 x 4000 = Rp20.000)
+        $this->actingAs($cashier)->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 5]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 20000,
+        ])->assertStatus(200);
+
+        // 2. Generate a PENDING QRIS transaction (3 x 4000 = Rp12.000)
+        $qrisRes = $this->actingAs($cashier)->postJson('/pos/qris/generate', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 3]],
+            'customer_name' => 'Pending Buyer',
+        ]);
+        $qrisRes->assertStatus(200);
+        $pendingTxId = $qrisRes->json('transaction_id');
+
+        // 3. Create an overdue PENDING QRIS transaction that should auto-expire (2 x 4000 = Rp8.000)
+        $overdueRes = $this->actingAs($cashier)->postJson('/pos/qris/generate', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+            'customer_name' => 'Overdue Buyer',
+        ]);
+        $overdueTxId = $overdueRes->json('transaction_id');
+        Transaction::where('id', $overdueTxId)->update([
+            'qris_expired_at' => now()->subMinutes(15),
+        ]);
+
+        // Verify POS summary today only includes the paid transaction (Rp20.000, 1 transaction, 5 qty)
+        $summaryRes = $this->actingAs($cashier)->getJson('/pos/summary-today');
+        $summaryRes->assertStatus(200)
+            ->assertJson([
+                'total_transactions' => 1,
+                'total_sales' => 20000,
+                'total_qty' => 5,
+            ]);
+
+        // Verify overdue transaction was automatically marked as expired
+        $this->assertDatabaseHas('transactions', [
+            'id' => $overdueTxId,
+            'status' => 'expired',
+        ]);
+        $this->assertDatabaseHas('transactions', [
+            'id' => $pendingTxId,
+            'status' => 'pending',
+        ]);
+
+        // Verify Reports page only counts Rp20.000 and not Rp40.000
+        $today = now()->format('Y-m-d');
+        $reportRes = $this->actingAs($admin)->get("/reports?period=custom&start_date={$today}&end_date={$today}");
+        $reportRes->assertStatus(200);
+        $reportRes->assertSee('20.000');
+        $reportRes->assertDontSee('40.000');
+    }
+
+    /**
+     * Test cashier can cancel an active pending QRIS transaction.
+     */
+    public function test_cashier_can_cancel_pending_qris_transaction(): void
+    {
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::first();
+
+        $qrisRes = $this->actingAs($cashier)->postJson('/pos/qris/generate', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+        ]);
+        $qrisRes->assertStatus(200);
+        $txId = $qrisRes->json('transaction_id');
+
+        $cancelRes = $this->actingAs($cashier)->postJson("/pos/qris/cancel/{$txId}");
+        $cancelRes->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'transaction_status' => 'cancelled',
+            ]);
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $txId,
+            'status' => 'cancelled',
+        ]);
+    }
+
+    /**
+     * Test cash checkout rejects insufficient cash_tendered.
+     */
+    public function test_cash_checkout_rejects_insufficient_cash_tendered(): void
+    {
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::where('name', 'Jasmine Tea')->first(); // Rp4.000
+
+        $response = $this->actingAs($cashier)->postJson('/pos/checkout', [
+            'items' => [
+                ['menu_id' => $menu->id, 'quantity' => 3], // Total Rp12.000
+            ],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 5000, // Less than Rp12.000
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJson(['success' => false]);
+
+        $this->assertDatabaseMissing('transactions', [
+            'total_sales' => 12000.00,
+            'cash_tendered' => 5000.00,
+        ]);
+    }
+
+    /**
+     * Test updating a transaction reconciles cash_tendered, change_returned, and final_amount.
+     */
+    public function test_updating_transaction_reconciles_payment_fields(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $menu = Menu::where('name', 'Jasmine Tea')->first(); // Rp4.000
+
+        // Create initial cash transaction (2 x 4000 = 8000, paid with 20000 -> change 12000)
+        $checkoutRes = $this->actingAs($admin)->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 20000,
+        ]);
+        $txId = $checkoutRes->json('transaction.id');
+
+        // Admin edits quantity to 4 (4 x 4000 = 16000 -> change should become 4000)
+        $this->actingAs($admin)->put("/transactions/{$txId}", [
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_time' => '14:00',
+            'notes' => 'Updated qty',
+            'items' => [['menu_id' => $menu->id, 'quantity' => 4]],
+        ])->assertRedirect();
+
+        $this->assertDatabaseHas('transactions', [
+            'id' => $txId,
+            'total_sales' => 16000.00,
+            'cash_tendered' => 20000.00,
+            'change_returned' => 4000.00,
+        ]);
+    }
+
+    /**
+     * Test Admin can record, update, and delete operational expenses and verify Net Profit in Reports/Dashboard.
+     */
+    public function test_admin_can_crud_operational_expenses_and_calculate_net_profit(): void
+    {
+        $admin = User::where('username', 'admin')->first();
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::where('name', 'Jasmine Tea')->first(); // Rp4.000, 30% profit -> Rp1.200 profit per cup
+        $today = now()->format('Y-m-d');
+
+        // 1. Create a paid sale: 10 cups = Rp40.000 sales, Rp12.000 gross profit, Rp28.000 cost
+        $this->actingAs($cashier)->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 10]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 50000,
+        ])->assertStatus(200);
+
+        // 2. Admin records an operational expense of Rp5.000 (e.g., Es Batu)
+        $storeRes = $this->actingAs($admin)->post('/expenses', [
+            'expense_date' => $today,
+            'category' => 'Bahan Baku & Es',
+            'description' => 'Beli Es Batu Kristal',
+            'amount' => 5000,
+            'payment_method' => 'tunai',
+            'notes' => 'Warung sebelah',
+        ]);
+        $storeRes->assertRedirect('/expenses');
+
+        $expense = \App\Models\Expense::first();
+        $this->assertNotNull($expense);
+        $this->assertEquals(5000.00, (float) $expense->amount);
+
+        // 3. Check Reports page: Gross Profit Rp12.000 - Expense Rp5.000 = Net Profit Rp7.000
+        $reportRes = $this->actingAs($admin)->get("/reports?period=custom&start_date={$today}&end_date={$today}");
+        $reportRes->assertStatus(200);
+        $reportRes->assertSee('12.000'); // Gross profit
+        $reportRes->assertSee('5.000');  // Operational expense
+        $reportRes->assertSee('7.000');  // Net profit
+
+        // 4. Update expense to Rp3.000 -> Net Profit becomes Rp9.000
+        $this->actingAs($admin)->put("/expenses/{$expense->id}", [
+            'expense_date' => $today,
+            'category' => 'Bahan Baku & Es',
+            'description' => 'Beli Es Batu Kristal Revisi',
+            'amount' => 3000,
+            'payment_method' => 'tunai',
+        ])->assertRedirect('/expenses');
+
+        $dashboardRes = $this->actingAs($admin)->get("/dashboard?period=today");
+        $dashboardRes->assertStatus(200);
+        $dashboardRes->assertSee('9.000'); // Net profit on dashboard
+
+        // 5. Delete expense
+        $this->actingAs($admin)->delete("/expenses/{$expense->id}")->assertRedirect('/expenses');
+        $this->assertSoftDeleted('expenses', ['id' => $expense->id]);
+    }
+
+    /**
+     * Test POS checkout with nominal and percentage discount calculates accurate sales, profit, and receipt.
+     */
+    public function test_pos_checkout_with_discounts_and_qris_discount(): void
+    {
+        $cashier = User::where('username', 'kasir')->first();
+        $menu = Menu::where('name', 'Jasmine Tea')->first(); // Rp4.000, 30% profit
+
+        // 1. Nominal discount: 5 cups = Rp20.000 subtotal, Cost = Rp14.000, Orig Profit = Rp6.000
+        // Discount Rp2.000 -> Net Sales = Rp18.000, Net Profit = Rp4.000
+        $resNominal = $this->actingAs($cashier)->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 5]],
+            'payment_method' => 'tunai',
+            'discount_type' => 'nominal',
+            'discount_value' => 2000,
+            'cash_tendered' => 20000,
+        ]);
+        $resNominal->assertStatus(200)
+            ->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('transactions', [
+            'subtotal_amount' => 20000.00,
+            'discount_type' => 'nominal',
+            'discount_value' => 2000.00,
+            'discount_amount' => 2000.00,
+            'total_sales' => 18000.00,
+            'total_profit' => 4000.00,
+            'estimated_cost' => 14000.00,
+            'cash_tendered' => 20000.00,
+            'change_returned' => 2000.00,
+        ]);
+
+        // Verify receipt HTML contains Diskon row
+        $this->assertStringContainsString('Diskon', $resNominal->json('receipt_html'));
+        $this->assertStringContainsString('-Rp2.000', $resNominal->json('receipt_html'));
+
+        // 2. Percentage discount on QRIS generation: 5 cups = Rp20.000, 10% discount = Rp2.000 -> base_amount = Rp18.000
+        $resQris = $this->actingAs($cashier)->postJson('/pos/qris/generate', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 5]],
+            'discount_type' => 'percentage',
+            'discount_value' => 10,
+        ]);
+        $resQris->assertStatus(200)
+            ->assertJson([
+                'status' => 'success',
+                'subtotal_amount' => 20000,
+                'discount_type' => 'percentage',
+                'discount_value' => 10,
+                'discount_amount' => 2000,
+                'base_amount' => 18000,
+            ]);
+    }
 }
 

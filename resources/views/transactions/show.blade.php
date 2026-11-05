@@ -30,6 +30,38 @@
                     <span class="small text-muted d-block">Admin Penginput</span>
                     <strong class="text-dark"><i class="fa-regular fa-user text-success me-1"></i> {{ $transaction->admin->name ?? 'System' }}</strong>
                 </div>
+                <div class="mb-3">
+                    <span class="small text-muted d-block">Metode & Status Pembayaran</span>
+                    <div class="mt-1 d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-dark text-uppercase">{{ $transaction->payment_method ?? 'tunai' }}</span>
+                        @if(($transaction->status ?? 'paid') === 'paid')
+                            <span class="badge bg-success">Lunas (Paid)</span>
+                        @elseif($transaction->status === 'pending')
+                            <span class="badge bg-warning text-dark">Menunggu Pembayaran (Pending)</span>
+                        @elseif($transaction->status === 'expired')
+                            <span class="badge bg-secondary">Kadaluarsa (Expired)</span>
+                        @elseif($transaction->status === 'cancelled')
+                            <span class="badge bg-danger">Dibatalkan (Cancelled)</span>
+                        @endif
+                    </div>
+                </div>
+                @if($transaction->customer_name)
+                <div class="mb-3">
+                    <span class="small text-muted d-block">Nama Pelanggan</span>
+                    <strong class="text-dark">{{ $transaction->customer_name }}</strong>
+                </div>
+                @endif
+                @if(($transaction->discount_amount ?? 0) > 0)
+                <div class="mb-3">
+                    <span class="small text-muted d-block">Diskon Promo</span>
+                    <strong class="text-danger">
+                        -Rp{{ number_format($transaction->discount_amount, 0, ',', '.') }}
+                        @if($transaction->discount_type === 'percentage')
+                            ({{ (float) $transaction->discount_value }}%)
+                        @endif
+                    </strong>
+                </div>
+                @endif
                 <div class="mb-4">
                     <span class="small text-muted d-block">Catatan</span>
                     <p class="text-dark m-0 bg-light p-2.5 rounded-3 border" style="white-space: pre-wrap;">{{ $transaction->notes ?: 'Tidak ada catatan.' }}</p>
