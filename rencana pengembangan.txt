@@ -1,6 +1,6 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-tolong berikan saya masukan pengembangan fitur dan perbaikan teraskota berdasarkan fitur yang ada saat ini.
+saya ingin menjalankan aplikasi ini menggunakan hosting gratis dari infinityfree, apakah bisa? jika bisa apa yang harus dilakukan dan disiapkan? baik dari sisi aplikasi ini dan sisi saya bagai user. jelaskan plus dan minus menggunakan infinity free secara mendetail.
 
 
 STATUS PENGEMBANGAN VPS (SELESAI ✓):

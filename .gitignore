@@ -22,5 +22,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 teraskota.zip
+/dist
+*.sql
 /android_listener
 /scratch
+

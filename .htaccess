@@ -1,10 +1,24 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Aktifkan ini jika aplikasi menggunakan storage/app/public
+    # 1. Blokir akses ke file sensitif (.env, .git, json konfigurasi, lockfile, dan file artisan)
+    <FilesMatch "^\.(env|git|svn|hg)|(composer\.json|composer\.lock|package\.json|package-lock\.json|artisan|phpunit\.xml|README\.md)$">
+        <IfModule mod_authz_core.c>
+            Require all denied
+        </IfModule>
+        <IfModule !mod_authz_core.c>
+            Order allow,deny
+            Deny from all
+        </IfModule>
+    </FilesMatch>
+
+    # 2. Blokir akses langsung ke direktori sistem Laravel
+    RewriteRule ^(app|bootstrap|config|database|resources|routes|storage/logs|tests|vendor)(/.*)?$ - [F,L]
+
+    # 3. Handle public storage jika symlink tidak didukung oleh hosting
     RewriteRule ^storage/(.*)$ storage/app/public/$1 [L]
 
-    # Arahkan seluruh request ke folder public Laravel jika belum di folder public
+    # 4. Arahkan seluruh request ke folder public jika belum di folder public
     RewriteCond %{REQUEST_URI} !^/public/
     RewriteRule ^(.*)$ public/$1 [L]
 </IfModule>
