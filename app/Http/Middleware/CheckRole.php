@@ -22,11 +22,20 @@ class CheckRole
         }
 
         $user = Auth::user();
+        $userRole = $user->role ?: (($user->username === 'admin') ? 'admin' : 'kasir');
 
-        if (!in_array($user->role, $roles)) {
-            if ($user->isKasir()) {
+        if (!in_array($userRole, $roles, true)) {
+            if ($userRole === 'kasir') {
+                if ($request->routeIs('pos.*')) {
+                    abort(403, 'Akses ditolak.');
+                }
                 return redirect()->route('pos.index')
                     ->with('error', 'Akses ditolak. Kasir hanya memiliki izin pada menu POS Kasir.');
+            }
+
+            // Prevent infinite loop if already requesting dashboard
+            if ($request->routeIs('dashboard')) {
+                abort(403, 'Akses ditolak. Akun Anda tidak memiliki hak akses administrator.');
             }
 
             return redirect()->route('dashboard')

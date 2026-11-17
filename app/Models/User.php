@@ -49,6 +49,18 @@ class User extends Authenticatable
         ];
     }
 
+    /**
+     * Defensive fallback accessor for role in case database migration hasn't been executed.
+     */
+    public function getRoleAttribute($value): string
+    {
+        if (!empty($value)) {
+            return $value;
+        }
+
+        return ($this->username === 'admin' || $this->email === 'admin@teraskota.local') ? 'admin' : 'kasir';
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';

@@ -21,6 +21,46 @@ use App\Http\Controllers\ExpenseController;
 Route::post('/listener/payment', [PaymentListenerController::class, 'payment']);
 Route::post('/listener/test-connection', [PaymentListenerController::class, 'testConnection']);
 
+// Emergency / Shared Hosting Web Migration Trigger
+Route::get('/auto-migrate', function () {
+    try {
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+        $output = \Illuminate\Support\Facades\Artisan::output();
+
+        // Jalankan Seeder Transaksi November jika ada
+        if (class_exists(\Database\Seeders\November2026TransactionsSeeder::class)) {
+            \Illuminate\Support\Facades\Artisan::call('db:seed', [
+                '--class' => \Database\Seeders\November2026TransactionsSeeder::class,
+                '--force' => true
+            ]);
+            $output .= "\n" . \Illuminate\Support\Facades\Artisan::output();
+        }
+
+        \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn('users', 'role')) {
+            \Illuminate\Support\Facades\DB::table('users')->where('username', 'admin')->update(['role' => 'admin']);
+        }
+
+        return response('
+            <div style="font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica, Arial, sans-serif; padding: 40px; max-width: 600px; margin: 60px auto; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 16px; color: #166534; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 12px;">✓</div>
+                <h2 style="margin: 0 0 10px 0; font-size: 24px; color: #15803d;">Migrasi & Seeding Database Berhasil!</h2>
+                <p style="font-size: 15px; line-height: 1.5; color: #166534; margin-bottom: 20px;">Seluruh tabel, kolom sistem, dan transaksi November 2026 telah disinkronkan.</p>
+                <div style="text-align: left; background: #ffffff; padding: 14px; border-radius: 10px; border: 1px solid #dcfce7; font-size: 12px; font-family: monospace; overflow-x: auto; max-height: 200px; color: #374151; margin-bottom: 25px;">' . nl2br(htmlspecialchars($output ?: 'Basis data sudah berada pada versi terbaru.')) . '</div>
+                <a href="/login" style="display: inline-block; background: #16a34a; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px; box-shadow: 0 4px 12px rgba(22,163,74,0.3);">Masuk ke Halaman Login</a>
+            </div>
+        ');
+    } catch (\Throwable $e) {
+        return response('
+            <div style="font-family: sans-serif; padding: 40px; max-width: 600px; margin: 60px auto; background: #fef2f2; border: 1px solid #fecaca; border-radius: 16px; color: #991b1b; text-align: center;">
+                <h2 style="margin-top:0;">Gagal Menjalankan Migrasi Otomatis</h2>
+                <p style="text-align: left; background: white; padding: 15px; border-radius: 8px; border: 1px solid #fee2e2; font-family: monospace; font-size: 13px;">' . htmlspecialchars($e->getMessage()) . '</p>
+            </div>
+        ', 500);
+    }
+});
+
 // Authentication Routes
 Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
 Route::post('/login', [AuthController::class, 'login']);

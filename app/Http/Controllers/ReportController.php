@@ -40,6 +40,31 @@ class ReportController extends Controller
      */
     public function pdf(Request $request)
     {
+        // Ensure valid public path and physical directories exist for DomPDF on shared hosting (InfinityFree)
+        $corePublic = base_path('public');
+        if (!is_dir($corePublic)) {
+            @mkdir($corePublic, 0755, true);
+        }
+
+        $resolvedPublicPath = (function_exists('public_path') && is_dir(public_path()))
+            ? public_path()
+            : (is_dir($corePublic) ? $corePublic : base_path());
+
+        $fontDir = storage_path('fonts');
+        if (!is_dir($fontDir)) {
+            @mkdir($fontDir, 0755, true);
+        }
+
+        config([
+            'dompdf.public_path' => $resolvedPublicPath,
+            'dompdf.options.font_dir' => $fontDir,
+            'dompdf.options.font_cache' => $fontDir,
+            'dompdf.options.chroot' => array_filter([
+                realpath(base_path()),
+                realpath($resolvedPublicPath),
+            ]),
+        ]);
+
         $data = $this->getReportData($request);
         $pdf = Pdf::loadView('reports.pdf', $data);
         

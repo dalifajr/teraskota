@@ -1097,7 +1097,15 @@
 <script>
     // State Keranjang
     let cart = [];
+    let lastAnimatedItemId = null;
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
+    function triggerElementBounce(el) {
+        if (!el) return;
+        el.classList.remove('badge-bounce');
+        void el.offsetWidth;
+        el.classList.add('badge-bounce');
+    }
 
     // Modals
     const checkoutModal = new bootstrap.Modal(document.getElementById('posCheckoutModal'));
@@ -1124,7 +1132,19 @@
                 qty: 1
             });
         }
+        lastAnimatedItemId = id;
+
+        // Tactile card press animation
+        const cardEl = document.querySelector(`#posProductGrid .pos-product-card[data-id="${id}"]`);
+        if (cardEl) {
+            cardEl.classList.add('pos-card-tapped');
+            setTimeout(() => cardEl.classList.remove('pos-card-tapped'), 220);
+        }
+
         renderCart();
+        triggerElementBounce(document.getElementById('posTotalQty'));
+        triggerElementBounce(document.getElementById('posGrandTotal'));
+        triggerElementBounce(document.getElementById('mobileCartDot'));
     }
 
     // Update Quantity
@@ -1236,8 +1256,9 @@
             totalQty += item.qty;
             grandTotal += subtotal;
 
+            const isNewlyAnimated = (item.id === lastAnimatedItemId);
             html += `
-                <div class="pos-cart-item">
+                <div class="pos-cart-item ${isNewlyAnimated ? 'pos-cart-item-animate' : ''}">
                     <div class="pos-item-info">
                         <div class="pos-item-title" title="${item.name}">${item.name}</div>
                         <div class="pos-item-sub">${formatRupiah(item.price)} &times; ${item.qty} = <strong class="text-success">${formatRupiah(subtotal)}</strong></div>
@@ -1253,6 +1274,7 @@
                 </div>
             `;
         });
+        lastAnimatedItemId = null;
 
         // Desktop aside updates
         if (cartList) cartList.innerHTML = html;
@@ -1371,6 +1393,9 @@
         const screen = document.getElementById('posCheckoutScreen');
         if (screen) {
             screen.style.display = 'block';
+            screen.classList.remove('animate-slide-up');
+            void screen.offsetWidth;
+            screen.classList.add('animate-slide-up');
             populateCheckoutScreen();
         }
 
@@ -1379,7 +1404,12 @@
 
     function showCatalogView() {
         const catSection = document.getElementById('posCatalogSection');
-        if (catSection) catSection.style.display = '';
+        if (catSection) {
+            catSection.style.display = '';
+            catSection.classList.remove('animate-slide-up');
+            void catSection.offsetWidth;
+            catSection.classList.add('animate-slide-up');
+        }
         const cartAside = document.getElementById('posCartAside');
         if (cartAside) cartAside.style.removeProperty('display');
 
@@ -1995,7 +2025,7 @@
         }
     });
 
-    // Shared Process Payment Checkout Function (Offline-First Universal Architecture)
+    // Shared Process Payment Checkout Function (Online-First with Transparent Offline Fallback)
     async function executePaymentSubmission(paymentMethod, cashTendered, customerName, notes, submitBtn, mode = 'modal') {
         const pricing = computeCheckoutPricing(mode);
         const grandTotal = pricing.netTotal;
@@ -2019,17 +2049,95 @@
             startQrisPaymentFlow(customerName, notes, submitBtn, originalBtnHtml, pricing);
             return;
         }
+
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Menyimpan...';
 
+        const cashGiven = paymentMethod === 'tunai' ? cashTendered : grandTotal;
+        const changeRet = Math.max(0, cashGiven - grandTotal);
+
+        // 1. DIRECT ONLINE CHECKOUT (Jalur Utama saat perangkat online)
+        if (navigator.onLine) {
+            try {
+                const onlinePayload = {
+                    items: cart.map(i => ({ menu_id: i.id, quantity: i.qty })),
+                    payment_method: paymentMethod,
+                    discount_type: pricing.discountType || null,
+                    discount_value: pricing.discountValue || 0,
+                    cash_tendered: cashGiven,
+                    customer_name: customerName || null,
+                    notes: notes || null
+                };
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 7000);
+
+                const response = await fetch("{{ route('pos.checkout') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: JSON.stringify(onlinePayload),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const resData = await response.json();
+                    if (resData.success && resData.transaction) {
+                        const tx = resData.transaction;
+
+                        // Simpan cache lokal di IndexedDB sebagai transaksi tersinkron
+                        try {
+                            await OfflineDB.saveTransaction({
+                                ...tx,
+                                sync_id: tx.sync_id || ('online-' + tx.id),
+                                sync_status: 'synced',
+                                synced_at: new Date().toISOString(),
+                                cashier_name: tx.cashier?.name || "{{ Auth::user()->name }}",
+                                items: tx.details || []
+                            });
+                        } catch (e) {
+                            console.warn('[POS] Gagal menyimpan salinan offline:', e);
+                        }
+
+                        // Tutup modal checkout
+                        showCatalogView();
+                        checkoutModal.hide();
+
+                        // Render struk resmi server (tanpa watermark nota offline!)
+                        const receiptBody = document.getElementById('receiptModalBody');
+                        if (receiptBody) {
+                            receiptBody.innerHTML = resData.receipt_html || ReceiptRenderer.renderHTML(tx);
+                        }
+                        window.currentReceiptTransaction = tx;
+                        receiptModal.show();
+
+                        // Reset Keranjang
+                        cart = [];
+                        renderCart();
+
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = originalBtnHtml;
+                        await SyncManager.updateQueueBadge();
+                        return;
+                    }
+                }
+            } catch (onlineErr) {
+                console.warn('[POS] Online checkout tidak dapat dijangkau, mengalihkan ke mode offline:', onlineErr);
+            }
+        }
+
+        // 2. OFFLINE FALLBACK (Saat internet putus atau server tidak merespons)
         try {
             const syncId = (crypto.randomUUID ? crypto.randomUUID() : 'offline-' + Date.now());
             const deviceId = await OfflineDB.getDeviceId();
             const now = new Date();
             const txDate = now.toISOString().split('T')[0];
             const txTime = now.toTimeString().split(' ')[0];
-            const cashGiven = paymentMethod === 'tunai' ? cashTendered : grandTotal;
-            const changeRet = Math.max(0, cashGiven - grandTotal);
 
             const localTx = {
                 sync_id: syncId,
@@ -2069,7 +2177,7 @@
             const savedTx = await OfflineDB.saveTransaction(localTx);
             window.currentReceiptTransaction = savedTx;
 
-            // 2. Render struk instan (offline receipt generator)
+            // 2. Render struk offline
             showCatalogView();
             checkoutModal.hide();
 
@@ -2167,9 +2275,14 @@
 
             if (matchCategory && matchSearch) {
                 item.style.display = '';
+                item.style.setProperty('--tk-filter-idx', Math.min(visibleCount, 12));
+                item.classList.remove('tk-pos-card-enter', 'pos-card-filter-reveal');
+                void item.offsetWidth;
+                item.classList.add('pos-card-filter-reveal');
                 visibleCount++;
             } else {
                 item.style.display = 'none';
+                item.classList.remove('pos-card-filter-reveal');
             }
         });
 

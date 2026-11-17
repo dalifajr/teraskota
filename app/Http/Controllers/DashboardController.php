@@ -239,6 +239,34 @@ class DashboardController extends Controller
             ->orderBy('sales', 'desc')
             ->get();
 
+        // Payment Method Breakdown for Selected Period (Tunai vs QRIS)
+        $cashQuery = (clone $transactionsQuery)->where('payment_method', 'tunai');
+        $totalCashSales = (float) (clone $cashQuery)->sum('total_sales');
+        $totalCashCount = (int) (clone $cashQuery)->count();
+
+        $qrisQuery = (clone $transactionsQuery)->where('payment_method', 'qris');
+        $totalQrisSales = (float) (clone $qrisQuery)->sum('total_sales');
+        $totalQrisCount = (int) (clone $qrisQuery)->count();
+
+        // Today's Pulse Metrics (WIB)
+        $todayStr = Carbon::today()->format('Y-m-d');
+        $todayTxQuery = Transaction::paid()->whereDate('transaction_date', $todayStr);
+        $todaySales = (float) (clone $todayTxQuery)->sum('total_sales');
+        $todayProfit = (float) (clone $todayTxQuery)->sum('total_profit');
+        $todayTransactions = (int) (clone $todayTxQuery)->count();
+        $todayExpenses = (float) Expense::whereDate('expense_date', $todayStr)->sum('amount');
+        $todayNetProfit = $todayProfit - $todayExpenses;
+
+        // Recent 5 Transactions for Admin Monitoring
+        $recentTransactions = Transaction::paid()
+            ->with('user')
+            ->latest('id')
+            ->take(5)
+            ->get();
+
+        $totalActiveMenus = \App\Models\Menu::where('status', true)->count();
+        $totalCategories = Category::count();
+
         return view('dashboard.index', compact(
             'period',
             'startDate',
@@ -252,6 +280,17 @@ class DashboardController extends Controller
             'totalTransactions',
             'totalQuantity',
             'averageSales',
+            'totalCashSales',
+            'totalCashCount',
+            'totalQrisSales',
+            'totalQrisCount',
+            'todaySales',
+            'todayTransactions',
+            'todayExpenses',
+            'todayNetProfit',
+            'recentTransactions',
+            'totalActiveMenus',
+            'totalCategories',
             'trendData',
             'topMenus',
             'bottomMenus',

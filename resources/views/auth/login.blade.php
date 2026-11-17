@@ -26,7 +26,7 @@
 
     <!-- Custom Style -->
     <link
-        href="{{ asset('assets/css/custom.css') }}"
+        href="{{ asset('assets/css/custom.css') }}?v={{ filemtime(public_path('assets/css/custom.css')) }}"
         rel="stylesheet"
     >
 
@@ -192,6 +192,9 @@
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- UI Transitions & Progress Bar Engine -->
+    <script src="{{ asset('assets/js/ui-transitions.js') }}?v={{ filemtime(public_path('assets/js/ui-transitions.js')) }}"></script>
 
     <!-- Password Visibility Toggle & Service Worker -->
     <script>

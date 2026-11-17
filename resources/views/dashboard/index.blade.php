@@ -8,13 +8,47 @@
 @endsection
 
 @section('content')
-    <!-- Dashboard Filters -->
-    <div class="card premium-card mb-4">
-        <div class="card-body p-4">
-            <form action="{{ route('dashboard') }}" method="GET" id="filterForm" class="row g-3 align-items-end">
-                <div class="col-md-3">
-                    <label for="period" class="form-label fw-semibold text-dark"><i class="fa-solid fa-calendar-days text-success me-1"></i> Periode Laporan</label>
-                    <select name="period" id="period" class="form-select border-success-subtle">
+    <!-- Admin Hub Header & Quick Actions -->
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h4 class="fw-bold text-dark m-0">Ringkasan Operasional</h4>
+                <span class="badge badge-wib rounded-pill d-none d-sm-inline-block">Zona Waktu: WIB (UTC+7)</span>
+            </div>
+            <p class="text-muted small m-0">
+                Data performa penjualan, arus kas tunai/QRIS, dan laba bersih Teras Kota Berlian Makmur.
+            </p>
+        </div>
+
+        <!-- Quick Action Buttons for Admin -->
+        <div class="d-flex align-items-center flex-wrap gap-2">
+            <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-primary-green quick-action-btn shadow-sm" title="Buka Aplikasi Kasir POS di Tab Baru">
+                <i class="fa-solid fa-cash-register text-lime"></i>
+                <span>Buka Kasir POS</span>
+                <i class="fa-solid fa-arrow-up-right-from-square small opacity-75"></i>
+            </a>
+
+            <a href="{{ route('expenses.index') }}" class="btn btn-outline-danger quick-action-btn bg-white" title="Catat Pengeluaran Kas Operasional">
+                <i class="fa-solid fa-plus-circle text-danger"></i>
+                <span>Catat Pengeluaran</span>
+            </a>
+
+            <a href="{{ route('reports.index') }}" class="btn btn-outline-secondary quick-action-btn bg-white" title="Buka Laporan Penjualan Lengkap">
+                <i class="fa-solid fa-file-invoice-dollar text-muted"></i>
+                <span>Laporan</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Compact Filter Bar -->
+    <div class="card premium-card border-0 shadow-sm mb-4">
+        <div class="card-body p-3 p-md-4">
+            <form action="{{ route('dashboard') }}" method="GET" id="filterForm" class="row g-2 g-md-3 align-items-end">
+                <div class="col-12 col-md-3">
+                    <label for="period" class="form-label fw-semibold text-dark small mb-1">
+                        <i class="fa-solid fa-calendar-days text-success me-1"></i> Periode Laporan
+                    </label>
+                    <select name="period" id="period" class="form-select form-select-sm border-success-subtle fw-medium">
                         <option value="today" {{ $period === 'today' ? 'selected' : '' }}>Hari Ini</option>
                         <option value="yesterday" {{ $period === 'yesterday' ? 'selected' : '' }}>Kemarin</option>
                         <option value="this_week" {{ $period === 'this_week' ? 'selected' : '' }}>Minggu Ini</option>
@@ -22,46 +56,48 @@
                         <option value="this_month" {{ $period === 'this_month' ? 'selected' : '' }}>Bulan Ini</option>
                         <option value="prev_month" {{ $period === 'prev_month' ? 'selected' : '' }}>Bulan Sebelumnya</option>
                         <option value="this_year" {{ $period === 'this_year' ? 'selected' : '' }}>Tahun Ini</option>
-                        <option value="specific_day" {{ $period === 'specific_day' ? 'selected' : '' }}>Hari Tertentu</option>
-                        <option value="specific_month" {{ $period === 'specific_month' ? 'selected' : '' }}>Bulan Tertentu</option>
-                        <option value="specific_year" {{ $period === 'specific_year' ? 'selected' : '' }}>Tahun Tertentu</option>
-                        <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}>Rentang Tanggal...</option>
+                        <option value="specific_day" {{ $period === 'specific_day' ? 'selected' : '' }}>Hari Tertentu...</option>
+                        <option value="specific_month" {{ $period === 'specific_month' ? 'selected' : '' }}>Bulan Tertentu...</option>
+                        <option value="specific_year" {{ $period === 'specific_year' ? 'selected' : '' }}>Tahun Tertentu...</option>
+                        <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}>Rentang Tanggal Custom...</option>
                     </select>
                 </div>
 
                 <!-- Conditional Fields -->
-                <div class="col-md-3 cond-field" id="field_specific_day" style="display:none;">
-                    <label for="specific_day" class="form-label fw-semibold text-dark">Pilih Tanggal</label>
-                    <input type="date" name="specific_day" id="specific_day" class="form-control" value="{{ request('specific_day', date('Y-m-d')) }}">
+                <div class="col-12 col-sm-6 col-md-3 cond-field" id="field_specific_day" style="display:none;">
+                    <label for="specific_day" class="form-label fw-semibold text-dark small mb-1">Pilih Tanggal</label>
+                    <input type="date" name="specific_day" id="specific_day" class="form-control form-select-sm" value="{{ request('specific_day', date('Y-m-d')) }}">
                 </div>
 
-                <div class="col-md-3 cond-field" id="field_specific_month" style="display:none;">
-                    <label for="specific_month" class="form-label fw-semibold text-dark">Pilih Bulan</label>
-                    <input type="month" name="specific_month" id="specific_month" class="form-control" value="{{ request('specific_month', date('Y-m')) }}">
+                <div class="col-12 col-sm-6 col-md-3 cond-field" id="field_specific_month" style="display:none;">
+                    <label for="specific_month" class="form-label fw-semibold text-dark small mb-1">Pilih Bulan</label>
+                    <input type="month" name="specific_month" id="specific_month" class="form-control form-select-sm" value="{{ request('specific_month', date('Y-m')) }}">
                 </div>
 
-                <div class="col-md-3 cond-field" id="field_specific_year" style="display:none;">
-                    <label for="specific_year" class="form-label fw-semibold text-dark">Pilih Tahun</label>
-                    <select name="specific_year" id="specific_year" class="form-select">
+                <div class="col-12 col-sm-6 col-md-3 cond-field" id="field_specific_year" style="display:none;">
+                    <label for="specific_year" class="form-label fw-semibold text-dark small mb-1">Pilih Tahun</label>
+                    <select name="specific_year" id="specific_year" class="form-select form-select-sm">
                         @for($y = date('Y'); $y >= 2020; $y--)
                             <option value="{{ $y }}" {{ request('specific_year') == $y ? 'selected' : '' }}>{{ $y }}</option>
                         @endfor
                     </select>
                 </div>
 
-                <div class="col-md-2 cond-field" id="field_start_date" style="display:none;">
-                    <label for="start_date" class="form-label fw-semibold text-dark">Mulai Tanggal</label>
-                    <input type="date" name="start_date" id="start_date" class="form-control" value="{{ request('start_date', date('Y-m-01')) }}">
+                <div class="col-12 col-sm-6 col-md-2 cond-field" id="field_start_date" style="display:none;">
+                    <label for="start_date" class="form-label fw-semibold text-dark small mb-1">Mulai Tanggal</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control form-select-sm" value="{{ request('start_date', date('Y-m-01')) }}">
                 </div>
 
-                <div class="col-md-2 cond-field" id="field_end_date" style="display:none;">
-                    <label for="end_date" class="form-label fw-semibold text-dark">Akhir Tanggal</label>
-                    <input type="date" name="end_date" id="end_date" class="form-control" value="{{ request('end_date', date('Y-m-t')) }}">
+                <div class="col-12 col-sm-6 col-md-2 cond-field" id="field_end_date" style="display:none;">
+                    <label for="end_date" class="form-label fw-semibold text-dark small mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control form-select-sm" value="{{ request('end_date', date('Y-m-t')) }}">
                 </div>
 
-                <div class="col-md-3">
-                    <label for="group_by" class="form-label fw-semibold text-dark"><i class="fa-solid fa-chart-bar text-success me-1"></i> Pengelompokan Grafik</label>
-                    <select name="group_by" id="group_by" class="form-select border-success-subtle">
+                <div class="col-12 col-md-3">
+                    <label for="group_by" class="form-label fw-semibold text-dark small mb-1">
+                        <i class="fa-solid fa-chart-simple text-success me-1"></i> Skala Grafik
+                    </label>
+                    <select name="group_by" id="group_by" class="form-select form-select-sm border-success-subtle">
                         <option value="daily" {{ $groupBy === 'daily' ? 'selected' : '' }}>Harian</option>
                         <option value="weekly" {{ $groupBy === 'weekly' ? 'selected' : '' }}>Mingguan</option>
                         <option value="monthly" {{ $groupBy === 'monthly' ? 'selected' : '' }}>Bulanan</option>
@@ -69,170 +105,368 @@
                     </select>
                 </div>
 
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary-green w-100"><i class="fa-solid fa-filter me-2"></i> Filter</button>
+                <div class="col-12 col-md-2">
+                    <button type="submit" class="btn btn-sm btn-primary-green w-100 py-2">
+                        <i class="fa-solid fa-filter me-1"></i> Terapkan
+                    </button>
+                </div>
+
+                <!-- Active Date Range Label -->
+                <div class="col-12 mt-2 pt-2 border-top d-flex justify-content-between align-items-center flex-wrap gap-2 text-muted small">
+                    <div>
+                        <i class="fa-regular fa-calendar-check text-success me-1"></i>
+                        Rentang Aktif:
+                        <strong class="text-dark">{{ $startDate->translatedFormat('d M Y') }}</strong> s/d <strong class="text-dark">{{ $endDate->translatedFormat('d M Y') }}</strong>
+                        <span class="text-muted">(WIB)</span>
+                    </div>
+                    <div class="d-none d-md-block">
+                        <span>Katalog Menu: <strong>{{ $totalActiveMenus }}</strong> aktif dari <strong>{{ $totalCategories }}</strong> kategori</span>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
-    <!-- Stats Cards Grid -->
+    <!-- SECTION 1: CORE FINANCIAL OVERVIEW (4 HERO CARDS) -->
     <div class="row g-3 mb-4">
-        <!-- Total Omzet -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft">
-                            <i class="fa-solid fa-wallet"></i>
-                        </div>
+        <!-- 1. Total Omzet Penjualan -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card premium-card stat-hero-card hero-omzet h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-hero-label">Total Omzet</span>
+                    <div class="card-icon-wrapper bg-mint-soft" style="width:40px; height:40px; font-size:1.15rem;">
+                        <i class="fa-solid fa-wallet"></i>
                     </div>
-                    <div class="stat-value">Rp{{ number_format($totalSales, 0, ',', '.') }}</div>
-                    <div class="stat-label">Total Omzet</div>
+                </div>
+                <div class="stat-hero-value text-dark">
+                    Rp{{ number_format($totalSales, 0, ',', '.') }}
+                </div>
+                <div class="stat-hero-sub d-flex align-items-center justify-content-between mt-auto pt-2 border-top">
+                    <span>Transaksi Berhasil</span>
+                    <strong class="text-dark">{{ number_format($totalTransactions, 0, ',', '.') }}</strong>
                 </div>
             </div>
         </div>
 
-        <!-- Total Keuntungan -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft" style="background-color:#e0f2fe; color:#0284c7;">
-                            <i class="fa-solid fa-arrow-trend-up"></i>
-                        </div>
+        <!-- 2. Estimasi Modal / HPP -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card premium-card stat-hero-card hero-cost h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-hero-label">Estimasi Modal (HPP)</span>
+                    <div class="card-icon-wrapper" style="width:40px; height:40px; font-size:1.15rem; background-color:#fee2e2; color:#dc2626;">
+                        <i class="fa-solid fa-boxes-stacked"></i>
                     </div>
-                    <div class="stat-value">Rp{{ number_format($totalProfit, 0, ',', '.') }}</div>
-                    <div class="stat-label">Total Keuntungan</div>
+                </div>
+                <div class="stat-hero-value text-danger">
+                    Rp{{ number_format($estimatedCost, 0, ',', '.') }}
+                </div>
+                <div class="stat-hero-sub d-flex align-items-center justify-content-between mt-auto pt-2 border-top">
+                    <span>Laba Kotor (Omzet - HPP)</span>
+                    <strong class="text-dark">Rp{{ number_format($totalProfit, 0, ',', '.') }}</strong>
                 </div>
             </div>
         </div>
 
-        <!-- Estimasi Modal -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft" style="background-color:#fee2e2; color:#dc2626;">
-                            <i class="fa-solid fa-hand-holding-dollar"></i>
-                        </div>
+        <!-- 3. Pengeluaran Operasional Toko -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card premium-card stat-hero-card hero-expense h-100 p-3">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="stat-hero-label">Pengeluaran Kas</span>
+                    <div class="card-icon-wrapper" style="width:40px; height:40px; font-size:1.15rem; background-color:#fef3c7; color:#d97706;">
+                        <i class="fa-solid fa-money-bill-transfer"></i>
                     </div>
-                    <div class="stat-value">Rp{{ number_format($estimatedCost, 0, ',', '.') }}</div>
-                    <div class="stat-label">Estimasi Modal</div>
+                </div>
+                <div class="stat-hero-value text-warning">
+                    Rp{{ number_format($totalExpenses, 0, ',', '.') }}
+                </div>
+                <div class="stat-hero-sub d-flex align-items-center justify-content-between mt-auto pt-2 border-top">
+                    <span>Kas Operasional Keluar</span>
+                    <a href="{{ route('expenses.index') }}" class="text-decoration-none text-success fw-bold">
+                        Kelola <i class="fa-solid fa-arrow-right small"></i>
+                    </a>
                 </div>
             </div>
         </div>
 
-        <!-- Jumlah Transaksi -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft" style="background-color:#fef3c7; color:#d97706;">
-                            <i class="fa-solid fa-file-invoice"></i>
-                        </div>
+        <!-- 4. Laba Bersih Aktual (Net Profit) -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card premium-card stat-hero-card hero-netprofit h-100 p-3" style="background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <span class="stat-hero-label text-success">Laba Bersih Aktual</span>
+                        <small class="d-block text-muted" style="font-size:0.7rem;">(Laba Kotor &minus; Pengeluaran Kas)</small>
                     </div>
-                    <div class="stat-value">{{ number_format($totalTransactions, 0, ',', '.') }}</div>
-                    <div class="stat-label">Jumlah Transaksi</div>
+                    <div class="card-icon-wrapper bg-mint-soft" style="width:40px; height:40px; font-size:1.15rem;">
+                        <i class="fa-solid fa-sack-dollar"></i>
+                    </div>
+                </div>
+                <div class="stat-hero-value {{ $netProfit >= 0 ? 'text-success' : 'text-danger' }}">
+                    Rp{{ number_format($netProfit, 0, ',', '.') }}
+                </div>
+                <div class="stat-hero-sub d-flex align-items-center justify-content-between mt-auto pt-2 border-top">
+                    <span>Status Finansial</span>
+                    @if($netProfit >= 0)
+                        <span class="badge bg-success-subtle text-success fw-bold px-2 py-1 rounded-pill">Surplus / Profit</span>
+                    @else
+                        <span class="badge bg-danger-subtle text-danger fw-bold px-2 py-1 rounded-pill">Defisit</span>
+                    @endif
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 2: OPERATIONAL VOLUME & AVERAGE TICKET (4 METRIC CARDS) -->
+    <div class="row g-3 mb-4">
+        <!-- Total Transaksi -->
+        <div class="col-6 col-xl-3">
+            <div class="card premium-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="card-icon-wrapper bg-light text-primary" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+                        <i class="fa-solid fa-receipt"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value fs-4 text-dark mb-0">{{ number_format($totalTransactions, 0, ',', '.') }}</div>
+                        <div class="stat-label small">Struk / Transaksi</div>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Jumlah Produk Terjual -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft" style="background-color:#faf5ff; color:#7c3aed;">
-                            <i class="fa-solid fa-glass-water"></i>
-                        </div>
+        <!-- Total Produk Terjual -->
+        <div class="col-6 col-xl-3">
+            <div class="card premium-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="card-icon-wrapper bg-light text-success" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+                        <i class="fa-solid fa-mug-saucer"></i>
                     </div>
-                    <div class="stat-value">{{ number_format($totalQuantity, 0, ',', '.') }} pcs</div>
-                    <div class="stat-label">Produk Terjual</div>
+                    <div>
+                        <div class="stat-value fs-4 text-dark mb-0">{{ number_format($totalQuantity, 0, ',', '.') }} <span class="fs-6 fw-normal text-muted">pcs</span></div>
+                        <div class="stat-label small">Cup / Produk Terjual</div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Rata-rata Nilai Transaksi -->
-        <div class="col-md-6 col-xl-2 col-sm-6">
-            <div class="card premium-card h-100">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div class="card-icon-wrapper bg-mint-soft" style="background-color:#f0fdf4; color:#16a34a;">
-                            <i class="fa-solid fa-calculator"></i>
-                        </div>
+        <div class="col-6 col-xl-3">
+            <div class="card premium-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="card-icon-wrapper bg-light text-info" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+                        <i class="fa-solid fa-calculator"></i>
                     </div>
-                    <div class="stat-value">Rp{{ number_format($averageSales, 0, ',', '.') }}</div>
-                    <div class="stat-label">Rata-rata Transaksi</div>
+                    <div>
+                        <div class="stat-value fs-4 text-dark mb-0">Rp{{ number_format($averageSales, 0, ',', '.') }}</div>
+                        <div class="stat-label small">Rata-rata per Struk</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diskon Promo -->
+        <div class="col-6 col-xl-3">
+            <div class="card premium-card p-3 h-100">
+                <div class="d-flex align-items-center gap-3">
+                    <div class="card-icon-wrapper bg-light text-warning" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+                        <i class="fa-solid fa-tags"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value fs-4 text-dark mb-0">Rp{{ number_format($totalDiscount, 0, ',', '.') }}</div>
+                        <div class="stat-label small">Diskon Promo Diberikan</div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Net Profit & Operational Expenses Banner -->
+    <!-- SECTION 3: CASH FLOW BREAKDOWN (TUNAI vs QRIS) & RECENT TRANSACTIONS FEED -->
     <div class="row g-3 mb-4">
-        <div class="col-md-4">
-            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="small text-muted d-block mb-1">Total Diskon Promo</span>
-                        <strong class="fs-5 text-warning">Rp{{ number_format($totalDiscount ?? 0, 0, ',', '.') }}</strong>
-                    </div>
-                    <i class="fa-solid fa-tags fs-3 text-warning opacity-50"></i>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="small text-muted d-block mb-1">Pengeluaran Operasional (Kas Keluar)</span>
-                        <strong class="fs-5 text-danger">Rp{{ number_format($totalExpenses ?? 0, 0, ',', '.') }}</strong>
-                    </div>
-                    <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-danger rounded-pill px-3">Kelola</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100" style="border-left: 4px solid var(--primary-green) !important;">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <span class="small text-muted d-block mb-1">Laba Bersih Aktual (Laba Kotor - Pengeluaran)</span>
-                        <strong class="fs-4 {{ ($netProfit ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($netProfit ?? 0, 0, ',', '.') }}</strong>
-                    </div>
-                    <i class="fa-solid fa-sack-dollar fs-3 text-success opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Charts Section -->
-    <div class="row mb-4">
-        <!-- Sales and Profit Trend Chart -->
-        <div class="col-lg-8 mb-4 mb-lg-0">
+        <!-- Left: Payment Method Breakdown (Cash in Drawer vs QRIS in Bank) -->
+        <div class="col-12 col-lg-5">
             <div class="card premium-card h-100">
-                <div class="premium-header">
-                    <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-chart-line text-success me-2"></i> Perkembangan Omzet & Keuntungan</h5>
+                <div class="premium-header d-flex justify-content-between align-items-center py-3 px-4">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-scale-balanced text-success me-2"></i> Arus Masuk per Metode Bayar
+                    </h6>
+                    <span class="badge bg-light text-muted border">Periode Terpilih</span>
                 </div>
                 <div class="card-body p-4">
-                    <canvas id="trendChart" style="height: 350px;"></canvas>
+                    <div class="row g-3 mb-3">
+                        <!-- Tunai (Laci Kasir) -->
+                        <div class="col-12 col-sm-6">
+                            <div class="payment-channel-box h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="small fw-semibold text-muted">
+                                        <i class="fa-solid fa-money-bill-wave text-success me-1"></i> Tunai (Laci Kasir)
+                                    </span>
+                                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill" style="font-size:0.7rem;">
+                                        {{ $totalCashCount }} trx
+                                    </span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-1">Rp{{ number_format($totalCashSales, 0, ',', '.') }}</h5>
+                                <div class="small text-muted">
+                                    {{ $totalSales > 0 ? round(($totalCashSales / $totalSales) * 100, 1) : 0 }}% dari omzet
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- QRIS (Bank / Digital) -->
+                        <div class="col-12 col-sm-6">
+                            <div class="payment-channel-box h-100">
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <span class="small fw-semibold text-muted">
+                                        <i class="fa-solid fa-qrcode text-info me-1"></i> QRIS Dinamis
+                                    </span>
+                                    <span class="badge bg-info bg-opacity-10 text-info rounded-pill" style="font-size:0.7rem;">
+                                        {{ $totalQrisCount }} trx
+                                    </span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-1">Rp{{ number_format($totalQrisSales, 0, ',', '.') }}</h5>
+                                <div class="small text-muted">
+                                    {{ $totalSales > 0 ? round(($totalQrisSales / $totalSales) * 100, 1) : 0 }}% dari omzet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar Ratio -->
+                    @php
+                        $cashPct = $totalSales > 0 ? ($totalCashSales / $totalSales) * 100 : 50;
+                        $qrisPct = $totalSales > 0 ? ($totalQrisSales / $totalSales) * 100 : 50;
+                    @endphp
+                    <div class="mb-3">
+                        <div class="d-flex justify-content-between small text-muted mb-1">
+                            <span>Tunai: {{ round($cashPct, 1) }}%</span>
+                            <span>QRIS: {{ round($qrisPct, 1) }}%</span>
+                        </div>
+                        <div class="progress" style="height: 8px;">
+                            <div class="progress-bar bg-success" role="progressbar" style="width: {{ $cashPct }}%" aria-valuenow="{{ $cashPct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            <div class="progress-bar bg-info" role="progressbar" style="width: {{ $qrisPct }}%" aria-valuenow="{{ $qrisPct }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                    </div>
+
+                    <!-- Today's Pulse Strip (WIB) -->
+                    <div class="p-3 bg-light rounded-3 border">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark small">
+                                <i class="fa-solid fa-bolt text-warning me-1"></i> Performa Hari Ini (WIB)
+                            </span>
+                            <span class="badge bg-white text-secondary border small">{{ date('d M Y') }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
+                            <span>Omzet: <strong class="text-dark">Rp{{ number_format($todaySales, 0, ',', '.') }}</strong></span>
+                            <span>Pengeluaran: <strong class="text-danger">Rp{{ number_format($todayExpenses, 0, ',', '.') }}</strong></span>
+                            <span>Bersih: <strong class="{{ $todayNetProfit >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($todayNetProfit, 0, ',', '.') }}</strong></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: 5 Recent Successful Transactions Live Feed -->
+        <div class="col-12 col-lg-7">
+            <div class="card premium-card h-100">
+                <div class="premium-header d-flex justify-content-between align-items-center py-3 px-4">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-clock-rotate-left text-success me-2"></i> 5 Transaksi Berhasil Terakhir
+                    </h6>
+                    <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 text-decoration-none" style="font-size:0.78rem;">
+                        Semua Transaksi <i class="fa-solid fa-arrow-right ms-1"></i>
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr style="font-size:0.8rem;">
+                                    <th class="ps-3">No. Nota</th>
+                                    <th>Waktu (WIB)</th>
+                                    <th>Pelanggan</th>
+                                    <th>Metode</th>
+                                    <th class="text-end pe-3">Total Belanja</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse($recentTransactions as $tx)
+                                    <tr>
+                                        <td class="ps-3">
+                                            <a href="{{ route('transactions.show', $tx->id) }}" class="fw-bold text-success text-decoration-none" title="Lihat Struk Transaksi">
+                                                {{ $tx->transaction_number }}
+                                            </a>
+                                        </td>
+                                        <td class="small text-muted">
+                                            {{ \Carbon\Carbon::parse($tx->transaction_date)->translatedFormat('d M') }}
+                                            <span class="fw-semibold text-dark">{{ substr((string) ($tx->transaction_time ?? '00:00'), 0, 5) }}</span>
+                                        </td>
+                                        <td class="small text-dark">
+                                            {{ $tx->customer_name ?: 'Pelanggan' }}
+                                        </td>
+                                        <td>
+                                            @if($tx->payment_method === 'qris')
+                                                <span class="badge bg-info-subtle text-info border border-info-subtle rounded-pill px-2 py-1" style="font-size:0.7rem;">
+                                                    <i class="fa-solid fa-qrcode me-1"></i> QRIS
+                                                </span>
+                                            @else
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1" style="font-size:0.7rem;">
+                                                    <i class="fa-solid fa-money-bill-wave me-1"></i> Tunai
+                                                </span>
+                                            @endif
+                                        </td>
+                                        <td class="text-end pe-3 fw-bold text-dark">
+                                            Rp{{ number_format($tx->final_amount ?: $tx->total_sales, 0, ',', '.') }}
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center py-4 text-muted small">
+                                            <i class="fa-solid fa-inbox fs-3 mb-2 d-block text-secondary opacity-50"></i>
+                                            Belum ada transaksi berhasil yang tercatat.
+                                        </td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECTION 4: CHARTS (TREND & CATEGORY BREAKDOWN) -->
+    <div class="row g-3 mb-4">
+        <!-- Sales and Profit Trend Chart -->
+        <div class="col-12 col-lg-8">
+            <div class="card premium-card h-100">
+                <div class="premium-header py-3 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-chart-line text-success me-2"></i> Perkembangan Omzet & Keuntungan
+                    </h6>
+                    <span class="badge bg-light text-muted border">Skala: {{ ucfirst($groupBy) }}</span>
+                </div>
+                <div class="card-body p-3 p-md-4">
+                    <div style="height: 330px; position: relative;">
+                        <canvas id="trendChart"></canvas>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Sales by Category Pie Chart -->
-        <div class="col-lg-4">
+        <div class="col-12 col-lg-4">
             <div class="card premium-card h-100">
-                <div class="premium-header">
-                    <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-chart-pie text-success me-2"></i> Penjualan per Kategori</h5>
+                <div class="premium-header py-3 px-4">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-chart-pie text-success me-2"></i> Penjualan per Kategori
+                    </h6>
                 </div>
-                <div class="card-body p-4 d-flex align-items-center justify-content-center">
+                <div class="card-body p-3 p-md-4 d-flex align-items-center justify-content-center">
                     @if($categorySales->count() > 0)
-                        <canvas id="categoryChart" style="max-height: 300px;"></canvas>
+                        <div style="width: 100%; max-height: 290px; position: relative;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
                     @else
                         <div class="text-center text-muted py-5">
-                            <i class="fa-solid fa-folder-open fs-1 mb-3"></i>
-                            <p class="m-0">Tidak ada data untuk periode ini</p>
+                            <i class="fa-solid fa-folder-open fs-1 mb-2 text-secondary opacity-50"></i>
+                            <p class="small m-0">Tidak ada data kategori untuk periode ini</p>
                         </div>
                     @endif
                 </div>
@@ -240,21 +474,27 @@
         </div>
     </div>
 
-    <div class="row">
-        <!-- Top 10 Best Sellers Chart & List -->
-        <div class="col-lg-6 mb-4">
+    <!-- SECTION 5: MENU PERFORMANCE (TOP BEST SELLERS & LEAST SOLD) -->
+    <div class="row g-3">
+        <!-- Top 10 Best Sellers -->
+        <div class="col-12 col-lg-6">
             <div class="card premium-card h-100">
-                <div class="premium-header">
-                    <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-trophy text-warning me-2"></i> 10 Menu Paling Laris (Terpopuler)</h5>
+                <div class="premium-header py-3 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-trophy text-warning me-2"></i> 10 Menu Paling Laris
+                    </h6>
+                    <span class="badge bg-warning bg-opacity-10 text-dark" style="font-size:0.75rem;">Terpopuler</span>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-3 p-md-4">
                     @if($topMenus->count() > 0)
-                        <canvas id="topMenusChart" style="max-height: 250px;" class="mb-4"></canvas>
+                        <div style="max-height: 220px; position: relative;" class="mb-3">
+                            <canvas id="topMenusChart"></canvas>
+                        </div>
                         <div class="table-responsive">
-                            <table class="table table-sm table-hover border">
-                                <thead>
+                            <table class="table table-sm table-hover align-middle border mb-0">
+                                <thead class="table-light small">
                                     <tr>
-                                        <th>No</th>
+                                        <th style="width: 35px;">No</th>
                                         <th>Nama Menu</th>
                                         <th class="text-center">Terjual</th>
                                         <th class="text-end">Omzet</th>
@@ -263,10 +503,16 @@
                                 <tbody>
                                     @foreach($topMenus as $idx => $m)
                                         <tr>
-                                            <td>{{ $idx + 1 }}</td>
-                                            <td class="fw-semibold text-dark">{{ $m->menu_name_snapshot }}</td>
-                                            <td class="text-center"><span class="badge bg-success">{{ $m->qty }} pcs</span></td>
-                                            <td class="text-end">Rp{{ number_format($m->sales, 0, ',', '.') }}</td>
+                                            <td class="small text-muted">{{ $idx + 1 }}</td>
+                                            <td class="fw-semibold text-dark small">{{ $m->menu_name_snapshot }}</td>
+                                            <td class="text-center">
+                                                <span class="badge bg-success bg-opacity-15 text-success rounded-pill px-2 py-1" style="font-size:0.75rem;">
+                                                    {{ $m->qty }} pcs
+                                                </span>
+                                            </td>
+                                            <td class="text-end small fw-semibold text-dark">
+                                                Rp{{ number_format($m->sales, 0, ',', '.') }}
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -274,8 +520,8 @@
                         </div>
                     @else
                         <div class="text-center text-muted py-5">
-                            <i class="fa-solid fa-info-circle fs-1 mb-3 text-secondary"></i>
-                            <p class="m-0">Tidak ada data transaksi</p>
+                            <i class="fa-solid fa-mug-hot fs-2 mb-2 text-secondary opacity-50"></i>
+                            <p class="small m-0">Belum ada transaksi menu pada periode ini.</p>
                         </div>
                     @endif
                 </div>
@@ -283,18 +529,24 @@
         </div>
 
         <!-- Least Sold Menus -->
-        <div class="col-lg-6 mb-4">
+        <div class="col-12 col-lg-6">
             <div class="card premium-card h-100">
-                <div class="premium-header text-danger">
-                    <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-arrow-down-wide-short text-danger me-2"></i> Menu Sedikit Terjual</h5>
+                <div class="premium-header py-3 px-4 d-flex justify-content-between align-items-center">
+                    <h6 class="m-0 fw-bold text-dark">
+                        <i class="fa-solid fa-arrow-down-wide-short text-danger me-2"></i> Menu Perlu Perhatian
+                    </h6>
+                    <span class="badge bg-danger bg-opacity-10 text-danger" style="font-size:0.75rem;">Penjualan Terendah</span>
                 </div>
-                <div class="card-body p-4">
+                <div class="card-body p-3 p-md-4">
                     @if($bottomMenus->count() > 0)
+                        <p class="text-muted small mb-3">
+                            Daftar menu dengan frekuensi penjualan paling rendah untuk evaluasi promosi, resep, atau rotasi stok bahan.
+                        </p>
                         <div class="table-responsive">
-                            <table class="table table-hover border">
-                                <thead>
+                            <table class="table table-sm table-hover align-middle border mb-0">
+                                <thead class="table-light small">
                                     <tr>
-                                        <th>No</th>
+                                        <th style="width: 35px;">No</th>
                                         <th>Nama Menu</th>
                                         <th class="text-center">Jumlah Terjual</th>
                                     </tr>
@@ -302,9 +554,13 @@
                                 <tbody>
                                     @foreach($bottomMenus as $idx => $m)
                                         <tr>
-                                            <td>{{ $idx + 1 }}</td>
-                                            <td class="fw-semibold text-dark">{{ $m->menu_name_snapshot }}</td>
-                                            <td class="text-center"><span class="badge bg-danger">{{ $m->qty }} pcs</span></td>
+                                            <td class="small text-muted">{{ $idx + 1 }}</td>
+                                            <td class="fw-semibold text-dark small">{{ $m->menu_name_snapshot }}</td>
+                                            <td class="text-center">
+                                                <span class="badge bg-secondary bg-opacity-15 text-secondary rounded-pill px-2 py-1" style="font-size:0.75rem;">
+                                                    {{ $m->qty }} pcs
+                                                </span>
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -312,8 +568,8 @@
                         </div>
                     @else
                         <div class="text-center text-muted py-5">
-                            <i class="fa-solid fa-info-circle fs-1 mb-3 text-secondary"></i>
-                            <p class="m-0">Tidak ada data transaksi</p>
+                            <i class="fa-solid fa-circle-check fs-2 mb-2 text-success opacity-50"></i>
+                            <p class="small m-0">Seluruh menu terjual merata pada periode ini.</p>
                         </div>
                     @endif
                 </div>
@@ -344,68 +600,93 @@
             }
 
             periodSelect.addEventListener('change', togglePeriodFields);
-            togglePeriodFields(); // Run on mount
+            togglePeriodFields();
 
             // ----------------------------------------------
             // Chart 1: Trend Chart (Sales vs Profit)
             // ----------------------------------------------
-            const trendCtx = document.getElementById('trendChart').getContext('2d');
-            const trendLabels = @json(collect($trendData)->pluck('label'));
-            const salesData = @json(collect($trendData)->pluck('sales'));
-            const profitData = @json(collect($trendData)->pluck('profit'));
-            const qtyData = @json(collect($trendData)->pluck('quantity'));
+            const trendEl = document.getElementById('trendChart');
+            if (trendEl) {
+                const trendCtx = trendEl.getContext('2d');
+                const trendLabels = @json(collect($trendData)->pluck('label'));
+                const salesData = @json(collect($trendData)->pluck('sales'));
+                const profitData = @json(collect($trendData)->pluck('profit'));
 
-            new Chart(trendCtx, {
-                type: 'line',
-                data: {
-                    labels: trendLabels,
-                    datasets: [
-                        {
-                            label: 'Omzet (Sales)',
-                            data: salesData,
-                            borderColor: '#11361b',
-                            backgroundColor: 'rgba(17, 54, 27, 0.05)',
-                            fill: true,
-                            tension: 0.3,
-                            borderWidth: 3,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Keuntungan (Profit)',
-                            data: profitData,
-                            borderColor: '#a3e635',
-                            backgroundColor: 'rgba(163, 230, 83, 0.05)',
-                            fill: true,
-                            tension: 0.3,
-                            borderWidth: 2,
-                            yAxisID: 'y'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'top' }
-                    },
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Nilai (Rupiah)'
+                new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: trendLabels,
+                        datasets: [
+                            {
+                                label: 'Omzet Penjualan',
+                                data: salesData,
+                                borderColor: '#11361b',
+                                backgroundColor: 'rgba(17, 54, 27, 0.06)',
+                                fill: true,
+                                tension: 0.35,
+                                borderWidth: 3,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                yAxisID: 'y'
                             },
-                            ticks: {
-                                callback: function(value) {
-                                    return 'Rp' + value.toLocaleString('id-ID');
+                            {
+                                label: 'Keuntungan Kotor',
+                                data: profitData,
+                                borderColor: '#a3e635',
+                                backgroundColor: 'rgba(163, 230, 83, 0.08)',
+                                fill: true,
+                                tension: 0.35,
+                                borderWidth: 2,
+                                pointRadius: 3,
+                                pointHoverRadius: 5,
+                                yAxisID: 'y'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false
+                        },
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    usePointStyle: true,
+                                    boxWidth: 8,
+                                    font: { size: 12, family: 'Inter, system-ui, sans-serif' }
                                 }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        let val = ctx.parsed.y || 0;
+                                        return ctx.dataset.label + ': Rp' + val.toLocaleString('id-ID');
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: {
+                                    font: { size: 11 },
+                                    callback: function(value) {
+                                        return 'Rp' + value.toLocaleString('id-ID');
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { font: { size: 11 } }
                             }
                         }
                     }
-                }
-            });
+                });
+            }
 
             // ----------------------------------------------
             // Chart 2: Category Breakdown
@@ -427,17 +708,36 @@
                                 '#2e7d32',
                                 '#4caf50',
                                 '#81c784',
-                                '#c8e6c9',
-                                '#e8f5e9'
+                                '#a3e635',
+                                '#d9f99d',
+                                '#64748b'
                             ],
-                            borderWidth: 1
+                            borderWidth: 2,
+                            borderColor: '#ffffff'
                         }]
                     },
                     options: {
                         responsive: true,
+                        maintainAspectRatio: false,
                         plugins: {
-                            legend: { position: 'bottom' }
-                        }
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 10,
+                                    usePointStyle: true,
+                                    font: { size: 11 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(ctx) {
+                                        let val = ctx.parsed || 0;
+                                        return ctx.label + ': Rp' + val.toLocaleString('id-ID');
+                                    }
+                                }
+                            }
+                        },
+                        cutout: '65%'
                     }
                 });
             }
@@ -455,7 +755,7 @@
                     data: {
                         labels: topLabels,
                         datasets: [{
-                            label: 'Jumlah Gelas Terjual',
+                            label: 'Jumlah Terjual (pcs)',
                             data: topQtys,
                             backgroundColor: '#2e7d32',
                             borderRadius: 6
@@ -471,7 +771,12 @@
                         scales: {
                             x: {
                                 beginAtZero: true,
-                                title: { display: true, text: 'Pcs' }
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: { font: { size: 11 } }
+                            },
+                            y: {
+                                grid: { display: false },
+                                ticks: { font: { size: 11 } }
                             }
                         }
                     }

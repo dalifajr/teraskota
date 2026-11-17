@@ -5,6 +5,20 @@
 
     RewriteEngine On
 
+    # 1. Blokir akses langsung ke folder backend 'core' jika diletakkan di dalam htdocs
+    RewriteRule ^core(/.*)?$ - [F,L]
+
+    # 2. Blokir akses ke file sensitif
+    <FilesMatch "^\.(env|git|svn|hg)|(composer\.json|composer\.lock|package\.json|package-lock\.json|artisan|phpunit\.xml|README\.md)$">
+        <IfModule mod_authz_core.c>
+            Require all denied
+        </IfModule>
+        <IfModule !mod_authz_core.c>
+            Order allow,deny
+            Deny from all
+        </IfModule>
+    </FilesMatch>
+
     # Handle Authorization Header
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

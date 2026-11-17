@@ -172,8 +172,9 @@ const SyncManager = (function () {
 
     /**
      * Trigger synchronization of all pending offline transactions.
+     * @param {boolean} force If true, bypasses backoff delay and retries immediately.
      */
-    async function triggerSync() {
+    async function triggerSync(force = false) {
         if (isSyncing) return;
 
         const queue = await OfflineDB.getPendingQueue();
@@ -184,6 +185,7 @@ const SyncManager = (function () {
 
         const now = Date.now();
         const eligibleItems = queue.filter(item => {
+            if (force) return true; // User manually triggered sync, attempt all items immediately
             return item.status !== 'conflict' && (!item.next_attempt || item.next_attempt <= now);
         });
 
@@ -296,7 +298,7 @@ const SyncManager = (function () {
                     });
                 }
 
-                await triggerSync();
+                await triggerSync(true);
 
                 if (window.Swal) {
                     const remaining = await OfflineDB.getPendingCount();
@@ -309,10 +311,12 @@ const SyncManager = (function () {
                             showConfirmButton: false,
                         });
                     } else {
+                        const queue = await OfflineDB.getPendingQueue();
+                        const firstError = queue[0]?.last_error ? `<br><small class="text-danger mt-2 d-block">Penyebab: ${queue[0].last_error}</small>` : '';
                         Swal.fire({
                             icon: 'warning',
                             title: 'Sinkronisasi Sebagian',
-                            text: `${remaining} transaksi masih belum tersinkron. Sistem akan mencoba lagi secara otomatis.`,
+                            html: `${remaining} transaksi masih belum tersinkron.${firstError}`,
                         });
                     }
                 }

@@ -333,6 +333,12 @@ class SalesTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('20.000'); // Today's sales
         $response->assertDontSee('40.000'); // Yesterday's sales
+
+        // Test PDF Export under custom public path / shared hosting environment
+        $pdfResponse = $this->actingAs($admin)
+            ->get('/reports/pdf?period=custom&start_date=2026-07-29&end_date=2026-07-29');
+        $pdfResponse->assertStatus(200);
+        $this->assertEquals('application/pdf', $pdfResponse->headers->get('content-type'));
     }
 
     /**

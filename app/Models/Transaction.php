@@ -61,9 +61,22 @@ class Transaction extends Model
         'change_returned' => 'decimal:2',
     ];
 
+    /**
+     * Mutator to guarantee discount_type is always valid for ENUM or VARCHAR columns.
+     */
+    public function setDiscountTypeAttribute($value)
+    {
+        $this->attributes['discount_type'] = in_array($value, ['nominal', 'percentage'], true) ? $value : 'none';
+    }
+
     public function details()
     {
         return $this->hasMany(TransactionDetail::class);
+    }
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 
     public function admin()
@@ -94,9 +107,13 @@ class Transaction extends Model
      */
     public static function expireOverdueQris(): int
     {
-        return static::where('status', 'pending')
-            ->whereNotNull('qris_expired_at')
-            ->where('qris_expired_at', '<', now())
-            ->update(['status' => 'expired']);
+        try {
+            return static::where('status', 'pending')
+                ->whereNotNull('qris_expired_at')
+                ->where('qris_expired_at', '<', now())
+                ->update(['status' => 'expired']);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 }

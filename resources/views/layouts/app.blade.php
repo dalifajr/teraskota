@@ -18,7 +18,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
     <!-- Custom Style -->
-    <link href="{{ asset('assets/css/custom.css') }}" rel="stylesheet">
+    <link href="{{ asset('assets/css/custom.css') }}?v={{ filemtime(public_path('assets/css/custom.css')) }}" rel="stylesheet">
     
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -33,17 +33,18 @@
             <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm flex-shrink-0" style="width: 38px; height: 38px; object-fit: cover; background: #fff;">
             <div class="d-flex flex-column text-truncate" style="line-height: 1.15;">
                 <span class="text-truncate fw-bold text-white fs-6">Teras Kota</span>
-                <small class="text-white-50" style="font-size: 0.7rem; letter-spacing: 0.5px;">INDONESIA</small>
+                <small class="text-white-50" style="font-size: 0.7rem; letter-spacing: 0.5px;">BERLIAN MAKMUR</small>
             </div>
         </div>
         <ul class="sidebar-menu">
+            <li class="sidebar-section-label">Operasional</li>
             <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
                 <a href="{{ route('dashboard') }}" class="sidebar-link">
                     <i class="fa-solid fa-chart-line"></i>
                     <span>Dashboard</span>
                 </a>
             </li>
-            <li class="sidebar-item mb-3">
+            <li class="sidebar-item mb-2">
                 <a href="{{ route('pos.index') }}" class="sidebar-link btn-light-accent text-dark fw-bold py-2 shadow-sm" target="_blank">
                     <i class="fa-solid fa-cash-register text-success"></i>
                     <span>Buka Kasir POS <i class="fa-solid fa-arrow-up-right-from-square small ms-1"></i></span>
@@ -51,7 +52,7 @@
             </li>
             <li class="sidebar-item {{ Request::routeIs('transactions.index') || Request::routeIs('transactions.show') || Request::routeIs('transactions.edit') ? 'active' : '' }}">
                 <a href="{{ route('transactions.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-history"></i>
+                    <i class="fa-solid fa-clock-rotate-left"></i>
                     <span>Riwayat Transaksi</span>
                 </a>
             </li>
@@ -61,24 +62,30 @@
                     <span>Pengeluaran Kas</span>
                 </a>
             </li>
+
+            <li class="sidebar-section-label">Data Master</li>
             <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
                 <a href="{{ route('menus.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-coffee"></i>
+                    <i class="fa-solid fa-mug-hot"></i>
                     <span>Data Menu</span>
                 </a>
             </li>
             <li class="sidebar-item {{ Request::routeIs('categories.*') ? 'active' : '' }}">
                 <a href="{{ route('categories.index') }}" class="sidebar-link">
                     <i class="fa-solid fa-tags"></i>
-                    <span>Kategori</span>
+                    <span>Kategori Menu</span>
                 </a>
             </li>
+
+            <li class="sidebar-section-label">Laporan & Analisis</li>
             <li class="sidebar-item {{ Request::routeIs('reports.*') ? 'active' : '' }}">
                 <a href="{{ route('reports.index') }}" class="sidebar-link">
                     <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>Laporan</span>
+                    <span>Laporan Penjualan</span>
                 </a>
-            <!-- Grouped Settings Menu -->
+            </li>
+
+            <li class="sidebar-section-label">Sistem & Pengaturan</li>
             <li class="sidebar-item {{ Request::routeIs('settings.*') ? 'active' : '' }}">
                 <a href="#settingsSubmenuDesktop" data-bs-toggle="collapse" class="sidebar-link d-flex align-items-center justify-content-between {{ Request::routeIs('settings.*') ? '' : 'collapsed' }}" aria-expanded="{{ Request::routeIs('settings.*') ? 'true' : 'false' }}">
                     <div class="d-flex align-items-center gap-2">
@@ -119,7 +126,7 @@
                     <span>Profil Akun</span>
                 </a>
             </li>
-            <li class="sidebar-item mt-4">
+            <li class="sidebar-item mt-4 pt-2 border-top border-white border-opacity-10">
                 <form action="{{ route('logout') }}" method="POST" id="logout-form" class="d-none">
                     @csrf
                 </form>
@@ -138,7 +145,7 @@
                 <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover; background: #fff;">
                 <div class="d-flex flex-column text-truncate" style="line-height: 1.15;">
                     <span class="fw-bold fs-6 text-white text-truncate" id="sidebarOffcanvasLabel">Teras Kota</span>
-                    <small class="text-white-50" style="font-size: 0.68rem; letter-spacing: 0.5px;">INDONESIA</small>
+                    <small class="text-white-50" style="font-size: 0.68rem; letter-spacing: 0.5px;">BERLIAN MAKMUR</small>
                 </div>
             </div>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
@@ -146,6 +153,7 @@
         <div class="offcanvas-body">
             <!-- Full Navigation Menu -->
             <ul class="sidebar-menu mb-0">
+                <li class="sidebar-section-label">Operasional</li>
                 <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
                     <a href="{{ route('dashboard') }}" class="sidebar-link">
                         <i class="fa-solid fa-chart-line"></i>
@@ -160,7 +168,7 @@
                 </li>
                 <li class="sidebar-item {{ Request::routeIs('transactions.index') || Request::routeIs('transactions.show') || Request::routeIs('transactions.edit') ? 'active' : '' }}">
                     <a href="{{ route('transactions.index') }}" class="sidebar-link">
-                        <i class="fa-solid fa-history"></i>
+                        <i class="fa-solid fa-clock-rotate-left"></i>
                         <span>Riwayat Transaksi</span>
                     </a>
                 </li>
@@ -170,25 +178,30 @@
                         <span>Pengeluaran Kas</span>
                     </a>
                 </li>
+
+                <li class="sidebar-section-label">Data Master</li>
                 <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
                     <a href="{{ route('menus.index') }}" class="sidebar-link">
-                        <i class="fa-solid fa-coffee"></i>
+                        <i class="fa-solid fa-mug-hot"></i>
                         <span>Data Menu</span>
                     </a>
                 </li>
                 <li class="sidebar-item {{ Request::routeIs('categories.*') ? 'active' : '' }}">
                     <a href="{{ route('categories.index') }}" class="sidebar-link">
                         <i class="fa-solid fa-tags"></i>
-                        <span>Kategori</span>
+                        <span>Kategori Menu</span>
                     </a>
                 </li>
+
+                <li class="sidebar-section-label">Laporan & Analisis</li>
                 <li class="sidebar-item {{ Request::routeIs('reports.*') ? 'active' : '' }}">
                     <a href="{{ route('reports.index') }}" class="sidebar-link">
                         <i class="fa-solid fa-file-invoice-dollar"></i>
-                        <span>Laporan</span>
+                        <span>Laporan Penjualan</span>
                     </a>
                 </li>
-                <!-- Grouped Settings Menu (Mobile) -->
+
+                <li class="sidebar-section-label">Sistem & Pengaturan</li>
                 <li class="sidebar-item {{ Request::routeIs('settings.*') ? 'active' : '' }}">
                     <a href="#settingsSubmenuMobile" data-bs-toggle="collapse" class="sidebar-link d-flex align-items-center justify-content-between {{ Request::routeIs('settings.*') ? '' : 'collapsed' }}" aria-expanded="{{ Request::routeIs('settings.*') ? 'true' : 'false' }}">
                         <div class="d-flex align-items-center gap-2">
@@ -255,6 +268,21 @@
             </div>
             
             <div class="d-flex align-items-center gap-2 gap-sm-3">
+                <!-- Live Realtime WIB Clock -->
+                <div class="admin-live-clock d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill" title="Zona Waktu Operasional: Waktu Indonesia Barat (WIB)">
+                    <i class="fa-regular fa-clock text-success"></i>
+                    <span id="adminLiveClock" class="fw-bold text-dark font-monospace">--:--:--</span>
+                    <span class="badge badge-wib rounded-pill">WIB</span>
+                    <span class="text-muted small border-start ps-2 d-none d-xl-inline" id="adminLiveDate">--</span>
+                </div>
+
+                <!-- Quick POS Terminal Link -->
+                <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-sm btn-light-accent fw-bold px-3 d-none d-sm-inline-flex align-items-center gap-2 shadow-sm" title="Buka Terminal Kasir POS di Tab Baru">
+                    <i class="fa-solid fa-cash-register text-success"></i>
+                    <span>Kasir POS</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square small text-muted"></i>
+                </a>
+
                 @if(Auth::user()?->isAdmin())
                     <!-- Admin Browser Push Notification Toggle -->
                     <button type="button" class="btn btn-light rounded-circle position-relative p-2" id="btnToggleDesktopNotification" title="Notifikasi Desktop Pembayaran Masuk" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
@@ -266,8 +294,8 @@
                 @endif
 
                 <div class="text-end d-none d-sm-block">
-                    <div class="fw-semibold text-dark">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
-                    <small class="text-muted">{{ Auth::user()?->email ?? '' }}</small>
+                    <div class="fw-semibold text-dark text-truncate" style="max-width: 140px;">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
+                    <small class="text-muted d-block text-truncate" style="font-size: 0.72rem; max-width: 140px;">{{ Auth::user()?->role === 'admin' ? 'Administrator' : 'Kasir' }}</small>
                 </div>
                 <a href="{{ route('profile.edit') }}" class="nav-user text-decoration-none" title="Profil Akun">
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()?->name ?? 'User') }}&background=11361b&color=ffffff" alt="Avatar">
@@ -346,6 +374,9 @@
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- UI Transitions & Progress Bar Engine -->
+    <script src="{{ asset('assets/js/ui-transitions.js') }}?v={{ filemtime(public_path('assets/js/ui-transitions.js')) }}"></script>
 
     <!-- Service Worker Registration -->
     <script>
@@ -504,6 +535,30 @@
         })();
     </script>
     @endif
+
+    <!-- Live Realtime WIB Clock Script -->
+    <script>
+        (function() {
+            function updateAdminClock() {
+                try {
+                    // Force Asia/Jakarta (WIB, UTC+7) format regardless of client device OS timezone
+                    const now = new Date();
+                    const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                    const optionsDate = { timeZone: 'Asia/Jakarta', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+
+                    const timeStr = new Intl.DateTimeFormat('id-ID', optionsTime).format(now);
+                    const dateStr = new Intl.DateTimeFormat('id-ID', optionsDate).format(now);
+
+                    const clockEl = document.getElementById('adminLiveClock');
+                    const dateEl = document.getElementById('adminLiveDate');
+                    if (clockEl) clockEl.textContent = timeStr;
+                    if (dateEl) dateEl.textContent = dateStr;
+                } catch(e) {}
+            }
+            setInterval(updateAdminClock, 1000);
+            updateAdminClock();
+        })();
+    </script>
     
     @yield('scripts')
 </body>
