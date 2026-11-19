@@ -4,7 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Teras Kota Berlian Makmur') - Dashboard Penjualan</title>
+    @php
+        $isSuperAdminPanel = Auth::user()?->isSuperAdmin() && !($isImpersonatingTenant ?? false);
+        $brandTitle = $isSuperAdminPanel ? ($platformName ?? 'KasirLoka') : ($currentTenant?->name ?? ($platformName ?? 'KasirLoka'));
+        $brandSubtitle = $isSuperAdminPanel ? 'SUPER ADMIN PANEL' : strtoupper($currentTenant?->business_type ?? ($platformName ?? 'KASIRLOKA'));
+        $brandLogo = (!$isSuperAdminPanel && $currentTenant && $currentTenant->logo_path)
+            ? $currentTenant->logoUrl()
+            : asset('assets/images/logo.png');
+    @endphp
+    <title>@yield('title', $brandTitle) - {{ $platformName ?? 'KasirLoka' }}</title>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
 <meta name="theme-color" content="#14532d">
 <link
@@ -30,129 +38,60 @@
     <!-- Desktop Sidebar (Visible on >= 992px) -->
     <div class="sidebar d-none d-lg-block" id="sidebar">
         <div class="sidebar-brand d-flex align-items-center gap-2 text-truncate">
-            <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm flex-shrink-0" style="width: 38px; height: 38px; object-fit: cover; background: #fff;">
+            <img src="{{ $brandLogo }}" alt="{{ $brandTitle }}" class="rounded-circle shadow-sm flex-shrink-0" style="width: 38px; height: 38px; object-fit: cover; background: #fff;">
             <div class="d-flex flex-column text-truncate" style="line-height: 1.15;">
-                <span class="text-truncate fw-bold text-white fs-6">Teras Kota</span>
-                <small class="text-white-50" style="font-size: 0.7rem; letter-spacing: 0.5px;">BERLIAN MAKMUR</small>
+                <span class="text-truncate fw-bold text-white fs-6">{{ $brandTitle }}</span>
+                <small class="text-white-50 text-truncate" style="font-size: 0.68rem; letter-spacing: 0.5px;">{{ $brandSubtitle }}</small>
             </div>
         </div>
         <ul class="sidebar-menu">
-            <li class="sidebar-section-label">Operasional</li>
-            <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
-                <a href="{{ route('dashboard') }}" class="sidebar-link">
-                    <i class="fa-solid fa-chart-line"></i>
-                    <span>Dashboard</span>
-                </a>
-            </li>
-            <li class="sidebar-item mb-2">
-                <a href="{{ route('pos.index') }}" class="sidebar-link btn-light-accent text-dark fw-bold py-2 shadow-sm" target="_blank">
-                    <i class="fa-solid fa-cash-register text-success"></i>
-                    <span>Buka Kasir POS <i class="fa-solid fa-arrow-up-right-from-square small ms-1"></i></span>
-                </a>
-            </li>
-            <li class="sidebar-item {{ Request::routeIs('transactions.index') || Request::routeIs('transactions.show') || Request::routeIs('transactions.edit') ? 'active' : '' }}">
-                <a href="{{ route('transactions.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-clock-rotate-left"></i>
-                    <span>Riwayat Transaksi</span>
-                </a>
-            </li>
-            <li class="sidebar-item {{ Request::routeIs('expenses.*') ? 'active' : '' }}">
-                <a href="{{ route('expenses.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-money-bill-transfer"></i>
-                    <span>Pengeluaran Kas</span>
-                </a>
-            </li>
+            @if($isSuperAdminPanel)
+                <li class="sidebar-section-label">Platform {{ $platformName ?? 'KasirLoka' }}</li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.dashboard') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.dashboard') }}" class="sidebar-link">
+                        <i class="fa-solid fa-gauge-high"></i>
+                        <span>Dashboard SaaS</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.tenants*') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.tenants') }}" class="sidebar-link">
+                        <i class="fa-solid fa-store"></i>
+                        <span>Daftar Usaha (Tenant)</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.invoices') }}" class="sidebar-link">
+                        <i class="fa-solid fa-file-invoice-dollar"></i>
+                        <span>Tagihan & Pembayaran</span>
+                    </a>
+                </li>
 
-            <li class="sidebar-section-label">Data Master</li>
-            <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
-                <a href="{{ route('menus.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-mug-hot"></i>
-                    <span>Data Menu</span>
-                </a>
-            </li>
-            <li class="sidebar-item {{ Request::routeIs('categories.*') ? 'active' : '' }}">
-                <a href="{{ route('categories.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-tags"></i>
-                    <span>Kategori Menu</span>
-                </a>
-            </li>
-
-            <li class="sidebar-section-label">Laporan & Analisis</li>
-            <li class="sidebar-item {{ Request::routeIs('reports.*') ? 'active' : '' }}">
-                <a href="{{ route('reports.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-file-invoice-dollar"></i>
-                    <span>Laporan Penjualan</span>
-                </a>
-            </li>
-
-            <li class="sidebar-section-label">Sistem & Pengaturan</li>
-            <li class="sidebar-item {{ Request::routeIs('settings.*') ? 'active' : '' }}">
-                <a href="#settingsSubmenuDesktop" data-bs-toggle="collapse" class="sidebar-link d-flex align-items-center justify-content-between {{ Request::routeIs('settings.*') ? '' : 'collapsed' }}" aria-expanded="{{ Request::routeIs('settings.*') ? 'true' : 'false' }}">
-                    <div class="d-flex align-items-center gap-2">
+                <li class="sidebar-section-label">Monetisasi & Sistem</li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.plans*') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.plans') }}" class="sidebar-link">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <span>Paket & Harga</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.settings*') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.settings') }}" class="sidebar-link">
                         <i class="fa-solid fa-sliders"></i>
-                        <span>Pengaturan</span>
-                    </div>
-                    <i class="fa-solid fa-chevron-down sub-arrow small"></i>
-                </a>
-                <div class="collapse {{ Request::routeIs('settings.*') ? 'show' : '' }}" id="settingsSubmenuDesktop">
-                    <ul class="submenu">
-                        <li class="submenu-item {{ Request::routeIs('settings.qris.*') ? 'active' : '' }}">
-                            <a href="{{ route('settings.qris.index') }}" class="submenu-link">
-                                <i class="fa-solid fa-qrcode me-2"></i> Pengaturan QRIS
-                            </a>
-                        </li>
-                        <li class="submenu-item {{ Request::routeIs('settings.profit.*') ? 'active' : '' }}">
-                            <a href="{{ route('settings.profit.edit') }}" class="submenu-link">
-                                <i class="fa-solid fa-percent me-2"></i> Pengaturan Profit
-                            </a>
-                        </li>
-                        <li class="submenu-item {{ Request::routeIs('settings.update.*') ? 'active' : '' }}">
-                            <a href="{{ route('settings.update.index') }}" class="submenu-link">
-                                <i class="fa-brands fa-github me-2"></i> Update Sistem
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </li>
-            <li class="sidebar-item {{ Request::routeIs('users.*') ? 'active' : '' }}">
-                <a href="{{ route('users.index') }}" class="sidebar-link">
-                    <i class="fa-solid fa-users-gear"></i>
-                    <span>Kelola Pengguna</span>
-                </a>
-            </li>
-            <li class="sidebar-item {{ Request::routeIs('profile.edit') ? 'active' : '' }}">
-                <a href="{{ route('profile.edit') }}" class="sidebar-link">
-                    <i class="fa-solid fa-user-gear"></i>
-                    <span>Profil Akun</span>
-                </a>
-            </li>
-            <li class="sidebar-item mt-4 pt-2 border-top border-white border-opacity-10">
-                <form action="{{ route('logout') }}" method="POST" id="logout-form" class="d-none">
-                    @csrf
-                </form>
-                <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="sidebar-link text-danger">
-                    <i class="fa-solid fa-right-from-bracket"></i>
-                    <span>Logout</span>
-                </a>
-            </li>
-        </ul>
-    </div>
-
-    <!-- Mobile Offcanvas Drawer (< 992px) -->
-    <div class="offcanvas offcanvas-start offcanvas-sidebar d-lg-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
-        <div class="offcanvas-header d-flex justify-content-between align-items-center">
-            <div class="d-flex align-items-center gap-2 text-white text-truncate">
-                <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover; background: #fff;">
-                <div class="d-flex flex-column text-truncate" style="line-height: 1.15;">
-                    <span class="fw-bold fs-6 text-white text-truncate" id="sidebarOffcanvasLabel">Teras Kota</span>
-                    <small class="text-white-50" style="font-size: 0.68rem; letter-spacing: 0.5px;">BERLIAN MAKMUR</small>
-                </div>
-            </div>
-            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
-        </div>
-        <div class="offcanvas-body">
-            <!-- Full Navigation Menu -->
-            <ul class="sidebar-menu mb-0">
+                        <span>Pengaturan Platform</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('superadmin.update.*') ? 'active' : '' }}">
+                    <a href="{{ route('superadmin.update.index') }}" class="sidebar-link">
+                        <i class="fa-brands fa-github"></i>
+                        <span>Update Sistem</span>
+                    </a>
+                </li>
+                <li class="sidebar-item {{ Request::routeIs('profile.edit') ? 'active' : '' }}">
+                    <a href="{{ route('profile.edit') }}" class="sidebar-link">
+                        <i class="fa-solid fa-user-gear"></i>
+                        <span>Profil Akun</span>
+                    </a>
+                </li>
+            @else
                 <li class="sidebar-section-label">Operasional</li>
                 <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
                     <a href="{{ route('dashboard') }}" class="sidebar-link">
@@ -201,20 +140,41 @@
                     </a>
                 </li>
 
-                <li class="sidebar-section-label">Sistem & Pengaturan</li>
+                <li class="sidebar-section-label">Usaha & Langganan</li>
+                <li class="sidebar-item {{ Request::routeIs('billing.*') ? 'active' : '' }}">
+                    <a href="{{ route('billing.index') }}" class="sidebar-link d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="fa-solid fa-crown text-warning"></i>
+                            <span>Langganan & Paket</span>
+                        </div>
+                        @if($subscriptionState === 'expired' || $subscriptionState === 'grace')
+                            <span class="badge bg-danger rounded-pill" style="font-size: 0.65rem;">!</span>
+                        @elseif($subscriptionState === 'trial')
+                            <span class="badge bg-warning text-dark rounded-pill" style="font-size: 0.65rem;">Trial</span>
+                        @endif
+                    </a>
+                </li>
                 <li class="sidebar-item {{ Request::routeIs('settings.*') ? 'active' : '' }}">
-                    <a href="#settingsSubmenuMobile" data-bs-toggle="collapse" class="sidebar-link d-flex align-items-center justify-content-between {{ Request::routeIs('settings.*') ? '' : 'collapsed' }}" aria-expanded="{{ Request::routeIs('settings.*') ? 'true' : 'false' }}">
+                    <a href="#settingsSubmenuDesktop" data-bs-toggle="collapse" class="sidebar-link d-flex align-items-center justify-content-between {{ Request::routeIs('settings.*') ? '' : 'collapsed' }}" aria-expanded="{{ Request::routeIs('settings.*') ? 'true' : 'false' }}">
                         <div class="d-flex align-items-center gap-2">
                             <i class="fa-solid fa-sliders"></i>
                             <span>Pengaturan</span>
                         </div>
                         <i class="fa-solid fa-chevron-down sub-arrow small"></i>
                     </a>
-                    <div class="collapse {{ Request::routeIs('settings.*') ? 'show' : '' }}" id="settingsSubmenuMobile">
+                    <div class="collapse {{ Request::routeIs('settings.*') ? 'show' : '' }}" id="settingsSubmenuDesktop">
                         <ul class="submenu">
+                            <li class="submenu-item {{ Request::routeIs('settings.store.*') ? 'active' : '' }}">
+                                <a href="{{ route('settings.store.edit') }}" class="submenu-link">
+                                    <i class="fa-solid fa-store me-2"></i> Profil Usaha & Struk
+                                </a>
+                            </li>
                             <li class="submenu-item {{ Request::routeIs('settings.qris.*') ? 'active' : '' }}">
                                 <a href="{{ route('settings.qris.index') }}" class="submenu-link">
                                     <i class="fa-solid fa-qrcode me-2"></i> Pengaturan QRIS
+                                    @if($currentTenant && !$currentTenant->hasFeature('qris_dynamic'))
+                                        <span class="badge bg-warning text-dark ms-1" style="font-size: 0.6rem;">PRO</span>
+                                    @endif
                                 </a>
                             </li>
                             <li class="submenu-item {{ Request::routeIs('settings.profit.*') ? 'active' : '' }}">
@@ -222,11 +182,13 @@
                                     <i class="fa-solid fa-percent me-2"></i> Pengaturan Profit
                                 </a>
                             </li>
-                            <li class="submenu-item {{ Request::routeIs('settings.update.*') ? 'active' : '' }}">
-                                <a href="{{ route('settings.update.index') }}" class="submenu-link">
-                                    <i class="fa-brands fa-github me-2"></i> Update Sistem
-                                </a>
-                            </li>
+                            @if($currentTenant?->is_lifetime || Auth::user()?->isSuperAdmin())
+                                <li class="submenu-item {{ Request::routeIs('settings.update.*') ? 'active' : '' }}">
+                                    <a href="{{ route('settings.update.index') }}" class="submenu-link">
+                                        <i class="fa-brands fa-github me-2"></i> Update Sistem
+                                    </a>
+                                </li>
+                            @endif
                         </ul>
                     </div>
                 </li>
@@ -242,6 +204,94 @@
                         <span>Profil Akun</span>
                     </a>
                 </li>
+            @endif
+
+            <li class="sidebar-item mt-4 pt-2 border-top border-white border-opacity-10">
+                <form action="{{ route('logout') }}" method="POST" id="logout-form" class="d-none">
+                    @csrf
+                </form>
+                <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="sidebar-link text-danger">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                    <span>Logout</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Mobile Offcanvas Drawer (< 992px) -->
+    <div class="offcanvas offcanvas-start offcanvas-sidebar d-lg-none" tabindex="-1" id="sidebarOffcanvas" aria-labelledby="sidebarOffcanvasLabel">
+        <div class="offcanvas-header d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2 text-white text-truncate">
+                <img src="{{ $brandLogo }}" alt="{{ $brandTitle }}" class="rounded-circle shadow-sm flex-shrink-0" style="width: 34px; height: 34px; object-fit: cover; background: #fff;">
+                <div class="d-flex flex-column text-truncate" style="line-height: 1.15;">
+                    <span class="fw-bold fs-6 text-white text-truncate" id="sidebarOffcanvasLabel">{{ $brandTitle }}</span>
+                    <small class="text-white-50 text-truncate" style="font-size: 0.65rem; letter-spacing: 0.5px;">{{ $brandSubtitle }}</small>
+                </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Tutup"></button>
+        </div>
+        <div class="offcanvas-body">
+            <ul class="sidebar-menu mb-0">
+                @if($isSuperAdminPanel)
+                    <li class="sidebar-section-label">Platform {{ $platformName ?? 'KasirLoka' }}</li>
+                    <li class="sidebar-item {{ Request::routeIs('superadmin.dashboard') ? 'active' : '' }}">
+                        <a href="{{ route('superadmin.dashboard') }}" class="sidebar-link"><i class="fa-solid fa-gauge-high"></i><span>Dashboard SaaS</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('superadmin.tenants*') ? 'active' : '' }}">
+                        <a href="{{ route('superadmin.tenants') }}" class="sidebar-link"><i class="fa-solid fa-store"></i><span>Daftar Usaha</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
+                        <a href="{{ route('superadmin.invoices') }}" class="sidebar-link"><i class="fa-solid fa-file-invoice-dollar"></i><span>Tagihan & Pembayaran</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('superadmin.plans*') ? 'active' : '' }}">
+                        <a href="{{ route('superadmin.plans') }}" class="sidebar-link"><i class="fa-solid fa-layer-group"></i><span>Paket & Harga</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('superadmin.settings*') ? 'active' : '' }}">
+                        <a href="{{ route('superadmin.settings') }}" class="sidebar-link"><i class="fa-solid fa-sliders"></i><span>Pengaturan Platform</span></a>
+                    </li>
+                @else
+                    <li class="sidebar-section-label">Operasional</li>
+                    <li class="sidebar-item {{ Request::routeIs('dashboard') ? 'active' : '' }}">
+                        <a href="{{ route('dashboard') }}" class="sidebar-link"><i class="fa-solid fa-chart-line"></i><span>Dashboard</span></a>
+                    </li>
+                    <li class="sidebar-item mb-2">
+                        <a href="{{ route('pos.index') }}" class="sidebar-link btn-light-accent text-dark fw-bold py-2 shadow-sm" target="_blank">
+                            <i class="fa-solid fa-cash-register text-success"></i><span>Buka Kasir POS</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('transactions.*') ? 'active' : '' }}">
+                        <a href="{{ route('transactions.index') }}" class="sidebar-link"><i class="fa-solid fa-clock-rotate-left"></i><span>Riwayat Transaksi</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('expenses.*') ? 'active' : '' }}">
+                        <a href="{{ route('expenses.index') }}" class="sidebar-link"><i class="fa-solid fa-money-bill-transfer"></i><span>Pengeluaran Kas</span></a>
+                    </li>
+                    <li class="sidebar-section-label">Data Master</li>
+                    <li class="sidebar-item {{ Request::routeIs('menus.*') ? 'active' : '' }}">
+                        <a href="{{ route('menus.index') }}" class="sidebar-link"><i class="fa-solid fa-mug-hot"></i><span>Data Menu</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('categories.*') ? 'active' : '' }}">
+                        <a href="{{ route('categories.index') }}" class="sidebar-link"><i class="fa-solid fa-tags"></i><span>Kategori Menu</span></a>
+                    </li>
+                    <li class="sidebar-section-label">Laporan & Langganan</li>
+                    <li class="sidebar-item {{ Request::routeIs('reports.*') ? 'active' : '' }}">
+                        <a href="{{ route('reports.index') }}" class="sidebar-link"><i class="fa-solid fa-file-invoice-dollar"></i><span>Laporan Penjualan</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('billing.*') ? 'active' : '' }}">
+                        <a href="{{ route('billing.index') }}" class="sidebar-link"><i class="fa-solid fa-crown text-warning"></i><span>Langganan & Paket</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('settings.store.*') ? 'active' : '' }}">
+                        <a href="{{ route('settings.store.edit') }}" class="sidebar-link"><i class="fa-solid fa-store"></i><span>Profil Usaha & Struk</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('settings.qris.*') ? 'active' : '' }}">
+                        <a href="{{ route('settings.qris.index') }}" class="sidebar-link"><i class="fa-solid fa-qrcode"></i><span>Pengaturan QRIS</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('settings.profit.*') ? 'active' : '' }}">
+                        <a href="{{ route('settings.profit.edit') }}" class="sidebar-link"><i class="fa-solid fa-percent"></i><span>Pengaturan Profit</span></a>
+                    </li>
+                    <li class="sidebar-item {{ Request::routeIs('users.*') ? 'active' : '' }}">
+                        <a href="{{ route('users.index') }}" class="sidebar-link"><i class="fa-solid fa-users-gear"></i><span>Kelola Pengguna</span></a>
+                    </li>
+                @endif
                 <li class="sidebar-item mt-3 pt-3 border-top border-white border-opacity-10">
                     <a href="#" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="sidebar-link text-danger">
                         <i class="fa-solid fa-right-from-bracket"></i>
@@ -262,8 +312,8 @@
                     <i class="fa-solid fa-bars"></i>
                 </button>
                 <div class="d-flex align-items-center gap-2">
-                    <img src="{{ asset('assets/images/logo.png') }}" alt="Logo" class="d-lg-none rounded-circle" style="width: 28px; height: 28px; object-fit: cover;">
-                    <h4 class="m-0 fw-semibold text-dark text-truncate">@yield('page_title', 'Teras Kota Berlian Makmur')</h4>
+                    <img src="{{ $brandLogo }}" alt="Logo" class="d-lg-none rounded-circle" style="width: 28px; height: 28px; object-fit: cover;">
+                    <h4 class="m-0 fw-semibold text-dark text-truncate">@yield('page_title', $brandTitle)</h4>
                 </div>
             </div>
             
@@ -276,14 +326,16 @@
                     <span class="text-muted small border-start ps-2 d-none d-xl-inline" id="adminLiveDate">--</span>
                 </div>
 
-                <!-- Quick POS Terminal Link -->
-                <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-sm btn-light-accent fw-bold px-3 d-none d-sm-inline-flex align-items-center gap-2 shadow-sm" title="Buka Terminal Kasir POS di Tab Baru">
-                    <i class="fa-solid fa-cash-register text-success"></i>
-                    <span>Kasir POS</span>
-                    <i class="fa-solid fa-arrow-up-right-from-square small text-muted"></i>
-                </a>
+                @if(!$isSuperAdminPanel)
+                    <!-- Quick POS Terminal Link -->
+                    <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-sm btn-light-accent fw-bold px-3 d-none d-sm-inline-flex align-items-center gap-2 shadow-sm" title="Buka Terminal Kasir POS di Tab Baru">
+                        <i class="fa-solid fa-cash-register text-success"></i>
+                        <span>Kasir POS</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square small text-muted"></i>
+                    </a>
+                @endif
 
-                @if(Auth::user()?->isAdmin())
+                @if(Auth::user()?->isAdmin() && !$isSuperAdminPanel)
                     <!-- Admin Browser Push Notification Toggle -->
                     <button type="button" class="btn btn-light rounded-circle position-relative p-2" id="btnToggleDesktopNotification" title="Notifikasi Desktop Pembayaran Masuk" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
                         <i class="fa-solid fa-bell text-secondary fs-5" id="bellIcon"></i>
@@ -295,7 +347,9 @@
 
                 <div class="text-end d-none d-sm-block">
                     <div class="fw-semibold text-dark text-truncate" style="max-width: 140px;">{{ Auth::user()?->name ?? 'Pengguna' }}</div>
-                    <small class="text-muted d-block text-truncate" style="font-size: 0.72rem; max-width: 140px;">{{ Auth::user()?->role === 'admin' ? 'Administrator' : 'Kasir' }}</small>
+                    <small class="text-muted d-block text-truncate" style="font-size: 0.72rem; max-width: 140px;">
+                        {{ Auth::user()?->isSuperAdmin() ? 'Super Admin' : (Auth::user()?->isAdmin() ? 'Admin Usaha' : 'Kasir') }}
+                    </small>
                 </div>
                 <a href="{{ route('profile.edit') }}" class="nav-user text-decoration-none" title="Profil Akun">
                     <img src="https://ui-avatars.com/api/?name={{ urlencode(Auth::user()?->name ?? 'User') }}&background=11361b&color=ffffff" alt="Avatar">
@@ -303,13 +357,63 @@
             </div>
         </div>
 
+        <!-- Super Admin Impersonation Banner -->
+        @if($isImpersonatingTenant ?? false)
+            <div class="bg-primary text-white py-2 px-3 px-md-4 d-flex flex-wrap justify-content-between align-items-center gap-2 shadow-sm">
+                <div class="small fw-semibold">
+                    <i class="fa-solid fa-user-secret me-2"></i>
+                    Mode Support Super Admin: Anda sedang melihat panel usaha <strong>{{ $currentTenant?->name }}</strong>
+                </div>
+                <form action="{{ route('superadmin.stop-impersonate') }}" method="POST" class="m-0">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-light fw-bold py-0 px-3">
+                        <i class="fa-solid fa-arrow-left me-1"></i> Kembali ke Super Admin
+                    </button>
+                </form>
+            </div>
+        @endif
+
+        <!-- Subscription Status Banner (Grace / Expired / Trial <= 3 days) -->
+        @if(!$isSuperAdminPanel && $currentTenant && !Request::routeIs('billing.*'))
+            @php $daysLeft = $currentTenant->daysRemaining(); @endphp
+            @if($subscriptionState === 'expired' || $subscriptionState === 'suspended')
+                <div class="bg-danger text-white py-2 px-3 px-md-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="small fw-semibold">
+                        <i class="fa-solid fa-lock me-2"></i>
+                        {{ $subscriptionState === 'suspended' ? 'Akun usaha dinonaktifkan sementara.' : 'Masa aktif langganan telah berakhir (Mode Baca Saja / Read-Only). Kasir POS terkunci hingga paket diperpanjang.' }}
+                    </div>
+                    <a href="{{ route('billing.index') }}" class="btn btn-sm btn-warning text-dark fw-bold py-0 px-3">Perpanjang Sekarang</a>
+                </div>
+            @elseif($subscriptionState === 'grace')
+                <div class="bg-warning text-dark py-2 px-3 px-md-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="small fw-semibold">
+                        <i class="fa-solid fa-clock me-2"></i>
+                        Masa aktif langganan habis! Anda berada dalam <strong>Masa Tenggang (Grace Period)</strong> sebelum akses kasir dikunci otomatis.
+                    </div>
+                    <a href="{{ route('billing.index') }}" class="btn btn-sm btn-dark fw-bold py-0 px-3">Bayar Perpanjangan</a>
+                </div>
+            @elseif($subscriptionState === 'trial' && $daysLeft !== null && $daysLeft <= 5)
+                <div class="bg-success bg-opacity-10 border-bottom border-success border-opacity-25 text-success py-2 px-3 px-md-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div class="small fw-semibold">
+                        <i class="fa-solid fa-sparkles me-2"></i>
+                        Masa uji coba gratis tersisa <strong>{{ max(0, $daysLeft) }} hari lagi</strong>. Pilih paket Starter atau Pro agar operasional toko tetap lancar.
+                    </div>
+                    <a href="{{ route('billing.index') }}" class="btn btn-sm btn-success fw-bold py-0 px-3">Lihat Paket</a>
+                </div>
+            @endif
+        @endif
+
         <!-- Main Content -->
         <div class="container-fluid p-3 p-md-4">
             
             <!-- Breadcrumbs -->
             <nav aria-label="breadcrumb" class="mb-3 mb-md-4">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" class="text-decoration-none text-success"><i class="fa-solid fa-home"></i> Home</a></li>
+                    <li class="breadcrumb-item">
+                        <a href="{{ $isSuperAdminPanel ? route('superadmin.dashboard') : route('dashboard') }}" class="text-decoration-none text-success">
+                            <i class="fa-solid fa-home"></i> Home
+                        </a>
+                    </li>
                     @yield('breadcrumbs')
                 </ol>
             </nav>
@@ -341,7 +445,7 @@
         <!-- Footer -->
         <footer class="mt-auto py-3 bg-white border-top text-center text-muted">
             <div class="container">
-                <small>&copy; {{ date('Y') }} Teras Kota Berlian Makmur. All Rights Reserved.</small>
+                <small>&copy; {{ date('Y') }} {{ $brandTitle }} · Powered by <strong>{{ $platformName ?? 'KasirLoka' }}</strong>.</small>
             </div>
         </footer>
 

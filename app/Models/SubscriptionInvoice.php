@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class SubscriptionInvoice extends Model
+{
+    protected $fillable = [
+        'tenant_id',
+        'plan_id',
+        'subscription_id',
+        'invoice_number',
+        'billing_cycle',
+        'base_amount',
+        'unique_code',
+        'final_amount',
+        'payment_method',
+        'qris_payload',
+        'qris_expired_at',
+        'payment_reference',
+        'payment_source_app',
+        'status',
+        'paid_at',
+        'approved_by',
+        'notes',
+    ];
+
+    protected $casts = [
+        'base_amount' => 'decimal:2',
+        'unique_code' => 'integer',
+        'final_amount' => 'decimal:2',
+        'qris_expired_at' => 'datetime',
+        'paid_at' => 'datetime',
+    ];
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
+    }
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
+
+    public function subscription()
+    {
+        return $this->belongsTo(Subscription::class);
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function isPaid(): bool
+    {
+        return $this->status === 'paid';
+    }
+
+    public function isUnpaid(): bool
+    {
+        return $this->status === 'unpaid';
+    }
+}

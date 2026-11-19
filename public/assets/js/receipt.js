@@ -85,15 +85,21 @@ const ReceiptRenderer = (function () {
             ? `<div style="text-align: center; margin-bottom: 8px;"><span style="background: #fef08a; color: #854d0e; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px dashed #ca8a04;">NOTA OFFLINE (PENDING SYNC)</span></div>`
             : '';
 
+        const tenantInfo = window.POS_TENANT_INFO || {};
+        const storeName = (tenantInfo.name || 'KasirLoka').toUpperCase();
+        const storeAddress = tenantInfo.address || '';
+        const storePhone = tenantInfo.phone || '';
+        const storeFooter = tenantInfo.receipt_footer || 'Terima Kasih Atas Kunjungan Anda';
+
         return `
             <div class="receipt-card" style="font-family: 'Courier New', Courier, monospace; width: 100%; max-width: 320px; margin: 0 auto; padding: 12px; background: #ffffff; color: #1e293b; font-size: 12px; line-height: 1.4;">
                 ${syncBadge}
                 
                 <!-- Header -->
                 <div style="text-align: center; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px dashed #94a3b8;">
-                    <h2 style="font-size: 15px; font-weight: 700; text-transform: uppercase; margin: 0 0 2px 0; color: #0f172a;">TERAS KOTA</h2>
-                    <p style="font-size: 10px; color: #64748b; margin: 0;">Berlian Makmur</p>
-                    <p style="font-size: 9px; color: #94a3b8; margin: 0;">Tempat Santai & Kuliner Terbaik</p>
+                    <h2 style="font-size: 15px; font-weight: 700; text-transform: uppercase; margin: 0 0 2px 0; color: #0f172a;">${storeName}</h2>
+                    ${storeAddress ? `<p style="font-size: 10px; color: #64748b; margin: 0;">${storeAddress}</p>` : ''}
+                    ${storePhone ? `<p style="font-size: 9px; color: #94a3b8; margin: 0;">Telp: ${storePhone}</p>` : ''}
                 </div>
 
                 <!-- Meta -->
@@ -154,7 +160,7 @@ const ReceiptRenderer = (function () {
 
                 <!-- Footer -->
                 <div style="text-align: center; font-size: 10px; color: #64748b; margin-top: 8px;">
-                    <p style="margin: 0 0 2px 0; font-weight: 600;">Terima Kasih Atas Kunjungan Anda</p>
+                    <p style="margin: 0 0 2px 0; font-weight: 600;">${storeFooter}</p>
                     <p style="margin: 0; font-size: 9px; opacity: 0.8;">Simpan struk ini sebagai bukti pembayaran</p>
                 </div>
             </div>

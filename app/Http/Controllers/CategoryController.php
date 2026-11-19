@@ -3,27 +3,30 @@
 namespace App\Http\Controllers;
 
 use App\Models\Category;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CategoryController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $categories = Category::withCount('menus')->orderBy('name', 'asc')->get();
         return view('categories.index', compact('categories'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
+        $tenantId = TenantContext::id();
+
         $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:categories,name'],
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('categories', 'name')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+            ],
         ]);
 
         Category::create([
@@ -36,13 +39,19 @@ class CategoryController extends Controller
             ->with('success', 'Kategori berhasil ditambahkan!');
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, Category $category)
     {
+        $tenantId = TenantContext::id();
+
         $request->validate([
-            'name' => ['required', 'string', 'max:100', 'unique:categories,name,' . $category->id],
+            'name' => [
+                'required',
+                'string',
+                'max:100',
+                Rule::unique('categories', 'name')
+                    ->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q)
+                    ->ignore($category->id),
+            ],
             'status' => ['sometimes', 'boolean'],
         ]);
 
@@ -56,12 +65,8 @@ class CategoryController extends Controller
             ->with('success', 'Kategori berhasil diperbarui!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(Category $category)
     {
-        // Category that has menus cannot be deleted
         if ($category->menus()->exists()) {
             return back()->with('error', 'Kategori tidak dapat dihapus karena masih digunakan oleh beberapa menu.');
         }

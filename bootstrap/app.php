@@ -17,6 +17,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'subscription' => \App\Http\Middleware\CheckSubscription::class,
         ]);
         $middleware->validateCsrfTokens(except: [
             'listener/*',

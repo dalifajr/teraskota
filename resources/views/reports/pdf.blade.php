@@ -2,7 +2,11 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Laporan Penjualan Teras Kota Berlian Makmur</title>
+    @php
+        $pdfStoreName = $currentTenant?->name ?? ($platformName ?? 'KasirLoka');
+        $pdfStoreAddress = $currentTenant?->address;
+    @endphp
+    <title>Laporan Penjualan {{ $pdfStoreName }}</title>
     <style>
         body {
             font-family: 'Helvetica', 'Arial', sans-serif;
@@ -124,8 +128,8 @@
 
     <!-- Header / Kop Laporan -->
     <div class="header">
-        <h1>TERAS KOTA BERLIAN MAKMUR</h1>
-        <p>Laporan Kinerja Keuangan & Penjualan Produk</p>
+        <h1>{{ strtoupper($pdfStoreName) }}</h1>
+        <p>Laporan Kinerja Keuangan & Penjualan Produk{{ $pdfStoreAddress ? ' · ' . $pdfStoreAddress : '' }}</p>
     </div>
 
     <!-- Metadata Laporan -->

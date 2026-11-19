@@ -7,9 +7,11 @@ use App\Models\Menu;
 use App\Models\Setting;
 use App\Models\Transaction;
 use App\Services\TransactionService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class OfflineSyncController extends Controller
@@ -48,9 +50,19 @@ class OfflineSyncController extends Controller
             ]);
 
         $globalProfit = (float) Setting::getValue('global_profit_percentage', 30);
+        $tenant = TenantContext::current();
 
         return response()->json([
             'success' => true,
+            'tenant' => $tenant ? [
+                'id' => $tenant->id,
+                'name' => $tenant->name,
+                'slug' => $tenant->slug,
+                'address' => $tenant->address,
+                'phone' => $tenant->phone,
+                'receipt_footer' => $tenant->receipt_footer,
+                'logo_url' => $tenant->logoUrl(),
+            ] : null,
             'cashier' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -115,11 +127,16 @@ class OfflineSyncController extends Controller
                 continue;
             }
 
-            // Validate transaction payload
+            // Validate transaction payload (strictly scoped to current tenant menus)
+            $tenantId = TenantContext::id();
             $validator = Validator::make($input, [
                 'sync_id' => ['required', 'string', 'max:64'],
                 'items' => ['required', 'array', 'min:1'],
-                'items.*.menu_id' => ['required', 'integer', 'exists:menus,id'],
+                'items.*.menu_id' => [
+                    'required',
+                    'integer',
+                    Rule::exists('menus', 'id')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+                ],
                 'items.*.quantity' => ['required', 'integer', 'min:1'],
                 'payment_method' => ['nullable', 'string', 'in:tunai,qris'],
                 'discount_type' => ['nullable', 'string', 'in:none,nominal,percentage'],

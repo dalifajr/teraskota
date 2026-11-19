@@ -68,7 +68,7 @@ class SalesTest extends TestCase
         $response = $this->get('/login');
 
         $response->assertStatus(200);
-        $response->assertSee('Teras Kota');
+        $response->assertSee('KasirLoka');
         $response->assertSee('Masuk');
     }
 
@@ -171,6 +171,7 @@ class SalesTest extends TestCase
 
         // Create menu with custom 40% profit
         $menu = Menu::create([
+            'tenant_id' => $admin->tenant_id,
             'category_id' => $category->id,
             'code' => 'CUST-001',
             'name' => 'Custom Profit Drink',
@@ -280,6 +281,7 @@ class SalesTest extends TestCase
 
         // Transaction 1 (Yesterday)
         $t1 = Transaction::create([
+            'tenant_id' => $admin->tenant_id,
             'transaction_number' => 'TRX-20260728-0001',
             'transaction_date' => '2026-07-28',
             'transaction_time' => '12:00:00',
@@ -290,6 +292,7 @@ class SalesTest extends TestCase
             'created_by' => $admin->id,
         ]);
         \App\Models\TransactionDetail::create([
+            'tenant_id' => $admin->tenant_id,
             'transaction_id' => $t1->id,
             'menu_id' => $menu->id,
             'menu_name_snapshot' => $menu->name,
@@ -304,6 +307,7 @@ class SalesTest extends TestCase
 
         // Transaction 2 (Today)
         $t2 = Transaction::create([
+            'tenant_id' => $admin->tenant_id,
             'transaction_number' => 'TRX-20260729-0001',
             'transaction_date' => '2026-07-29',
             'transaction_time' => '12:00:00',
@@ -314,6 +318,7 @@ class SalesTest extends TestCase
             'created_by' => $admin->id,
         ]);
         \App\Models\TransactionDetail::create([
+            'tenant_id' => $admin->tenant_id,
             'transaction_id' => $t2->id,
             'menu_id' => $menu->id,
             'menu_name_snapshot' => $menu->name,
@@ -386,6 +391,7 @@ class SalesTest extends TestCase
         $cashier = User::where('username', 'kasir')->first();
         $menu = Menu::first();
         $trx = Transaction::create([
+            'tenant_id' => $cashier->tenant_id,
             'transaction_number' => 'TRX-TEST-0001',
             'transaction_date' => '2026-09-14',
             'transaction_time' => '10:00:00',
@@ -400,6 +406,7 @@ class SalesTest extends TestCase
             'created_by' => $cashier->id,
         ]);
         \App\Models\TransactionDetail::create([
+            'tenant_id' => $cashier->tenant_id,
             'transaction_id' => $trx->id,
             'menu_id' => $menu->id,
             'menu_name_snapshot' => $menu->name,

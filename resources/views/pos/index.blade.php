@@ -2125,6 +2125,46 @@
                         await SyncManager.updateQueueBadge();
                         return;
                     }
+                } else {
+                    // Server merespons namun mengembalikan status kegagalan (4xx / 5xx)
+                    const errData = await response.json().catch(() => ({}));
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnHtml;
+
+                    if (response.status === 419) {
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'Sesi Kasir Berakhir',
+                            text: 'Sesi login telah kedaluwarsa. Silakan muat ulang (refresh) halaman untuk memperbarui sesi kasir.',
+                            confirmButtonColor: '#11361b',
+                            confirmButtonText: 'Muat Ulang Halaman'
+                        }).then((result) => {
+                            if (result.isConfirmed) {
+                                window.location.reload();
+                            }
+                        });
+                        return;
+                    }
+
+                    if (response.status === 422 || response.status === 400) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Transaksi Gagal Diproses',
+                            text: errData.message || 'Validasi data kasir gagal.',
+                            confirmButtonColor: '#11361b'
+                        });
+                        return;
+                    }
+
+                    if (response.status === 500) {
+                        Swal.fire({
+                            icon: 'error',
+                            title: 'Kesalahan Sistem Server',
+                            text: errData.message || 'Terjadi kesalahan sistem di server saat memproses transaksi.',
+                            confirmButtonColor: '#11361b'
+                        });
+                        return;
+                    }
                 }
             } catch (onlineErr) {
                 console.warn('[POS] Online checkout tidak dapat dijangkau, mengalihkan ke mode offline:', onlineErr);

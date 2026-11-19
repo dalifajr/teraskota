@@ -273,7 +273,7 @@ class QrisService
         $secret = Setting::getValue('qris_secret');
         if (empty($secret)) {
             $secret = bin2hex(random_bytes(16));
-            Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => $secret]);
+            Setting::setValue('qris_secret', $secret);
         }
         return $secret;
     }

@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Category;
 use App\Models\Menu;
+use App\Support\TenantContext;
 
 class MenuSeeder extends Seeder
 {
@@ -82,6 +83,8 @@ class MenuSeeder extends Seeder
             ],
         ];
 
+        $tenantId = TenantContext::id();
+
         foreach ($categories as $catName => $catData) {
             $category = Category::where('name', $catName)->first();
             if ($category) {
@@ -89,7 +92,7 @@ class MenuSeeder extends Seeder
                 foreach ($catData['items'] as $item) {
                     $code = $catData['prefix'] . '-' . str_pad($i++, 3, '0', STR_PAD_LEFT);
                     Menu::updateOrCreate(
-                        ['name' => $item['name']],
+                        ['tenant_id' => $tenantId, 'name' => $item['name']],
                         [
                             'category_id' => $category->id,
                             'code' => $code,

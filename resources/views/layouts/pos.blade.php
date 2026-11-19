@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Kasir POS') - Teras Kota Berlian Makmur</title>
+    <title>@yield('title', 'Kasir POS') - {{ $currentTenant?->name ?? $platformName }}</title>
 
     <!-- PWA -->
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -266,8 +266,8 @@
         <!-- Brand -->
         <div class="d-flex align-items-center gap-3">
             <a href="{{ route('pos.index') }}" class="pos-brand">
-                <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Logo" class="rounded-circle shadow-sm" style="width: 32px; height: 32px; object-fit: cover; background: #fff;">
-                <span>Teras Kota</span> <small class="text-white opacity-75 fw-normal d-none d-md-inline">POS</small>
+                <img src="{{ $currentTenant && $currentTenant->logo_path ? $currentTenant->logoUrl() : asset('assets/images/logo.png') }}" alt="{{ $currentTenant?->name ?? $platformName }}" class="rounded-circle shadow-sm" style="width: 32px; height: 32px; object-fit: cover; background: #fff;">
+                <span class="text-truncate" style="max-width: 190px;">{{ $currentTenant?->name ?? $platformName }}</span> <small class="text-white opacity-75 fw-normal d-none d-md-inline">POS</small>
             </a>
             <div class="pos-user-badge">
                 <i class="fa-solid fa-user-tag"></i>
@@ -400,11 +400,34 @@
         }
     </script>
 
+    <!-- Multi-Tenant Context for Isolated IndexedDB & Dynamic Thermal Receipt -->
+    @php
+        $posTenantPayload = $currentTenant ? [
+            'id' => $currentTenant->id,
+            'name' => $currentTenant->name,
+            'address' => $currentTenant->address,
+            'phone' => $currentTenant->phone,
+            'receipt_footer' => $currentTenant->receipt_footer,
+            'has_qris_dynamic' => $currentTenant->hasFeature('qris_dynamic'),
+        ] : [
+            'id' => null,
+            'name' => $platformName ?? 'KasirLoka',
+            'address' => '',
+            'phone' => '',
+            'receipt_footer' => 'Terima Kasih Atas Kunjungan Anda',
+            'has_qris_dynamic' => true,
+        ];
+    @endphp
+    <script>
+        window.POS_TENANT_ID = @json($currentTenant?->id ?? null);
+        window.POS_TENANT_INFO = @json($posTenantPayload);
+    </script>
+
     <!-- Offline-First POS Engine Scripts -->
     <script src="{{ asset('assets/js/qrcode.min.js') }}"></script>
-    <script src="{{ asset('assets/js/offline-db.js') }}"></script>
-    <script src="{{ asset('assets/js/sync-manager.js') }}"></script>
-    <script src="{{ asset('assets/js/receipt.js') }}"></script>
+    <script src="{{ asset('assets/js/offline-db.js') }}?v={{ filemtime(public_path('assets/js/offline-db.js')) }}"></script>
+    <script src="{{ asset('assets/js/sync-manager.js') }}?v={{ filemtime(public_path('assets/js/sync-manager.js')) }}"></script>
+    <script src="{{ asset('assets/js/receipt.js') }}?v={{ filemtime(public_path('assets/js/receipt.js')) }}"></script>
 
     @yield('scripts')
 </body>

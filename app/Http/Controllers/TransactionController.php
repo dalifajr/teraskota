@@ -7,8 +7,10 @@ use App\Models\Menu;
 use App\Models\Transaction;
 use App\Models\Setting;
 use App\Services\TransactionService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class TransactionController extends Controller
@@ -87,12 +89,17 @@ class TransactionController extends Controller
      */
     public function store(Request $request)
     {
+        $tenantId = TenantContext::id();
+
         $request->validate([
             'transaction_date' => ['required', 'date'],
             'transaction_time' => ['required', 'string'],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.menu_id' => ['required', 'exists:menus,id'],
+            'items.*.menu_id' => [
+                'required',
+                Rule::exists('menus', 'id')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+            ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 
@@ -135,12 +142,17 @@ class TransactionController extends Controller
      */
     public function update(Request $request, Transaction $transaction)
     {
+        $tenantId = TenantContext::id();
+
         $request->validate([
             'transaction_date' => ['required', 'date'],
             'transaction_time' => ['required', 'string'],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
-            'items.*.menu_id' => ['required', 'exists:menus,id'],
+            'items.*.menu_id' => [
+                'required',
+                Rule::exists('menus', 'id')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+            ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
         ]);
 

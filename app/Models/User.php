@@ -19,6 +19,7 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+        'tenant_id',
         'name',
         'username',
         'email',
@@ -61,6 +62,11 @@ class User extends Authenticatable
         return ($this->username === 'admin' || $this->email === 'admin@teraskota.local') ? 'admin' : 'kasir';
     }
 
+    public function isSuperAdmin(): bool
+    {
+        return $this->role === 'super_admin';
+    }
+
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
@@ -69,6 +75,11 @@ class User extends Authenticatable
     public function isKasir(): bool
     {
         return $this->role === 'kasir';
+    }
+
+    public function tenant()
+    {
+        return $this->belongsTo(Tenant::class);
     }
 
     public function transactions()

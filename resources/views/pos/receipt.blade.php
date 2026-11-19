@@ -187,11 +187,22 @@
 
     <div class="{{ (isset($isModal) || request()->ajax() || request()->expectsJson()) ? '' : 'receipt-standalone-wrapper' }}">
         <div class="receipt-card" id="printableReceipt">
+            @php
+                $store = $transaction->tenant ?? $currentTenant;
+                $storeName = $store?->name ?? ($platformName ?? 'KasirLoka');
+                $storeAddress = $store?->address;
+                $storePhone = $store?->phone;
+                $storeFooter = $store?->receipt_footer ?: 'Terima kasih atas kunjungan Anda!';
+            @endphp
             <!-- Header -->
             <div class="receipt-header">
-                <h1>Teras Kota</h1>
-                <p>Berlian Makmur</p>
-                <p>Jl. Jenderal Sudirman, Palembang</p>
+                <h1>{{ $storeName }}</h1>
+                @if($storeAddress)
+                    <p>{{ $storeAddress }}</p>
+                @endif
+                @if($storePhone)
+                    <p>Telp: {{ $storePhone }}</p>
+                @endif
             </div>
 
             <!-- Meta Data -->
@@ -268,8 +279,7 @@
             <!-- Footer -->
             <div class="receipt-footer">
                 <p>*** LUNAS ***</p>
-                <p>Terima kasih atas kunjungan Anda!</p>
-                <p>Semoga harimu menyenangkan :)</p>
+                <p>{{ $storeFooter }}</p>
             </div>
         </div>
 

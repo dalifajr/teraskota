@@ -3,7 +3,7 @@
  * Handles durable local storage for categories, menus, transactions, and sync queue.
  */
 const OfflineDB = (function () {
-    const DB_NAME = 'TerasKotaPOS_DB';
+    const DB_NAME = window.POS_TENANT_ID ? ('KasirLoka_POS_T_' + window.POS_TENANT_ID) : 'KasirLoka_POS_DB';
     const DB_VERSION = 1;
     let dbInstance = null;
 

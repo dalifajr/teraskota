@@ -2,8 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Setting;
+use Illuminate\Database\Seeder;
 
 class SettingSeeder extends Seeder
 {
@@ -12,9 +12,6 @@ class SettingSeeder extends Seeder
      */
     public function run(): void
     {
-        Setting::updateOrCreate(
-            ['key' => 'global_profit_percentage'],
-            ['value' => '30']
-        );
+        Setting::setValue('global_profit_percentage', '30');
     }
 }

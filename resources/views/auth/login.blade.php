@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>Login - Teras Kota Berlian Makmur</title>
+    <title>Masuk - {{ $platformName ?? 'KasirLoka' }}</title>
 
     <!-- PWA -->
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -59,14 +59,16 @@
     <div class="login-card">
         <!-- Brand Header -->
         <div class="text-center mb-4">
-            <div class="mb-3">
-                <img src="{{ asset('assets/images/logo.png') }}" alt="Teras Kota Indonesia" class="rounded-circle shadow" style="width: 100px; height: 100px; object-fit: cover; background: #fff; border: 3px solid rgba(20, 83, 45, 0.2);">
-            </div>
-            <h3 class="fw-bold text-dark mb-1">Teras Kota</h3>
+            <a href="{{ route('landing') }}" class="text-decoration-none d-inline-block mb-3">
+                <div class="login-brand-icon mb-0" style="background: linear-gradient(135deg, #11361b 0%, #166534 100%); color: #a3e635; border-color: rgba(163, 230, 53, 0.4);">
+                    <i class="fa-solid fa-cash-register"></i>
+                </div>
+            </a>
+            <h3 class="fw-bold text-dark mb-1">{{ $platformName ?? 'KasirLoka' }}</h3>
             <span class="badge bg-success bg-opacity-10 text-success fw-medium px-3 py-1 rounded-pill mb-2">
-                Berlian Makmur · Indonesia
+                Platform Kasir POS & Keuangan UMKM
             </span>
-            <p class="text-muted small mb-0">Masuk untuk mengakses sistem penjualan & POS kasir</p>
+            <p class="text-muted small mb-0">Masuk ke dashboard toko atau terminal kasir Anda</p>
         </div>
 
         <!-- Flash Alerts -->
@@ -182,10 +184,15 @@
             </button>
         </form>
 
-        <!-- Card Footer -->
-        <div class="text-center mt-4 pt-2 border-top">
-            <small class="text-muted">
-                &copy; {{ date('Y') }} Teras Kota Berlian Makmur. All rights reserved.
+        <!-- Register CTA & Card Footer -->
+        <div class="text-center mt-4 pt-3 border-top">
+            <p class="small text-muted mb-2">
+                Belum punya akun usaha?
+                <a href="{{ route('register') }}" class="fw-bold text-success text-decoration-none">Daftar Gratis 14 Hari</a>
+            </p>
+            <small class="text-muted d-block">
+                <a href="{{ route('landing') }}" class="text-muted text-decoration-none me-2"><i class="fa-solid fa-arrow-left me-1"></i>Beranda</a>
+                &middot; &copy; {{ date('Y') }} {{ $platformName ?? 'KasirLoka' }}
             </small>
         </div>
     </div>

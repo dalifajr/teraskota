@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PaymentListenerLog;
 use App\Models\Setting;
 use App\Services\QrisService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 
 class QrisSettingController extends Controller
@@ -16,9 +17,6 @@ class QrisSettingController extends Controller
         $this->qrisService = $qrisService;
     }
 
-    /**
-     * Display QRIS Settings & Android Listener Documentation.
-     */
     public function index()
     {
         $payload = Setting::getValue('qris_payload', '');
@@ -29,23 +27,22 @@ class QrisSettingController extends Controller
         $merchantName = Setting::getValue('qris_merchant_name', '');
         $merchantCity = Setting::getValue('qris_merchant_city', '');
 
-        // Parse merchant info if not already saved
         if (!empty($payload) && (empty($merchantName) || empty($merchantCity))) {
             $info = $this->qrisService->getInfo($payload);
             if (!empty($info['merchant_name'])) {
                 $merchantName = $info['merchant_name'];
-                Setting::updateOrCreate(['key' => 'qris_merchant_name'], ['value' => $merchantName]);
+                Setting::setValue('qris_merchant_name', $merchantName);
             }
             if (!empty($info['merchant_city'])) {
                 $merchantCity = $info['merchant_city'];
-                Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => $merchantCity]);
+                Setting::setValue('qris_merchant_city', $merchantCity);
             }
         }
 
-        $webhookUrl = url('/listener/payment');
-        $testUrl = url('/listener/test-connection');
+        $tenant = TenantContext::current();
+        $webhookUrl = $tenant ? url('/listener/' . $tenant->slug . '/payment') : url('/listener/payment');
+        $testUrl = $tenant ? url('/listener/' . $tenant->slug . '/test-connection') : url('/listener/test-connection');
 
-        // Recent listener logs
         $logs = PaymentListenerLog::with('transaction')
             ->latest()
             ->take(15)
@@ -65,9 +62,6 @@ class QrisSettingController extends Controller
         ));
     }
 
-    /**
-     * Update QRIS settings.
-     */
     public function update(Request $request)
     {
         $validated = $request->validate([
@@ -81,7 +75,6 @@ class QrisSettingController extends Controller
         $payload = trim($validated['qris_payload'] ?? '', " \t\n\r\0\x0B");
         $payload = str_replace(["\r\n", "\r", "\n", "\t"], '', $payload);
 
-        // Auto-validate and auto-repair CRC16 if standard EMVCo payload format is detected
         if (!empty($payload) && str_starts_with($payload, '000201')) {
             if (str_contains($payload, '6304')) {
                 $body = preg_replace('/6304[0-9A-Fa-f]{0,4}$/', '6304', $payload);
@@ -90,19 +83,19 @@ class QrisSettingController extends Controller
             }
         }
 
-        Setting::updateOrCreate(['key' => 'qris_payload'], ['value' => $payload]);
-        Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => trim($validated['qris_secret'])]);
-        Setting::updateOrCreate(['key' => 'qris_unique_min'], ['value' => $validated['qris_unique_min']]);
-        Setting::updateOrCreate(['key' => 'qris_unique_max'], ['value' => $validated['qris_unique_max']]);
-        Setting::updateOrCreate(['key' => 'qris_expiry_minutes'], ['value' => $validated['qris_expiry_minutes']]);
+        Setting::setValue('qris_payload', $payload);
+        Setting::setValue('qris_secret', trim($validated['qris_secret']));
+        Setting::setValue('qris_unique_min', $validated['qris_unique_min']);
+        Setting::setValue('qris_unique_max', $validated['qris_unique_max']);
+        Setting::setValue('qris_expiry_minutes', $validated['qris_expiry_minutes']);
 
         if (!empty($payload)) {
             $info = $this->qrisService->getInfo($payload);
             if (!empty($info['merchant_name'])) {
-                Setting::updateOrCreate(['key' => 'qris_merchant_name'], ['value' => $info['merchant_name']]);
+                Setting::setValue('qris_merchant_name', $info['merchant_name']);
             }
             if (!empty($info['merchant_city'])) {
-                Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => $info['merchant_city']]);
+                Setting::setValue('qris_merchant_city', $info['merchant_city']);
             }
         }
 
@@ -110,21 +103,15 @@ class QrisSettingController extends Controller
             ->with('success', 'Pengaturan QRIS & Webhook berhasil diperbarui!');
     }
 
-    /**
-     * Regenerate webhook shared secret.
-     */
     public function regenerateSecret()
     {
         $newSecret = bin2hex(random_bytes(16));
-        Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => $newSecret]);
+        Setting::setValue('qris_secret', $newSecret);
 
         return redirect()->route('settings.qris.index')
             ->with('success', 'Secret Key Webhook berhasil diperbarui: ' . $newSecret);
     }
 
-    /**
-     * Update webhook shared secret key with a custom user-defined value.
-     */
     public function updateCustomSecret(Request $request)
     {
         $validated = $request->validate([
@@ -136,7 +123,7 @@ class QrisSettingController extends Controller
         ]);
 
         $newSecret = trim($validated['custom_secret']);
-        Setting::updateOrCreate(['key' => 'qris_secret'], ['value' => $newSecret]);
+        Setting::setValue('qris_secret', $newSecret);
 
         if ($request->wantsJson() || $request->ajax()) {
             return response()->json([
@@ -150,4 +137,3 @@ class QrisSettingController extends Controller
             ->with('success', 'Secret Key Webhook berhasil diperbarui: ' . $newSecret);
     }
 }
-

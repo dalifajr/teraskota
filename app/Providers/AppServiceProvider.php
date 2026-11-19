@@ -2,9 +2,13 @@
 
 namespace App\Providers;
 
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\URL;
+use App\Models\PlatformSetting;
+use App\Support\TenantContext;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -48,8 +52,28 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         // Enforce HTTPS URLs when app URL is configured with https or request is proxied via https
-        if (str_starts_with(config('app.url'), 'https://') || request()->server('HTTP_X_FORWARDED_PROTO') === 'https') {
+        if (str_starts_with((string) config('app.url'), 'https://') || request()->server('HTTP_X_FORWARDED_PROTO') === 'https') {
             URL::forceScheme('https');
         }
+
+        // Share platform branding & active tenant context to all Blade views
+        View::composer('*', function ($view) {
+            static $cachedPlatformName = null;
+            if ($cachedPlatformName === null) {
+                $cachedPlatformName = PlatformSetting::platformName();
+            }
+
+            $tenant = Auth::check() ? TenantContext::current() : null;
+            $isImpersonating = Auth::check()
+                && Auth::user()->isSuperAdmin()
+                && session()->has('impersonating_tenant_id');
+
+            $view->with([
+                'platformName' => $cachedPlatformName,
+                'currentTenant' => $tenant,
+                'subscriptionState' => $tenant ? $tenant->subscriptionState() : null,
+                'isImpersonatingTenant' => $isImpersonating,
+            ]);
+        });
     }
 }

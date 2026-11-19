@@ -24,7 +24,19 @@ class CheckRole
         $user = Auth::user();
         $userRole = $user->role ?: (($user->username === 'admin') ? 'admin' : 'kasir');
 
+        // Allow Super Admin to act as tenant admin/kasir while impersonating a tenant
+        if ($userRole === 'super_admin' && session()->has('impersonating_tenant_id')) {
+            if (in_array('admin', $roles, true) || in_array('kasir', $roles, true) || in_array('super_admin', $roles, true)) {
+                return $next($request);
+            }
+        }
+
         if (!in_array($userRole, $roles, true)) {
+            if ($userRole === 'super_admin') {
+                return redirect()->route('superadmin.dashboard')
+                    ->with('info', 'Pilih toko (Impersonate) terlebih dahulu jika ingin masuk ke panel toko pelanggan.');
+            }
+
             if ($userRole === 'kasir') {
                 if ($request->routeIs('pos.*')) {
                     abort(403, 'Akses ditolak.');

@@ -6,10 +6,18 @@ use App\Models\Category;
 use App\Models\Menu;
 use App\Http\Requests\StoreMenuRequest;
 use App\Http\Requests\UpdateMenuRequest;
+use App\Services\SubscriptionService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 
 class MenuController extends Controller
 {
+    protected SubscriptionService $subscriptionService;
+
+    public function __construct(SubscriptionService $subscriptionService)
+    {
+        $this->subscriptionService = $subscriptionService;
+    }
     /**
      * Display a listing of the resource.
      */
@@ -51,6 +59,14 @@ class MenuController extends Controller
      */
     public function store(StoreMenuRequest $request)
     {
+        $tenant = TenantContext::current();
+        if ($tenant) {
+            $limitCheck = $this->subscriptionService->checkMenuLimit($tenant);
+            if (!$limitCheck['allowed']) {
+                return redirect()->route('menus.index')->with('error', $limitCheck['message']);
+            }
+        }
+
         $validated = $request->validated();
         
         // Handle checkbox fields

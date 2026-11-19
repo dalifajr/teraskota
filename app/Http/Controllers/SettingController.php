@@ -25,10 +25,7 @@ class SettingController extends Controller
             'global_profit_percentage' => ['required', 'numeric', 'min:0', 'max:100'],
         ]);
 
-        Setting::updateOrCreate(
-            ['key' => 'global_profit_percentage'],
-            ['value' => $request->global_profit_percentage]
-        );
+        Setting::setValue('global_profit_percentage', $request->global_profit_percentage);
 
         return redirect()->route('settings.profit.edit')
             ->with('success', 'Persentase keuntungan global berhasil diperbarui!');

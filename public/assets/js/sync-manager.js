@@ -312,7 +312,9 @@ const SyncManager = (function () {
                         });
                     } else {
                         const queue = await OfflineDB.getPendingQueue();
-                        const firstError = queue[0]?.last_error ? `<br><small class="text-danger mt-2 d-block">Penyebab: ${queue[0].last_error}</small>` : '';
+                        const firstError = queue[0]?.last_error 
+                            ? `<div class="mt-3 p-2 bg-light border rounded text-start"><small class="text-danger fw-semibold"><i class="fa-solid fa-circle-exclamation me-1"></i>Penyebab:</small><br><small class="text-secondary" style="font-size: 0.8rem; word-break: break-all;">${queue[0].last_error}</small></div>` 
+                            : '';
                         Swal.fire({
                             icon: 'warning',
                             title: 'Sinkronisasi Sebagian',

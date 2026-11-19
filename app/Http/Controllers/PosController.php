@@ -7,8 +7,10 @@ use App\Models\Menu;
 use App\Models\Transaction;
 use App\Models\Setting;
 use App\Services\TransactionService;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class PosController extends Controller
@@ -64,9 +66,14 @@ class PosController extends Controller
      */
     public function checkout(Request $request)
     {
+        $tenantId = TenantContext::id();
+
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.menu_id' => ['required', 'exists:menus,id'],
+            'items.*.menu_id' => [
+                'required',
+                Rule::exists('menus', 'id')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+            ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'payment_method' => ['required', 'in:tunai,qris'],
             'discount_type' => ['nullable', 'in:nominal,percentage'],
@@ -167,9 +174,15 @@ class PosController extends Controller
      */
     public function generateQris(Request $request, \App\Services\QrisService $qrisService)
     {
+        $tenantId = TenantContext::id();
+        $tenant = TenantContext::current();
+
         $validated = $request->validate([
             'items' => ['required', 'array', 'min:1'],
-            'items.*.menu_id' => ['required', 'exists:menus,id'],
+            'items.*.menu_id' => [
+                'required',
+                Rule::exists('menus', 'id')->where(fn($q) => $tenantId !== null ? $q->where('tenant_id', $tenantId) : $q),
+            ],
             'items.*.quantity' => ['required', 'integer', 'min:1'],
             'discount_type' => ['nullable', 'in:nominal,percentage'],
             'discount_value' => ['nullable', 'numeric', 'min:0'],
@@ -179,11 +192,12 @@ class PosController extends Controller
 
         $staticPayload = $qrisService->getStaticPayload();
         if (empty($staticPayload)) {
+            $defaultMerchant = strtoupper($tenant?->name ?? 'KASIRLOKA');
             // Auto-provision standard valid EMVCo QRIS default payload so POS is never blocked
             $staticPayload = "00020101021126590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME51590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME5204549953033605802ID5910TERAS KOTA6014KOTA TANGERANG61051511162070703A01630448B3";
-            Setting::updateOrCreate(['key' => 'qris_payload'], ['value' => $staticPayload]);
-            Setting::updateOrCreate(['key' => 'qris_merchant_name'], ['value' => 'TERAS KOTA']);
-            Setting::updateOrCreate(['key' => 'qris_merchant_city'], ['value' => 'KOTA TANGERANG']);
+            Setting::setValue('qris_payload', $staticPayload);
+            Setting::setValue('qris_merchant_name', $defaultMerchant);
+            Setting::setValue('qris_merchant_city', strtoupper($tenant?->address ?? 'INDONESIA'));
         }
 
         // Calculate subtotal & discount
@@ -247,7 +261,7 @@ class PosController extends Controller
             'qris_payload' => $dynamicPayload,
             'expired_at' => $expiredAt->toIso8601String(),
             'expires_in_seconds' => $expiryMinutes * 60,
-            'merchant_name' => Setting::getValue('qris_merchant_name', 'Teras Kota'),
+            'merchant_name' => Setting::getValue('qris_merchant_name', $tenant?->name ?? 'KasirLoka'),
             'merchant_city' => Setting::getValue('qris_merchant_city', ''),
         ]);
     }

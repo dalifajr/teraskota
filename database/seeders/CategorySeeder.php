@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\Category;
+use App\Support\TenantContext;
 use Illuminate\Support\Str;
 
 class CategorySeeder extends Seeder
@@ -13,6 +14,7 @@ class CategorySeeder extends Seeder
      */
     public function run(): void
     {
+        $tenantId = TenantContext::id();
         $categories = [
             'Varian Tea',
             'Varian Yakult',
@@ -23,7 +25,7 @@ class CategorySeeder extends Seeder
 
         foreach ($categories as $cat) {
             Category::updateOrCreate(
-                ['name' => $cat],
+                ['tenant_id' => $tenantId, 'name' => $cat],
                 [
                     'slug' => Str::slug($cat),
                     'status' => true,
