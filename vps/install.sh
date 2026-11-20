@@ -19,7 +19,7 @@ if [ -z "$INSTALLER_DIR" ] || [ ! -f "${INSTALLER_DIR}/lib/common.sh" ]; then
         echo "[ERR] Script harus dijalankan sebagai root (sudo)." >&2
         exit 1
     fi
-    BOOTSTRAP_REPO="${TERASKOTA_BOOTSTRAP_REPO:-https://github.com/dzulfikrialifajri/teraskota.git}"
+    BOOTSTRAP_REPO="${TERASKOTA_BOOTSTRAP_REPO:-https://github.com/dalifajr/teraskota.git}"
     BOOTSTRAP_BRANCH="${TERASKOTA_BOOTSTRAP_BRANCH:-main}"
     BOOTSTRAP_DIR="/tmp/teraskota-installer"
 
@@ -115,7 +115,7 @@ collect_config() {
     INSTALL_PLATFORM_NAME=$(prompt_input "Nama Platform" "Nama brand platform SaaS" "KasirLoka")
 
     # GitHub repo
-    local default_repo="https://github.com/dzulfikrialifajri/teraskota.git"
+    local default_repo="https://github.com/dalifajr/teraskota.git"
     if [ -d "${INSTALLER_DIR}/../.git" ]; then
         local detected_origin
         detected_origin=$(git -C "${INSTALLER_DIR}/.." remote get-url origin 2>/dev/null || echo "")
