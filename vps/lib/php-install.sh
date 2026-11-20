@@ -16,10 +16,11 @@ PHP_EXTENSIONS=(
 )
 
 # ── Detect available PHP version ─────────────────────────────────────────────
-# Scans apt-cache for php*-fpm packages, picks the highest version >= 8.2
+# Scans apt-cache for stable php*-fpm packages supported by Laravel 12 & composer.lock
+# Priority: 8.4 (most stable LTS) -> 8.3 -> 8.5 -> 8.2 (excludes 8.6 which breaks composer.lock ^8.2|^8.3|^8.4|^8.5)
 detect_available_php() {
     local ver
-    for ver in 8.6 8.5 8.4 8.3 8.2; do
+    for ver in 8.4 8.3 8.5 8.2; do
         if apt-cache show "php${ver}-fpm" &>/dev/null 2>&1; then
             echo "$ver"
             return 0
@@ -153,6 +154,17 @@ install_php() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" 2>&1 | \
         grep -E "^(Setting up|E:|W:)" || true
 
+    # ── Force TARGET_PHP as system default BEFORE version verification ────
+    # Prevents previously installed incompatible versions (e.g. php8.6) from hijacking `php`
+    if [ -x "/usr/bin/php${TARGET_PHP}" ] && command -v update-alternatives &>/dev/null; then
+        update-alternatives --set php "/usr/bin/php${TARGET_PHP}" 2>/dev/null || true
+    fi
+
+    # Stop incompatible php8.6-fpm if previously installed to save RAM
+    if [ "$TARGET_PHP" != "8.6" ] && systemctl is-active --quiet php8.6-fpm 2>/dev/null; then
+        systemctl disable --now php8.6-fpm 2>/dev/null || true
+    fi
+
     # ── Post-install verification ─────────────────────────────────────────
     local installed_ver
     installed_ver=$(detect_php_version)
@@ -165,13 +177,12 @@ install_php() {
     log_ok "PHP ${installed_ver} terinstall"
 
     if [ "$installed_ver" != "$TARGET_PHP" ]; then
-        log_warn "PHP terinstall versi ${installed_ver}, bukan ${TARGET_PHP}"
-        log_warn "Menyesuaikan — Laravel 12 butuh >= 8.2, versi ${installed_ver} tetap kompatibel"
+        log_warn "PHP aktif versi ${installed_ver}, bukan ${TARGET_PHP}"
+        if [ -x "/usr/bin/php${TARGET_PHP}" ]; then
+            ln -sf "/usr/bin/php${TARGET_PHP}" /usr/bin/php 2>/dev/null || true
+            installed_ver=$(detect_php_version)
+        fi
         TARGET_PHP="$installed_ver"
-    fi
-
-    if command -v update-alternatives &>/dev/null; then
-        update-alternatives --set php "/usr/bin/php${TARGET_PHP}" 2>/dev/null || true
     fi
 
     # ── Verify critical extensions ────────────────────────────────────────

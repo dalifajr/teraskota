@@ -445,8 +445,11 @@ setup_application() {
 
     cd "${TERASKOTA_ROOT}"
 
-    log_substep "Menginstall PHP dependencies..."
-    composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -5
+    log_substep "Menginstall PHP dependencies (PHP $(php -r 'echo PHP_VERSION;'))..."
+    if ! composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tee -a "${TERASKOTA_LOG}" | tail -15; then
+        log_error "composer install gagal! Lihat detail error di atas atau di ${TERASKOTA_LOG}"
+        exit 2
+    fi
 
     # Configure .env safely via set_env_var (immune to &, |, \, ' in DB passwords)
     log_substep "Mengkonfigurasi .env..."
