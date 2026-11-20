@@ -233,6 +233,16 @@
 
     <!-- Bootstrap 5 Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- SweetAlert2 Unified Dialog Engine -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        window.KL_STORE_INFO = @json([
+            'name' => $brandTitle,
+            'address' => $currentTenant?->address ?? '',
+            'phone' => $currentTenant?->phone ?? '',
+            'footer' => $currentTenant?->receipt_footer ?? 'Terima kasih atas kunjungan Anda!',
+        ]);
+    </script>
 
     <!-- UI Transitions & Progress Bar Engine -->
     <script src="{{ asset('assets/js/ui-transitions.js') }}?v={{ filemtime(public_path('assets/js/ui-transitions.js')) }}"></script>

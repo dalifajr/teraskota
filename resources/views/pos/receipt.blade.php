@@ -284,14 +284,49 @@
         </div>
 
         @if(!isset($isModal) && !request()->ajax() && !request()->expectsJson())
+            @php
+                $waTxPayload = [
+                    'transaction_number' => $transaction->transaction_number,
+                    'transaction_date' => \Carbon\Carbon::parse($transaction->transaction_date)->format('d/m/Y'),
+                    'transaction_time' => substr($transaction->transaction_time, 0, 5),
+                    'customer_name' => $transaction->customer_name,
+                    'payment_method' => $transaction->payment_method,
+                    'discount_amount' => (float) ($transaction->discount_amount ?? 0),
+                    'total_sales' => (float) $transaction->total_sales,
+                    'cash_tendered' => (float) ($transaction->cash_tendered ?? 0),
+                    'change_returned' => (float) ($transaction->change_returned ?? 0),
+                    'store_name' => $storeName,
+                    'store_address' => $storeAddress,
+                    'store_footer' => $storeFooter,
+                    'details' => $transaction->details->map(fn($d) => [
+                        'menu_name_snapshot' => $d->menu_name_snapshot,
+                        'quantity' => $d->quantity,
+                        'price_snapshot' => (float) $d->price_snapshot,
+                        'subtotal' => (float) $d->subtotal,
+                    ])->values(),
+                ];
+            @endphp
             <div class="no-print">
                 <button onclick="window.print()" class="btn-print">
                     🖨️ Cetak Struk
+                </button>
+                <button type="button" onclick="sendStandaloneWaReceipt()" class="btn-print" style="background-color: #16a34a;">
+                    💬 Kirim WA
                 </button>
                 <a href="{{ route('pos.index') }}" class="btn-close-receipt">
                     ➕ Transaksi Baru
                 </a>
             </div>
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+            <script src="{{ asset('assets/js/ui-transitions.js') }}?v={{ filemtime(public_path('assets/js/ui-transitions.js')) }}"></script>
+            <script>
+                function sendStandaloneWaReceipt() {
+                    const tx = @json($waTxPayload);
+                    if (typeof window.KLWhatsAppReceipt === 'function') {
+                        window.KLWhatsAppReceipt(tx);
+                    }
+                }
+            </script>
         @endif
     </div>
 

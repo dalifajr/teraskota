@@ -1,6 +1,6 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN TERASKOTA;
 
-lakukan analisa, fitur, menu, serta perubahan terakhir yang dilakukan. lakukan brainstorming untuk mendapatkan kritik dan saran. serta berikan ide dan fitur baru atau perbaikan fitur yang sudah ada.
+lakukan analisa, fitur, menu, serta perubahan terakhir yang dilakukan. lakukan brainstorming untuk mendapatkan kritik dan saran. serta berikan ide dan fitur baru atau perbaikan fitur yang sudah ada. mulai dari role user superadmin terlebih dahulu.
 
 
 
@@ -10,3 +10,4 @@ BACA!!! CATATAN UNTUK KAMU:
 - selalu cek kembali setiap perubahan yang dilakukan.
 - mitigasi/minimalkan terjadinya error pada code setelah perubahan.
 - selalu memberikan /plan ke saya untuk saya review terlebih dahulu.
+- gunakan skill /modern-web-guidance.

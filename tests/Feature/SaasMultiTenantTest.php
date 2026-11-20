@@ -76,9 +76,9 @@ class SaasMultiTenantTest extends TestCase
         $this->assertEquals($tenant->id, $owner->tenant_id);
         $this->assertEquals('admin', $owner->role);
 
-        // Verify sample menus created strictly under this tenant
+        // Verify sample menus created strictly under this tenant (4 smart items for Kedai Minuman / Kopi)
         $this->assertEquals(
-            3,
+            4,
             Menu::withoutGlobalScope('tenant')->where('tenant_id', $tenant->id)->count()
         );
     }
@@ -482,5 +482,81 @@ class SaasMultiTenantTest extends TestCase
 
         $owner = User::where('username', 'baksomalang')->firstOrFail();
         $this->assertTrue(\Illuminate\Support\Facades\Hash::check('barubanget99', $owner->password));
+    }
+
+    public function test_smart_sample_catalog_by_business_type_and_1click_menu_toggle_and_whitelabel_csv(): void
+    {
+        $subService = app(SubscriptionService::class);
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+
+        // 1. Bakery preset seeds Bakery-specific items
+        $bakery = $subService->provisionTenant(
+            ['name' => 'RotiHarum Bakery', 'business_type' => 'Bakery & Kue'],
+            ['name' => 'Owner Bakery', 'username' => 'bakery_owner', 'email' => 'owner@bakery.id', 'password' => 'secret123'],
+            true
+        );
+
+        $bakeryMenuNames = Menu::withoutGlobalScope('tenant')
+            ->where('tenant_id', $bakery['tenant']->id)
+            ->pluck('name')
+            ->toArray();
+
+        $this->assertContains('Croissant Butter', $bakeryMenuNames);
+        $this->assertContains('Roti Bakar Cokelat Keju', $bakeryMenuNames);
+
+        // 2. Retail preset seeds Retail-specific items
+        $retail = $subService->provisionTenant(
+            ['name' => 'Berkah Minimarket', 'business_type' => 'Toko Kelontong / Retail'],
+            ['name' => 'Owner Retail', 'username' => 'retail_owner', 'email' => 'owner@retail.id', 'password' => 'secret123'],
+            true
+        );
+
+        $retailMenuNames = Menu::withoutGlobalScope('tenant')
+            ->where('tenant_id', $retail['tenant']->id)
+            ->pluck('name')
+            ->toArray();
+
+        $this->assertContains('Mie Instan Goreng', $retailMenuNames);
+        $this->assertContains('Air Mineral 600ml', $retailMenuNames);
+
+        // 3. 1-Click Menu Status Toggle (Aktif <-> Habis) & Cross-Tenant Isolation
+        $bakeryMenu = Menu::withoutGlobalScope('tenant')
+            ->where('tenant_id', $bakery['tenant']->id)
+            ->firstOrFail();
+
+        $this->assertTrue((bool) $bakeryMenu->status);
+
+        $this->actingAs($bakery['user'])
+            ->patch('/menus/' . $bakeryMenu->id . '/toggle-status')
+            ->assertRedirect();
+
+        $this->assertFalse((bool) $bakeryMenu->fresh()->status);
+
+        // Retail admin MUST NOT be able to toggle Bakery's menu (404 due to tenant scope)
+        $this->actingAs($retail['user'])
+            ->patch('/menus/' . $bakeryMenu->id . '/toggle-status')
+            ->assertStatus(404);
+
+        // 4. White-Label CSV Report Export uses tenant store name instead of hardcoded Teras Kota
+        $csvResponse = $this->actingAs($bakery['user'])->get('/reports/export');
+        $csvResponse->assertStatus(200);
+        $csvContent = $csvResponse->streamedContent();
+        $this->assertStringContainsString('LAPORAN PENJUALAN ROTIHARUM BAKERY', $csvContent);
+        $this->assertStringNotContainsString('TERAS KOTA BERLIAN MAKMUR', $csvContent);
+
+        // 5. Plan Quota Indicators on /menus & /users
+        $this->actingAs($bakery['user'])->get('/menus')
+            ->assertStatus(200)
+            ->assertSee('Kuota Menu Paket Langganan')
+            ->assertSee('Kelola Menu Produk');
+
+        $this->actingAs($bakery['user'])->get('/users')
+            ->assertStatus(200)
+            ->assertSee('Kuota Akun Paket');
+
+        // 6. Super Admin Tenant Status Filter (/superadmin/tenants?status=trial)
+        $this->actingAs($superAdmin)->get('/superadmin/tenants?status=trial')
+            ->assertStatus(200)
+            ->assertSee('RotiHarum Bakery');
     }
 }

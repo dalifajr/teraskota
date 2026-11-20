@@ -41,8 +41,24 @@ class MenuController extends Controller
 
         $menus = $query->orderBy('code', 'asc')->paginate(15)->withQueryString();
         $categories = Category::all();
+        $tenant = TenantContext::current();
+        $menuLimitInfo = $tenant ? $this->subscriptionService->checkMenuLimit($tenant) : null;
 
-        return view('menus.index', compact('menus', 'categories'));
+        return view('menus.index', compact('menus', 'categories', 'menuLimitInfo'));
+    }
+
+    /**
+     * Quick 1-click toggle menu active/out-of-stock status.
+     */
+    public function toggleStatus(Menu $menu)
+    {
+        $menu->update([
+            'status' => !$menu->status,
+        ]);
+
+        $stateLabel = $menu->status ? 'diaktifkan (Tersedia di POS)' : 'dinonaktifkan (Habis / Disembunyikan dari POS)';
+
+        return back()->with('success', "Status menu {$menu->name} berhasil {$stateLabel}.");
     }
 
     /**

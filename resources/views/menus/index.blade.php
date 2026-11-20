@@ -1,13 +1,42 @@
 @extends('layouts.app')
 
 @section('title', 'Data Menu')
-@section('page_title', 'Kelola Menu Minuman')
+@section('page_title', 'Kelola Menu Produk')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item active" aria-current="page">Menu</li>
 @endsection
 
 @section('content')
+@if(isset($menuLimitInfo))
+<div class="card premium-card mb-3 border-0 shadow-sm">
+    <div class="card-body py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-3 p-2 {{ $menuLimitInfo['allowed'] ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger' }}">
+                <i class="fa-solid fa-layer-group fs-5"></i>
+            </div>
+            <div>
+                <div class="small text-muted fw-semibold">Kuota Menu Paket Langganan</div>
+                <div class="fw-bold text-dark">
+                    {{ $menuLimitInfo['current'] }} / {{ $menuLimitInfo['limit'] ?? 'Unlimited (Tanpa Batas)' }} Menu Terdaftar
+                </div>
+            </div>
+        </div>
+        @if($menuLimitInfo['limit'] !== null)
+            <div class="d-flex align-items-center gap-3">
+                @php $pct = min(100, (int) round(($menuLimitInfo['current'] / max(1, $menuLimitInfo['limit'])) * 100)); @endphp
+                <div class="progress" style="width: 140px; height: 8px;">
+                    <div class="progress-bar {{ $pct >= 100 ? 'bg-danger' : ($pct >= 80 ? 'bg-warning' : 'bg-success') }}" role="progressbar" style="width: {{ $pct }}%"></div>
+                </div>
+                @if(!$menuLimitInfo['allowed'])
+                    <a href="{{ route('billing.index') }}" class="btn btn-sm btn-warning fw-bold">Upgrade Paket</a>
+                @endif
+            </div>
+        @endif
+    </div>
+</div>
+@endif
+
 <!-- Filter Panel -->
 <div class="card premium-card mb-4">
     <div class="card-body p-4">
@@ -84,17 +113,25 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    @if($menu->status)
-                                        <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i> Aktif</span>
-                                    @else
-                                        <span class="badge bg-danger"><i class="fa-solid fa-circle-xmark me-1"></i> Nonaktif</span>
-                                    @endif
+                                    <form action="{{ route('menus.toggle-status', $menu->id) }}" method="POST" class="d-inline">
+                                        @csrf
+                                        @method('PATCH')
+                                        @if($menu->status)
+                                            <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" title="Klik untuk tandai Habis / Nonaktif">
+                                                <i class="fa-solid fa-circle-check me-1"></i> Aktif
+                                            </button>
+                                        @else
+                                            <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-semibold" title="Klik untuk Aktifkan kembali di Kasir POS">
+                                                <i class="fa-solid fa-circle-xmark me-1"></i> Habis / Nonaktif
+                                            </button>
+                                        @endif
+                                    </form>
                                 </td>
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm" role="group">
                                         <a href="{{ route('menus.edit', $menu->id) }}" class="btn btn-outline-primary" title="Edit"><i class="fa-solid fa-edit"></i></a>
                                         
-                                        <form action="{{ route('menus.destroy', $menu->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus menu {{ $menu->name }}? Menu yang memiliki riwayat transaksi akan dinonaktifkan (soft delete).')">
+                                        <form action="{{ route('menus.destroy', $menu->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus menu {{ $menu->name }}? Menu yang memiliki riwayat transaksi akan dinonaktifkan (soft delete).">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>

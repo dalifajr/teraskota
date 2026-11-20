@@ -136,7 +136,7 @@
     <table class="meta-table">
         <tr>
             <td class="meta-label">Judul Laporan</td>
-            <td>: Laporan Penjualan Penjualan Minuman</td>
+            <td>: Laporan Penjualan &amp; Laba Bersih</td>
             <td class="meta-label" style="text-align: right; width: 100px;">Tanggal Cetak</td>
             <td style="text-align: right;">: {{ now()->translatedFormat('d F Y H:i') }}</td>
         </tr>
@@ -192,7 +192,7 @@
         <thead>
             <tr>
                 <th style="width: 35px;" class="text-center">No</th>
-                <th>Menu Minuman</th>
+                <th>Nama Menu</th>
                 <th>Kategori</th>
                 <th class="text-center" style="width: 80px;">Jumlah</th>
                 <th class="text-end" style="width: 100px;">Omzet</th>

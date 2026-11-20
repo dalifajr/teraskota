@@ -715,14 +715,12 @@ body {
 .main-wrapper > .container-fluid,
 .pos-content-wrapper,
 .login-card {
-    animation: tkPageEnter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-    will-change: transform, opacity;
-    transition: opacity 0.2s ease, transform 0.2s ease;
+    animation: tkPageEnter 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: opacity 0.2s ease;
 }
 
 .tk-page-leaving {
     opacity: 0.45 !important;
-    transform: translateY(4px) scale(0.996) !important;
     pointer-events: none;
 }
 
@@ -730,13 +728,13 @@ body {
    3. STAGGERED ENTRANCE FOR CARDS, TABLE ROWS & MENUS
    ========================================================================== */
 .tk-stagger-item {
-    animation: slideUpFade 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-delay: calc(var(--tk-stagger, 0) * 45ms);
+    animation: slideUpFade 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+    animation-delay: calc(var(--tk-stagger, 0) * 35ms);
 }
 
 .tk-stagger-row {
-    animation: slideUpFade 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
-    animation-delay: calc(var(--tk-stagger, 0) * 28ms);
+    animation: slideUpFade 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+    animation-delay: calc(var(--tk-stagger, 0) * 22ms);
 }
 
 .table tbody tr {
@@ -863,12 +861,155 @@ body {
 }
 
 .modal.fade .modal-dialog {
-    transform: scale(0.93) translateY(10px);
-    transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.22s ease-out;
+    transform: scale(0.95) translateY(8px);
+    transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease-out;
 }
 
 .modal.show .modal-dialog {
     transform: scale(1) translateY(0);
+}
+
+/* ==========================================================================
+   6. UNIFIED POPUP FORM MODALS (.modal) & CONFIRMATION DIALOGS (SweetAlert2)
+   ========================================================================== */
+.modal {
+    z-index: 1065 !important;
+}
+
+.modal-backdrop {
+    z-index: 1060 !important;
+    background-color: #0f172a !important;
+    backdrop-filter: blur(3px);
+}
+
+.modal-backdrop.show {
+    opacity: 0.55 !important;
+}
+
+.modal-content {
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.25), 0 0 0 1px rgba(15, 23, 42, 0.04) !important;
+    overflow: hidden;
+    background-color: #ffffff;
+}
+
+.modal-header {
+    padding: 1.1rem 1.4rem !important;
+    background-color: #f8fafc;
+    border-bottom: 1px solid #e2e8f0 !important;
+    align-items: center;
+}
+
+.modal-header.bg-success,
+.modal-header.bg-dark,
+.modal-header[style*="background-color"] {
+    border-bottom: none !important;
+}
+
+.modal-title {
+    font-weight: 700 !important;
+    font-size: 1.02rem !important;
+    letter-spacing: -0.01em;
+}
+
+.modal-body {
+    padding: 1.35rem 1.4rem !important;
+    color: #1e293b;
+}
+
+.modal-body .form-label {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.35rem;
+}
+
+.modal-body .form-control,
+.modal-body .form-select {
+    border-radius: 10px;
+    border-color: #cbd5e1;
+    padding: 0.55rem 0.85rem;
+    font-size: 0.92rem;
+}
+
+.modal-body .form-control:focus,
+.modal-body .form-select:focus {
+    border-color: var(--accent-green);
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.14);
+}
+
+.modal-footer {
+    padding: 0.95rem 1.4rem !important;
+    background-color: #f8fafc;
+    border-top: 1px solid #e2e8f0 !important;
+    gap: 0.5rem;
+}
+
+.modal-footer .btn {
+    border-radius: 10px;
+    font-weight: 600;
+    padding: 0.5rem 1.1rem;
+}
+
+/* Unified SweetAlert2 Confirmation & Prompt Popup Theme */
+.swal2-container {
+    z-index: 2000 !important;
+    backdrop-filter: blur(3px);
+}
+
+.swal2-popup {
+    font-family: 'Outfit', sans-serif !important;
+    border-radius: 20px !important;
+    padding: 1.6rem 1.5rem 1.4rem !important;
+    box-shadow: 0 24px 48px -12px rgba(15, 23, 42, 0.28) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    max-width: 420px !important;
+}
+
+.swal2-title {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 1.22rem !important;
+    font-weight: 700 !important;
+    color: #0f172a !important;
+    padding-top: 0.25rem !important;
+}
+
+.swal2-html-container {
+    font-family: 'Outfit', sans-serif !important;
+    font-size: 0.94rem !important;
+    color: #475569 !important;
+    line-height: 1.5 !important;
+    margin: 0.6rem 0 0.2rem !important;
+}
+
+.swal2-actions {
+    margin-top: 1.35rem !important;
+    gap: 0.6rem !important;
+}
+
+.swal2-styled.swal2-confirm,
+.swal2-styled.swal2-cancel {
+    border-radius: 10px !important;
+    font-weight: 600 !important;
+    font-size: 0.92rem !important;
+    padding: 0.58rem 1.25rem !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+
+.swal2-input {
+    font-family: 'Outfit', sans-serif !important;
+    border-radius: 10px !important;
+    border: 1px solid #cbd5e1 !important;
+    font-size: 0.95rem !important;
+    height: 2.75rem !important;
+    margin: 0.75rem auto 0.25rem !important;
+    box-shadow: none !important;
+}
+
+.swal2-input:focus {
+    border-color: var(--accent-green) !important;
+    box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.14) !important;
 }
 
 .badge-bounce {

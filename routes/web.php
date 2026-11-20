@@ -175,6 +175,7 @@ Route::middleware('auth')->group(function () {
 
             Route::resource('transactions', TransactionController::class);
             Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
+            Route::patch('/menus/{menu}/toggle-status', [MenuController::class, 'toggleStatus'])->name('menus.toggle-status');
             Route::resource('menus', MenuController::class);
             Route::resource('categories', CategoryController::class);
             Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);

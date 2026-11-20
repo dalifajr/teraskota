@@ -48,6 +48,28 @@
             </div>
         </div>
     </div>
+    @if(isset($userLimitInfo))
+    <div class="col-md-6 col-xl-3">
+        <div class="card premium-card p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center">
+                    <div class="card-icon-wrapper {{ $userLimitInfo['allowed'] ? 'bg-warning bg-opacity-10 text-warning' : 'bg-danger bg-opacity-10 text-danger' }} me-3">
+                        <i class="fa-solid fa-crown"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value {{ $userLimitInfo['allowed'] ? 'text-dark' : 'text-danger' }}">
+                            {{ $userLimitInfo['current'] }} / {{ $userLimitInfo['limit'] ?? '∞' }}
+                        </div>
+                        <div class="stat-label">Kuota Akun Paket</div>
+                    </div>
+                </div>
+                @if(!$userLimitInfo['allowed'])
+                    <a href="{{ route('billing.index') }}" class="btn btn-sm btn-warning fw-bold">Upgrade</a>
+                @endif
+            </div>
+        </div>
+    </div>
+    @endif
 </div>
 
 <div class="card premium-card">
@@ -120,7 +142,7 @@
                                     </button>
 
                                     @if($u->id !== Auth::id())
-                                        <form action="{{ route('users.destroy', $u->id) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus pengguna ini?');" class="d-inline">
+                                        <form action="{{ route('users.destroy', $u->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus pengguna {{ $u->name }}?" class="d-inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus Pengguna">
@@ -128,51 +150,6 @@
                                             </button>
                                         </form>
                                     @endif
-                                </div>
-
-                                <!-- Edit Modal -->
-                                <div class="modal fade" id="editUserModal{{ $u->id }}" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog text-start">
-                                        <div class="modal-content rounded-4 border-0 shadow">
-                                            <form action="{{ route('users.update', $u->id) }}" method="POST">
-                                                @csrf
-                                                @method('PUT')
-                                                <div class="modal-header bg-light">
-                                                    <h5 class="modal-title fw-bold text-dark">Edit Pengguna: {{ $u->name }}</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
-                                                </div>
-                                                <div class="modal-body p-4">
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small">Nama Lengkap</label>
-                                                        <input type="text" name="name" class="form-control" value="{{ $u->name }}" required>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small">Username</label>
-                                                        <input type="text" name="username" class="form-control" value="{{ $u->username }}" required>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small">Email</label>
-                                                        <input type="email" name="email" class="form-control" value="{{ $u->email }}" required>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small">Peran (Role)</label>
-                                                        <select name="role" class="form-select" required>
-                                                            <option value="kasir" {{ $u->role === 'kasir' ? 'selected' : '' }}>Kasir POS</option>
-                                                            <option value="admin" {{ $u->role === 'admin' ? 'selected' : '' }}>Administrator</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="mb-3">
-                                                        <label class="form-label fw-semibold small">Kata Sandi Baru (Kosongkan jika tidak diubah)</label>
-                                                        <input type="password" name="password" class="form-control" placeholder="Minimal 6 karakter...">
-                                                    </div>
-                                                </div>
-                                                <div class="modal-footer bg-light border-0">
-                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                                                    <button type="submit" class="btn btn-primary-green">Simpan Perubahan</button>
-                                                </div>
-                                            </form>
-                                        </div>
-                                    </div>
                                 </div>
                             </td>
                         </tr>
@@ -187,19 +164,66 @@
     </div>
 </div>
 
+@foreach($users as $u)
+<!-- Edit Modal -->
+<div class="modal fade" id="editUserModal{{ $u->id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ route('users.update', $u->id) }}" method="POST">
+                @csrf
+                @method('PUT')
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark"><i class="fa-solid fa-user-pen text-success me-2"></i>Edit Pengguna: {{ $u->name }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Nama Lengkap</label>
+                        <input type="text" name="name" class="form-control" value="{{ $u->name }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Username</label>
+                        <input type="text" name="username" class="form-control" value="{{ $u->username }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ $u->email }}" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small">Peran (Role)</label>
+                        <select name="role" class="form-select" required>
+                            <option value="kasir" {{ $u->role === 'kasir' ? 'selected' : '' }}>Kasir POS</option>
+                            <option value="admin" {{ $u->role === 'admin' ? 'selected' : '' }}>Administrator</option>
+                        </select>
+                    </div>
+                    <div class="mb-0">
+                        <label class="form-label fw-semibold small">Kata Sandi Baru (Kosongkan jika tidak diubah)</label>
+                        <input type="password" name="password" class="form-control" placeholder="Minimal 6 karakter...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary-green">Simpan Perubahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
+
 <!-- Modal Tambah Pengguna -->
 <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content rounded-4 border-0 shadow">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
             <form action="{{ route('users.store') }}" method="POST">
                 @csrf
-                <div class="modal-header bg-light">
+                <div class="modal-header">
                     <h5 class="modal-title fw-bold text-dark">
                         <i class="fa-solid fa-user-plus text-success me-2"></i> Tambah Pengguna Baru
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Nama Lengkap</label>
                         <input type="text" name="name" class="form-control" placeholder="Contoh: Siti Rahma" required>
@@ -210,7 +234,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Email</label>
-                        <input type="email" name="email" class="form-control" placeholder="Contoh: siti@teraskota.local" required>
+                        <input type="email" name="email" class="form-control" placeholder="Contoh: siti@tokoanda.id" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold small">Peran (Role)</label>
@@ -219,13 +243,13 @@
                             <option value="admin">Administrator (Akses penuh sistem)</option>
                         </select>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-0">
                         <label class="form-label fw-semibold small">Kata Sandi</label>
                         <input type="password" name="password" class="form-control" placeholder="Minimal 6 karakter..." required>
                     </div>
                 </div>
-                <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
                     <button type="submit" class="btn btn-primary-green">Tambah Pengguna</button>
                 </div>
             </form>

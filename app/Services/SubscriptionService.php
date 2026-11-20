@@ -85,46 +85,7 @@ class SubscriptionService
 
             if ($seedSampleData) {
                 TenantContext::runForTenant($tenant, function () use ($tenant) {
-                    $catMinuman = Category::create([
-                        'tenant_id' => $tenant->id,
-                        'name' => 'Minuman',
-                        'slug' => 'minuman',
-                        'status' => true,
-                    ]);
-                    $catMakanan = Category::create([
-                        'tenant_id' => $tenant->id,
-                        'name' => 'Makanan & Snack',
-                        'slug' => 'makanan-snack',
-                        'status' => true,
-                    ]);
-
-                    Menu::create([
-                        'tenant_id' => $tenant->id,
-                        'category_id' => $catMinuman->id,
-                        'code' => 'MNM-001',
-                        'name' => 'Es Teh Manis',
-                        'price' => 5000,
-                        'use_global_profit' => true,
-                        'status' => true,
-                    ]);
-                    Menu::create([
-                        'tenant_id' => $tenant->id,
-                        'category_id' => $catMinuman->id,
-                        'code' => 'MNM-002',
-                        'name' => 'Es Kopi Susu',
-                        'price' => 15000,
-                        'use_global_profit' => true,
-                        'status' => true,
-                    ]);
-                    Menu::create([
-                        'tenant_id' => $tenant->id,
-                        'category_id' => $catMakanan->id,
-                        'code' => 'MKN-001',
-                        'name' => 'Kentang Goreng',
-                        'price' => 12000,
-                        'use_global_profit' => true,
-                        'status' => true,
-                    ]);
+                    $this->seedSampleCatalogForBusinessType($tenant);
                 });
             }
 
@@ -134,6 +95,86 @@ class SubscriptionService
                 'subscription' => $subscription,
             ];
         });
+    }
+
+    /**
+     * Seed smart sample categories & menus tailored to the tenant's business_type.
+     */
+    protected function seedSampleCatalogForBusinessType(Tenant $tenant): void
+    {
+        $type = Str::lower((string) $tenant->business_type);
+
+        if (str_contains($type, 'bakery') || str_contains($type, 'roti') || str_contains($type, 'kue')) {
+            $preset = [
+                'Minuman Pendamping' => [
+                    ['code' => 'MNM-001', 'name' => 'Kopi Susu Bakery', 'price' => 15000],
+                ],
+                'Roti & Pastry' => [
+                    ['code' => 'BKR-001', 'name' => 'Roti Bakar Cokelat Keju', 'price' => 15000],
+                    ['code' => 'BKR-002', 'name' => 'Croissant Butter', 'price' => 18000],
+                ],
+                'Kue & Dessert' => [
+                    ['code' => 'BKR-003', 'name' => 'Donat Kampung Gula', 'price' => 8000],
+                ],
+            ];
+        } elseif (str_contains($type, 'kelontong') || str_contains($type, 'retail') || str_contains($type, 'minimarket') || str_contains($type, 'sembako')) {
+            $preset = [
+                'Minuman Kemasan' => [
+                    ['code' => 'MNM-001', 'name' => 'Air Mineral 600ml', 'price' => 4000],
+                ],
+                'Sembako & Kebutuhan' => [
+                    ['code' => 'RTL-001', 'name' => 'Mie Instan Goreng', 'price' => 3500],
+                    ['code' => 'RTL-002', 'name' => 'Kopi Sachet Renteng', 'price' => 15000],
+                    ['code' => 'RTL-003', 'name' => 'Sabun Mandi Batang', 'price' => 5000],
+                ],
+            ];
+        } elseif (str_contains($type, 'warung') || str_contains($type, 'makan') || str_contains($type, 'resto') || str_contains($type, 'kuliner')) {
+            $preset = [
+                'Minuman' => [
+                    ['code' => 'MNM-001', 'name' => 'Es Teh Manis', 'price' => 5000],
+                ],
+                'Makanan Utama' => [
+                    ['code' => 'MKN-001', 'name' => 'Nasi Goreng Spesial', 'price' => 18000],
+                    ['code' => 'MKN-002', 'name' => 'Ayam Bakar Madu + Nasi', 'price' => 22000],
+                ],
+                'Lauk & Camilan' => [
+                    ['code' => 'MKN-003', 'name' => 'Tempe Mendoan Hangat', 'price' => 10000],
+                ],
+            ];
+        } else {
+            // Default: Kedai Minuman / Kopi / F&B
+            $preset = [
+                'Kopi & Minuman' => [
+                    ['code' => 'MNM-001', 'name' => 'Es Kopi Susu Gula Aren', 'price' => 15000],
+                    ['code' => 'MNM-002', 'name' => 'Es Teh Manis Segar', 'price' => 5000],
+                    ['code' => 'MNM-003', 'name' => 'Matcha Latte Creamy', 'price' => 18000],
+                ],
+                'Makanan & Snack' => [
+                    ['code' => 'MKN-001', 'name' => 'Kentang Goreng Crispy', 'price' => 12000],
+                ],
+            ];
+        }
+
+        foreach ($preset as $categoryName => $menus) {
+            $cat = Category::create([
+                'tenant_id' => $tenant->id,
+                'name' => $categoryName,
+                'slug' => Str::slug($categoryName),
+                'status' => true,
+            ]);
+
+            foreach ($menus as $item) {
+                Menu::create([
+                    'tenant_id' => $tenant->id,
+                    'category_id' => $cat->id,
+                    'code' => $item['code'],
+                    'name' => $item['name'],
+                    'price' => $item['price'],
+                    'use_global_profit' => true,
+                    'status' => true,
+                ]);
+            }
+        }
     }
 
     /**

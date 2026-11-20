@@ -183,7 +183,149 @@
     document.addEventListener('pointerdown', createRipple, { passive: true });
 
     // =========================================================================
-    // 4. NAVIGATION TRANSITIONS & FORM SUBMIT FEEDBACK
+    // 4. UNIFIED MODAL PORTAL & GLOBAL SWEETALERT2 CONFIRMATION DIALOGS
+    // =========================================================================
+    function portalModalsToBody() {
+        document.querySelectorAll('.modal').forEach((modal) => {
+            if (modal.parentElement && modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
+    }
+
+    document.addEventListener('show.bs.modal', function (e) {
+        const modal = e.target;
+        if (modal && modal.classList && modal.classList.contains('modal') && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+    });
+
+    function convertInlineConfirmForms() {
+        document.querySelectorAll('form[onsubmit]').forEach((form) => {
+            const rawAttr = form.getAttribute('onsubmit') || '';
+            const match = rawAttr.match(/return\s+confirm\(\s*(['"`])([\s\S]*?)\1\s*\)\s*;?/i);
+            if (match && match[2]) {
+                form.setAttribute('data-confirm', match[2]);
+                form.removeAttribute('onsubmit');
+                form.onsubmit = null;
+            }
+        });
+    }
+
+    window.KLConfirm = async function (options = {}) {
+        const title = options.title || 'Konfirmasi Tindakan';
+        const text = options.text || 'Apakah Anda yakin ingin melanjutkan tindakan ini?';
+        const icon = options.icon || (options.isDanger ? 'warning' : 'question');
+        const confirmText = options.confirmText || (options.isDanger ? 'Ya, Lanjutkan' : 'Ya, Simpan');
+        const cancelText = options.cancelText || 'Batal';
+        const confirmColor = options.confirmColor || (options.isDanger ? '#dc2626' : '#14532d');
+
+        if (typeof Swal === 'undefined') {
+            return window.confirm(text);
+        }
+
+        const result = await Swal.fire({
+            title: title,
+            text: text,
+            icon: icon,
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonColor: confirmColor,
+            cancelButtonColor: '#64748b',
+            confirmButtonText: confirmText,
+            cancelButtonText: cancelText,
+            focusCancel: !!options.isDanger
+        });
+
+        return !!result.isConfirmed;
+    };
+
+    window.KLWhatsAppReceipt = async function (txData) {
+        if (!txData) return;
+
+        const storeInfo = window.POS_TENANT_INFO || window.KL_STORE_INFO || {};
+        const storeName = txData.store_name || storeInfo.name || 'KasirLoka';
+        const storeAddress = txData.store_address || storeInfo.address || '';
+        const storeFooter = txData.store_footer || storeInfo.footer || 'Terima kasih atas kunjungan Anda!';
+
+        let phone = '';
+        if (typeof Swal !== 'undefined') {
+            const { value: inputPhone, isConfirmed } = await Swal.fire({
+                title: 'Kirim Struk Digital WhatsApp',
+                html: `<div class="text-start small text-muted mb-1">Masukkan nomor WhatsApp pelanggan untuk nota <strong>${txData.transaction_number || '-'}</strong>:</div>`,
+                input: 'tel',
+                inputPlaceholder: 'Contoh: 081234567890',
+                inputValue: txData.customer_phone || '',
+                showCancelButton: true,
+                reverseButtons: true,
+                confirmButtonColor: '#16a34a',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: '<i class="fa-brands fa-whatsapp me-1"></i> Kirim Struk',
+                cancelButtonText: 'Batal',
+                inputValidator: (value) => {
+                    const cleaned = String(value || '').replace(/[^0-9]/g, '');
+                    if (!cleaned || cleaned.length < 9) {
+                        return 'Masukkan nomor WhatsApp yang valid (minimal 9 digit).';
+                    }
+                    return null;
+                }
+            });
+            if (!isConfirmed || !inputPhone) return;
+            phone = String(inputPhone).replace(/[^0-9]/g, '');
+        } else {
+            const raw = window.prompt('Masukkan nomor WhatsApp pelanggan (cth: 081234567890):', '');
+            if (!raw) return;
+            phone = String(raw).replace(/[^0-9]/g, '');
+        }
+
+        if (phone.startsWith('0')) {
+            phone = '62' + phone.substring(1);
+        } else if (phone.startsWith('8')) {
+            phone = '62' + phone;
+        }
+
+        const fmtRp = (n) => 'Rp' + new Intl.NumberFormat('id-ID').format(Math.round(Number(n) || 0));
+        const items = Array.isArray(txData.details) ? txData.details : (Array.isArray(txData.items) ? txData.items : []);
+
+        const lines = [];
+        lines.push(`*${String(storeName).toUpperCase()}*`);
+        if (storeAddress) lines.push(storeAddress);
+        lines.push('--------------------------------');
+        lines.push(`No. Nota : ${txData.transaction_number || '-'}`);
+        lines.push(`Tanggal  : ${txData.transaction_date || '-'} ${String(txData.transaction_time || '').substring(0, 5)}`);
+        if (txData.customer_name) {
+            lines.push(`Pelanggan: ${txData.customer_name}`);
+        }
+        lines.push('--------------------------------');
+
+        items.forEach((item) => {
+            const name = item.menu_name_snapshot || item.name || 'Item';
+            const qty = Number(item.quantity || item.qty || 1);
+            const price = Number(item.price_snapshot || item.price || 0);
+            const sub = Number(item.subtotal || (qty * price));
+            lines.push(`${name}`);
+            lines.push(`${qty} x ${fmtRp(price)} = *${fmtRp(sub)}*`);
+        });
+
+        lines.push('--------------------------------');
+        if (Number(txData.discount_amount || 0) > 0) {
+            lines.push(`Diskon   : -${fmtRp(txData.discount_amount)}`);
+        }
+        lines.push(`*TOTAL   : ${fmtRp(txData.total_sales)}*`);
+        lines.push(`Metode   : ${String(txData.payment_method || 'TUNAI').toUpperCase()} (LUNAS)`);
+        if (String(txData.payment_method || '').toLowerCase() === 'tunai' && Number(txData.cash_tendered || 0) > 0) {
+            lines.push(`Tunai    : ${fmtRp(txData.cash_tendered)}`);
+            lines.push(`Kembali  : ${fmtRp(txData.change_returned || 0)}`);
+        }
+        lines.push('--------------------------------');
+        lines.push(storeFooter);
+
+        const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(lines.join('\n'))}`;
+        window.open(waUrl, '_blank', 'noopener,noreferrer');
+    };
+
+    // =========================================================================
+    // 5. NAVIGATION TRANSITIONS & FORM SUBMIT FEEDBACK
     // =========================================================================
     function isInternalNavigableLink(anchor, event) {
         if (!anchor || !anchor.href) return false;
@@ -230,10 +372,43 @@
         }
     });
 
-    // Form submission loading progress & button state
+    // Form submission confirmation interceptor + loading progress & button state
     document.addEventListener('submit', function (e) {
         const form = e.target;
         if (!form || e.defaultPrevented) return;
+
+        // Check for inline or data-confirm attribute
+        convertInlineConfirmForms();
+        const confirmMsg = form.getAttribute('data-confirm');
+        if (confirmMsg && form.dataset.klConfirmed !== '1') {
+            e.preventDefault();
+            e.stopPropagation();
+
+            const submitter = e.submitter || form.querySelector('button[type="submit"], input[type="submit"]');
+            const methodInput = form.querySelector('input[name="_method"]');
+            const isDelete = (methodInput && String(methodInput.value).toUpperCase() === 'DELETE')
+                || /hapus|batal|suspend|reset|keluar/i.test(confirmMsg);
+
+            window.KLConfirm({
+                title: isDelete ? 'Konfirmasi Tindakan' : 'Konfirmasi Perubahan',
+                text: confirmMsg,
+                isDanger: isDelete,
+                confirmText: isDelete ? 'Ya, Lanjutkan' : 'Ya, Lanjutkan'
+            }).then((confirmed) => {
+                if (confirmed) {
+                    form.dataset.klConfirmed = '1';
+                    if (typeof form.requestSubmit === 'function') {
+                        form.requestSubmit(submitter || undefined);
+                    } else {
+                        form.submit();
+                    }
+                }
+            });
+            return;
+        }
+
+        delete form.dataset.klConfirmed;
+
         if (form.getAttribute('target') === '_blank') return;
 
         TKProgress.start();
@@ -258,14 +433,20 @@
     });
 
     // =========================================================================
-    // 5. STAGGERED ENTRANCE & MENU OPENING ANIMATIONS
+    // 6. STAGGERED ENTRANCE & MENU OPENING ANIMATIONS
     // =========================================================================
     function applyStaggeredAnimations() {
-        // Stagger Dashboard & Page Cards
+        portalModalsToBody();
+        convertInlineConfirmForms();
+
+        // Stagger Dashboard & Page Cards, then remove animation class on end so no transform containing block persists
         const cards = document.querySelectorAll('.premium-card, .card:not(.pos-product-card)');
         cards.forEach((card, index) => {
             card.style.setProperty('--tk-stagger', Math.min(index, 10));
             card.classList.add('tk-stagger-item');
+            card.addEventListener('animationend', function () {
+                card.classList.remove('tk-stagger-item');
+            }, { once: true });
         });
 
         // Stagger Table Rows (capped at first 15 rows for 60fps smoothness)
@@ -274,6 +455,9 @@
             if (index < 15) {
                 row.style.setProperty('--tk-stagger', index);
                 row.classList.add('tk-stagger-row');
+                row.addEventListener('animationend', function () {
+                    row.classList.remove('tk-stagger-row');
+                }, { once: true });
             }
         });
 

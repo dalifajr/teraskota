@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('title', 'Laporan Penjualan')
-@section('page_title', 'Laporan Penjualan Teras Kota Berlian Makmur')
+@section('page_title', 'Laporan Penjualan')
 
 @section('breadcrumbs')
     <li class="breadcrumb-item active" aria-current="page">Laporan Penjualan</li>
@@ -87,9 +87,9 @@
     <div class="col-md-4 col-lg-2.4 col-sm-6">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
-                <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Gelas Terjual</small>
+                <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Item Terjual</small>
                 <h3 class="fw-bold text-success m-0">{{ number_format($total_quantity, 0, ',', '.') }} pcs</h3>
-                <small class="text-muted">Volume penjualan minuman</small>
+                <small class="text-muted">Volume produk terjual</small>
             </div>
         </div>
     </div>

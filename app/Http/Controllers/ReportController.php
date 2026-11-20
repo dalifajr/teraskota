@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Expense;
 use App\Models\Menu;
+use App\Models\PlatformSetting;
 use App\Models\Transaction;
 use App\Models\TransactionDetail;
+use App\Support\TenantContext;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -94,7 +96,8 @@ class ReportController extends Controller
             // Excel UTF-8 BOM
             fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
 
-            fputcsv($file, ['LAPORAN PENJUALAN TERAS KOTA BERLIAN MAKMUR']);
+            $storeTitle = strtoupper(TenantContext::current()?->name ?? PlatformSetting::platformName());
+            fputcsv($file, ['LAPORAN PENJUALAN ' . $storeTitle]);
             fputcsv($file, ['Periode', $data['date_range_label']]);
             fputcsv($file, ['Tanggal Cetak', now()->translatedFormat('d F Y H:i')]);
             fputcsv($file, ['Nama Admin', $data['admin_name']]);

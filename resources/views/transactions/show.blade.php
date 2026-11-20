@@ -69,10 +69,42 @@
                 
                 <hr>
 
+                @php
+                    $txWaPayload = [
+                        'transaction_number' => $transaction->transaction_number,
+                        'transaction_date' => $transaction->transaction_date->format('d/m/Y'),
+                        'transaction_time' => date('H:i', strtotime($transaction->transaction_time)),
+                        'customer_name' => $transaction->customer_name,
+                        'payment_method' => $transaction->payment_method ?? 'tunai',
+                        'discount_amount' => (float) ($transaction->discount_amount ?? 0),
+                        'total_sales' => (float) $transaction->total_sales,
+                        'cash_tendered' => (float) ($transaction->cash_tendered ?? 0),
+                        'change_returned' => (float) ($transaction->change_returned ?? 0),
+                        'details' => $transaction->details->map(fn($d) => [
+                            'menu_name_snapshot' => $d->menu_name_snapshot,
+                            'quantity' => $d->quantity,
+                            'price_snapshot' => (float) $d->price_snapshot,
+                            'subtotal' => (float) $d->subtotal,
+                        ])->values(),
+                    ];
+                @endphp
                 <div class="d-flex flex-column gap-2 mt-4">
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="btn btn-dark w-100">
+                                <i class="fa-solid fa-print me-1"></i> Cetak Struk
+                            </a>
+                        </div>
+                        <div class="col-6">
+                            <button type="button" class="btn btn-success w-100 fw-semibold" onclick='window.KLWhatsAppReceipt(@json($txWaPayload))'>
+                                <i class="fa-brands fa-whatsapp me-1"></i> Kirim WA
+                            </button>
+                        </div>
+                    </div>
+
                     <a href="{{ route('transactions.edit', $transaction->id) }}" class="btn btn-primary-green w-100"><i class="fa-solid fa-edit me-1"></i> Edit Transaksi</a>
                     
-                    <form action="{{ route('transactions.destroy', $transaction->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi ini? Transaksi akan dipindahkan ke folder sampah (soft delete).')">
+                    <form action="{{ route('transactions.destroy', $transaction->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus transaksi {{ $transaction->transaction_number }}? Transaksi akan dipindahkan ke folder sampah (soft delete).">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn btn-outline-danger w-100"><i class="fa-solid fa-trash me-1"></i> Hapus Transaksi</button>

@@ -289,7 +289,7 @@
                                 <i class="fa-brands fa-android text-success me-2"></i> Konfigurasi Aplikasi Android Listener
                             </h5>
                             <p class="text-muted small">
-                                Gunakan aplikasi pendamping Android yang ada di direktori <code>android_listener/</code>. Aplikasi ini bertindak sebagai jembatan yang membaca notifikasi uang masuk dari bank/dompet digital Anda secara lokal dan otomatis meneruskannya ke website Teras Kota.
+                                Gunakan aplikasi pendamping Android yang ada di direktori <code>android_listener/</code>. Aplikasi ini bertindak sebagai jembatan yang membaca notifikasi uang masuk dari bank/dompet digital Anda secara lokal dan otomatis meneruskannya ke sistem kasir <strong>{{ $currentTenant?->name ?? ($platformName ?? 'KasirLoka') }}</strong>.
                             </p>
 
                             <!-- Endpoint URL Card -->
@@ -781,7 +781,7 @@
             payloadTextarea.value = cleanPayload;
 
             // Extract merchant name preview (Tag 59)
-            let merchantName = 'Teras Kota';
+            let merchantName = @json($currentTenant?->name ?? ($platformName ?? 'KasirLoka'));
             const mMatch = cleanPayload.match(/59([0-9]{2})([A-Za-z0-9\s\.\,\-\*]+)/);
             if (mMatch) {
                 const len = parseInt(mMatch[1], 10);

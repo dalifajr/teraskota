@@ -217,7 +217,8 @@ class SystemUpdateController extends Controller
         }
 
         $log = [];
-        $log[] = '=== MEMULAI PROSES PEMBARUAN SISTEM TERAS KOTA ===';
+        $platformTitle = strtoupper(\App\Models\PlatformSetting::platformName());
+        $log[] = "=== MEMULAI PROSES PEMBARUAN SISTEM {$platformTitle} ===";
         $log[] = 'Waktu: ' . Carbon::now()->toDateTimeString();
 
         try {

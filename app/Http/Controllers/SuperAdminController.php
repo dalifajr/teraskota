@@ -100,6 +100,44 @@ class SuperAdminController extends Controller
             });
         }
 
+        if ($request->filled('status')) {
+            $status = $request->status;
+            $now = Carbon::now();
+            if ($status === 'active') {
+                $query->where('is_active', true)->where(function ($q) use ($now) {
+                    $q->where('is_lifetime', true)
+                      ->orWhereHas('activeSubscription', function ($sq) use ($now) {
+                          $sq->where('status', 'active')
+                             ->where(function ($eq) use ($now) {
+                                 $eq->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+                             });
+                      });
+                });
+            } elseif ($status === 'trial') {
+                $query->where('is_active', true)
+                      ->where('is_lifetime', false)
+                      ->whereHas('activeSubscription', function ($sq) use ($now) {
+                          $sq->where('status', 'trial')
+                             ->where(function ($eq) use ($now) {
+                                 $eq->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
+                             });
+                      });
+            } elseif ($status === 'expired') {
+                $query->where(function ($q) use ($now) {
+                    $q->where('is_active', false)
+                      ->orWhere(function ($eq) use ($now) {
+                          $eq->where('is_lifetime', false)
+                             ->where(function ($subQ) use ($now) {
+                                 $subQ->whereDoesntHave('activeSubscription')
+                                      ->orWhereHas('activeSubscription', function ($sq) use ($now) {
+                                          $sq->whereNotNull('ends_at')->where('ends_at', '<', $now);
+                                      });
+                             });
+                      });
+                });
+            }
+        }
+
         $tenants = $query->latest()->paginate(15)->withQueryString();
         $plans = Plan::orderBy('sort_order')->get();
 

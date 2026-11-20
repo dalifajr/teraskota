@@ -1054,13 +1054,18 @@
             <div class="modal-body p-3 text-center" id="receiptModalBody" style="max-height: 75vh; overflow-y: auto;">
                 <!-- Receipt content injected dynamically -->
             </div>
-            <div class="modal-footer bg-light border-0 p-3 d-flex justify-content-between">
-                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" onclick="resetPosForNewTransaction()">
+            <div class="modal-footer bg-light border-0 p-3 d-flex flex-wrap justify-content-between gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" onclick="resetPosForNewTransaction()">
                     ➕ Transaksi Baru
                 </button>
-                <button type="button" class="btn btn-primary-green" id="btnPrintReceiptBtn">
-                    <i class="fa-solid fa-print me-1"></i> Cetak Struk
-                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-success btn-sm fw-bold" id="btnWhatsappReceiptBtn" title="Kirim Struk Digital ke WhatsApp Pelanggan">
+                        <i class="fa-brands fa-whatsapp me-1"></i> Kirim WA
+                    </button>
+                    <button type="button" class="btn btn-primary-green btn-sm" id="btnPrintReceiptBtn">
+                        <i class="fa-solid fa-print me-1"></i> Cetak Struk
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -2281,6 +2286,13 @@
         const receiptCard = document.getElementById('printableReceipt') || document.querySelector('#receiptModalBody .receipt-card');
         if (receiptCard) {
             window.print();
+        }
+    });
+
+    // Send Digital Receipt via WhatsApp (wa.me, Rp0 Cost)
+    document.getElementById('btnWhatsappReceiptBtn')?.addEventListener('click', function() {
+        if (window.currentReceiptTransaction && typeof window.KLWhatsAppReceipt === 'function') {
+            window.KLWhatsAppReceipt(window.currentReceiptTransaction);
         }
     });
 
