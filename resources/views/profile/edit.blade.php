@@ -1,10 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Profil Admin')
-@section('page_title', 'Profil Admin')
+@php
+    $roleTitle = $user->isSuperAdmin() ? 'Profil Super Admin' : ($user->isKasir() ? 'Profil Kasir' : 'Profil Akun Usaha');
+@endphp
+@section('title', $roleTitle)
+@section('page_title', $roleTitle)
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item active" aria-current="page">Profil Admin</li>
+    <li class="breadcrumb-item active" aria-current="page">{{ $roleTitle }}</li>
 @endsection
 
 @section('content')
@@ -12,7 +15,7 @@
     <div class="col-lg-8">
         <div class="card premium-card">
             <div class="premium-header">
-                <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-user-gear text-success me-2"></i> Pengaturan Akun Admin</h5>
+                <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-user-gear text-success me-2"></i> Pengaturan {{ $roleTitle }}</h5>
             </div>
             <div class="card-body p-4">
                 

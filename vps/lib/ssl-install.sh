@@ -148,7 +148,9 @@ validate_cloudflare_cert_pair() {
     return 0
 }
 
-# Write Nginx vhost configured with Cloudflare Origin SSL (443 + HTTP->HTTPS redirect)
+# Write Nginx vhost configured with Cloudflare Origin SSL
+# Serves BOTH port 80 and port 443 in a single server block (no forced 80->443 redirect)
+# so it works seamlessly under Cloudflare Flexible, Full, AND Full (Strict) without redirect loops.
 write_nginx_cloudflare_vhost() {
     local domain="$1"
     local php_ver="$2"
@@ -157,16 +159,10 @@ write_nginx_cloudflare_vhost() {
     local vhost="/etc/nginx/sites-available/teraskota"
 
     cat > "$vhost" <<EOFNGINX
-# KasirLoka / Teras Kota — Nginx Virtual Host (Cloudflare Origin SSL — Full Strict)
+# KasirLoka / Teras Kota — Nginx Virtual Host (Cloudflare Compatible: Flexible / Full / Full Strict)
 server {
     listen 80;
     listen [::]:80;
-    server_name ${domain};
-
-    return 301 https://\$host\$request_uri;
-}
-
-server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
 

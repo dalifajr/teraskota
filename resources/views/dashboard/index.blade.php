@@ -16,7 +16,7 @@
                 <span class="badge badge-wib rounded-pill d-none d-sm-inline-block">Zona Waktu: WIB (UTC+7)</span>
             </div>
             <p class="text-muted small m-0">
-                Data performa penjualan, arus kas tunai/QRIS, dan laba bersih Teras Kota Berlian Makmur.
+                Data performa penjualan, arus kas tunai/QRIS, dan laba bersih {{ $currentTenant?->name ?? ($platformName ?? 'KasirLoka') }}.
             </p>
         </div>
 

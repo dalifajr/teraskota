@@ -38,9 +38,17 @@ Route::post('/listener/{tenantSlug}/payment', [PaymentListenerController::class,
 Route::post('/listener/{tenantSlug}/test-connection', [PaymentListenerController::class, 'testConnection'])->name('listener.tenant.test');
 
 // =========================================================================
-// 2. EMERGENCY / SHARED HOSTING WEB MIGRATION TRIGGER
+// 2. EMERGENCY / SHARED HOSTING WEB MIGRATION TRIGGER (Super Admin / Secret Protected)
 // =========================================================================
-Route::get('/auto-migrate', function () {
+Route::get('/auto-migrate', function (\Illuminate\Http\Request $request) {
+    $secret = env('MIGRATE_SECRET');
+    $hasValidSecret = !empty($secret) && hash_equals((string) $secret, (string) $request->query('key', ''));
+    $isSuperAdmin = \Illuminate\Support\Facades\Auth::check() && \Illuminate\Support\Facades\Auth::user()->isSuperAdmin();
+
+    if (!$isSuperAdmin && !$hasValidSecret) {
+        abort(403, 'Akses ditolak. Fitur migrasi sistem hanya dapat dijalankan oleh Super Admin.');
+    }
+
     try {
         \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
         $output = \Illuminate\Support\Facades\Artisan::output();
@@ -108,7 +116,9 @@ Route::middleware('auth')->group(function () {
         ->group(function () {
             Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
             Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
+            Route::post('/tenants', [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
             Route::post('/tenants/{tenant}/subscription', [SuperAdminController::class, 'updateTenantSubscription'])->name('tenants.subscription');
+            Route::post('/tenants/{tenant}/reset-password', [SuperAdminController::class, 'resetOwnerPassword'])->name('tenants.reset-password');
             Route::post('/tenants/{tenant}/toggle', [SuperAdminController::class, 'toggleTenantStatus'])->name('tenants.toggle');
             Route::post('/tenants/{tenant}/impersonate', [SuperAdminController::class, 'impersonateTenant'])->name('tenants.impersonate');
 
@@ -188,13 +198,6 @@ Route::middleware('auth')->group(function () {
                 Route::post('/settings/qris/regenerate-secret', [QrisSettingController::class, 'regenerateSecret'])->name('settings.qris.regenerate-secret');
                 Route::post('/settings/qris/custom-secret', [QrisSettingController::class, 'updateCustomSecret'])->name('settings.qris.custom-secret');
             });
-
-            // Legacy System Update routes kept for founding tenant / superadmin compatibility
-            Route::get('/settings/update', [SystemUpdateController::class, 'index'])->name('settings.update.index');
-            Route::post('/settings/update/check', [SystemUpdateController::class, 'check'])->name('settings.update.check');
-            Route::post('/settings/update/execute', [SystemUpdateController::class, 'execute'])->name('settings.update.execute');
-            Route::post('/settings/update/migrate', [SystemUpdateController::class, 'migrateDb'])->name('settings.update.migrate');
-            Route::post('/settings/update/clear-cache', [SystemUpdateController::class, 'clearCache'])->name('settings.update.clear-cache');
         });
     });
 });

@@ -421,4 +421,66 @@ class SaasMultiTenantTest extends TestCase
             ->assertSee('Jl. Sudirman Kav 99, Bandung')
             ->assertSee('Sampai jumpa di seduhan berikutnya!');
     }
+
+    public function test_role_menu_segregation_and_super_admin_tenant_management(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $tenantAdmin = User::where('username', 'admin')->firstOrFail();
+        $cashier = User::where('username', 'kasir')->firstOrFail();
+        $proPlan = Plan::where('slug', 'pro')->firstOrFail();
+
+        // 1. Super Admin sees PLATFORM HQ menu & Super Admin mobile nav, NOT Tenant POS/Menu links
+        $saPage = $this->actingAs($superAdmin)->get('/superadmin');
+        $saPage->assertStatus(200)
+            ->assertSee('PLATFORM HQ')
+            ->assertSee('Pusat Kontrol SaaS')
+            ->assertSee('Update Sistem')
+            ->assertDontSee('Buka Kasir POS')
+            ->assertDontSee('Data Menu');
+
+        // 2. Tenant Admin sees store operational menus, NOT Super Admin PLATFORM HQ or Update Sistem
+        $taPage = $this->actingAs($tenantAdmin)->get('/dashboard');
+        $taPage->assertStatus(200)
+            ->assertSee('Buka Kasir POS')
+            ->assertSee('Langganan &amp; Paket', false)
+            ->assertSee('Profil Usaha &amp; Struk', false)
+            ->assertDontSee('PLATFORM HQ')
+            ->assertDontSee('Update Sistem');
+
+        // 3. Cashier opening /profile sees clean cashier profile without Admin sidebar menus
+        $kasirProfile = $this->actingAs($cashier)->get('/profile');
+        $kasirProfile->assertStatus(200)
+            ->assertSee('Profil Kasir')
+            ->assertSee('Kembali ke Kasir POS')
+            ->assertDontSee('Kelola Pengguna')
+            ->assertDontSee('PLATFORM HQ');
+
+        // 4. Guest or Tenant Admin cannot trigger /auto-migrate without Super Admin auth
+        $this->get('/auto-migrate')->assertStatus(403);
+        $this->actingAs($tenantAdmin)->get('/auto-migrate')->assertStatus(403);
+
+        // 5. Super Admin can manually create a new tenant & reset owner password
+        $this->actingAs($superAdmin)->post('/superadmin/tenants', [
+            'store_name' => 'Bakso Malang Juara',
+            'business_type' => 'Warung Makan',
+            'owner_name' => 'Pak Hendra',
+            'username' => 'baksomalang',
+            'email' => 'hendra@bakso.id',
+            'password' => 'awal123',
+            'plan_id' => $proPlan->id,
+            'billing_cycle' => 'monthly',
+            'seed_sample' => '1',
+        ])->assertRedirect();
+
+        $newTenant = Tenant::where('name', 'Bakso Malang Juara')->first();
+        $this->assertNotNull($newTenant);
+        $this->assertEquals('active', $newTenant->subscriptionState());
+
+        $this->actingAs($superAdmin)->post('/superadmin/tenants/' . $newTenant->id . '/reset-password', [
+            'new_password' => 'barubanget99',
+        ])->assertRedirect();
+
+        $owner = User::where('username', 'baksomalang')->firstOrFail();
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('barubanget99', $owner->password));
+    }
 }

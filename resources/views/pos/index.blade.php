@@ -989,7 +989,7 @@
                 <!-- Merchant info badge -->
                 <div class="mb-2">
                     <span class="badge bg-light text-success border px-3 py-2 rounded-pill fw-bold" id="qrisMerchantBadge">
-                        <i class="fa-solid fa-store me-1"></i> <span id="qrisMerchantName">Teras Kota</span>
+                        <i class="fa-solid fa-store me-1"></i> <span id="qrisMerchantName">{{ $currentTenant?->name ?? ($platformName ?? 'KasirLoka') }}</span>
                     </span>
                 </div>
 
@@ -1727,7 +1727,7 @@
             currentQrisData = data;
 
             // Fill UI Fields
-            document.getElementById('qrisMerchantName').innerText = data.merchant_name || 'Teras Kota';
+            document.getElementById('qrisMerchantName').innerText = data.merchant_name || (window.POS_TENANT_INFO?.name || 'KasirLoka');
             document.getElementById('qrisFinalAmountDisplay').innerText = formatRupiah(data.final_amount);
             document.getElementById('qrisBaseAmountDisplay').innerText = formatRupiah(data.base_amount);
             document.getElementById('qrisUniqueCodeDisplay').innerText = data.unique_code;

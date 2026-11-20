@@ -4,7 +4,7 @@
 @section('page_title', 'Pembaruan Sistem (GitHub Sync)')
 
 @section('breadcrumbs')
-    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" class="text-decoration-none text-success">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ route('superadmin.dashboard') }}" class="text-decoration-none text-success">Dashboard SaaS</a></li>
     <li class="breadcrumb-item active" aria-current="page">Pembaruan Sistem</li>
 @endsection
 
@@ -78,16 +78,16 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <!-- Form Migrasi Basis Data -->
-            <form action="{{ route('settings.update.migrate') }}" method="POST" class="d-inline" onsubmit="return confirm('Jalankan migrasi basis data (php artisan migrate)?');">
+            <form action="{{ route('superadmin.update.migrate') }}" method="POST" class="d-inline" onsubmit="return confirm('Jalankan migrasi basis data (php artisan migrate)?');">
                 @csrf
-                <button type="submit" class="btn btn-outline-primary" title="Jalankan migrasi tabel database secara mandiri (Aman untuk InfinityFree/Shared Hosting)">
+                <button type="submit" class="btn btn-outline-primary" title="Jalankan migrasi tabel database secara mandiri">
                     <i class="fa-solid fa-database me-1"></i> Migrasi DB
                 </button>
             </form>
 
             @if($isGitAvailable)
                 <!-- Form Cek Pembaruan -->
-                <form action="{{ route('settings.update.check') }}" method="POST" class="d-inline">
+                <form action="{{ route('superadmin.update.check') }}" method="POST" class="d-inline">
                     @csrf
                     <button type="submit" class="btn btn-outline-success">
                         <i class="fa-solid fa-magnifying-glass me-1"></i> Periksa Pembaruan
@@ -96,7 +96,7 @@
             @endif
 
             <!-- Form Bersihkan Cache -->
-            <form action="{{ route('settings.update.clear-cache') }}" method="POST" class="d-inline">
+            <form action="{{ route('superadmin.update.clear-cache') }}" method="POST" class="d-inline">
                 @csrf
                 <button type="submit" class="btn btn-outline-secondary" title="Bersihkan cache view, route & config">
                     <i class="fa-solid fa-broom me-1"></i> Bersihkan Cache
@@ -170,7 +170,7 @@
                             <pre class="m-0 text-muted" style="font-size: 0.8rem;">{{ $upInfo['commits'] }}</pre>
                         </div>
 
-                        <form action="{{ route('settings.update.execute') }}" method="POST" id="formExecuteUpdate" onsubmit="return confirmUpdate();">
+                        <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteUpdate" onsubmit="return confirmUpdate();">
                             @csrf
                             <button type="submit" class="btn btn-primary-green px-4 py-2 fw-bold" id="btnUpdateNow">
                                 <i class="fa-solid fa-cloud-arrow-down me-2"></i> Perbarui Sistem Sekarang
@@ -188,7 +188,7 @@
                     Sistem pembaruan ini menjalankan pipeline otomatis: mengaktifkan mode pemeliharaan, menarik perubahan dari GitHub, menjalankan migrasi basis data, membersihkan seluruh cache, dan mengaktifkan kembali aplikasi tanpa risiko desinkronisasi.
                 </p>
 
-                <form action="{{ route('settings.update.execute') }}" method="POST" id="formExecuteManual" onsubmit="return confirmUpdate();">
+                <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteManual" onsubmit="return confirmUpdate();">
                     @csrf
                     <button type="submit" class="btn btn-primary-green px-4 py-2" id="btnManualSync">
                         <i class="fa-solid fa-rotate me-2"></i> Jalankan Sinkronisasi GitHub (Pull & Migrate)
@@ -204,13 +204,13 @@
                     Anda dapat menjalankan migrasi database dan membersihkan cache aplikasi sewaktu-waktu secara langsung melalui tombol di bawah tanpa perlu terminal command line.
                 </p>
                 <div class="d-flex justify-content-center gap-2 flex-wrap">
-                    <form action="{{ route('settings.update.migrate') }}" method="POST" class="d-inline">
+                    <form action="{{ route('superadmin.update.migrate') }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn btn-primary px-4 py-2">
                             <i class="fa-solid fa-database me-2"></i> Jalankan Migrasi Database
                         </button>
                     </form>
-                    <form action="{{ route('settings.update.clear-cache') }}" method="POST" class="d-inline">
+                    <form action="{{ route('superadmin.update.clear-cache') }}" method="POST" class="d-inline">
                         @csrf
                         <button type="submit" class="btn btn-outline-secondary px-4 py-2">
                             <i class="fa-solid fa-broom me-2"></i> Bersihkan Seluruh Cache

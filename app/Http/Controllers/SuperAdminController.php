@@ -86,8 +86,10 @@ class SuperAdminController extends Controller
 
     public function tenants(Request $request)
     {
-        $query = Tenant::with(['activeSubscription.plan'])
-            ->withCount(['users', 'menus', 'transactions']);
+        $query = Tenant::with([
+            'activeSubscription.plan',
+            'users' => fn($q) => $q->where('role', 'admin')->orderBy('id'),
+        ])->withCount(['users', 'menus', 'transactions']);
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -102,6 +104,70 @@ class SuperAdminController extends Controller
         $plans = Plan::orderBy('sort_order')->get();
 
         return view('superadmin.tenants', compact('tenants', 'plans'));
+    }
+
+    public function storeTenant(Request $request)
+    {
+        $validated = $request->validate([
+            'store_name' => ['required', 'string', 'max:120'],
+            'business_type' => ['required', 'string', 'max:60'],
+            'owner_name' => ['required', 'string', 'max:120'],
+            'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
+            'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:6'],
+            'plan_id' => ['required', 'exists:plans,id'],
+            'billing_cycle' => ['required', 'in:trial,monthly,yearly,lifetime'],
+            'seed_sample' => ['nullable', 'boolean'],
+        ]);
+
+        $provisioned = $this->subscriptionService->provisionTenant(
+            [
+                'name' => $validated['store_name'],
+                'business_type' => $validated['business_type'],
+            ],
+            [
+                'name' => $validated['owner_name'],
+                'username' => $validated['username'],
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+            ],
+            $request->boolean('seed_sample', true)
+        );
+
+        $plan = Plan::findOrFail($validated['plan_id']);
+        if ($validated['billing_cycle'] !== 'trial' || $plan->slug !== 'trial') {
+            $this->subscriptionService->assignSubscriptionManually(
+                $provisioned['tenant'],
+                $plan,
+                $validated['billing_cycle'],
+                null,
+                'Dibuat manual oleh Super Admin'
+            );
+        }
+
+        return back()->with('success', "Usaha {$provisioned['tenant']->name} (Owner: {$provisioned['user']->username}) berhasil ditambahkan!");
+    }
+
+    public function resetOwnerPassword(Request $request, Tenant $tenant)
+    {
+        $validated = $request->validate([
+            'new_password' => ['required', 'string', 'min:6'],
+        ]);
+
+        $owner = User::where('tenant_id', $tenant->id)
+            ->where('role', 'admin')
+            ->orderBy('id')
+            ->first();
+
+        if (!$owner) {
+            return back()->with('error', "Akun admin/owner untuk usaha {$tenant->name} tidak ditemukan.");
+        }
+
+        $owner->update([
+            'password' => \Illuminate\Support\Facades\Hash::make($validated['new_password']),
+        ]);
+
+        return back()->with('success', "Password pemilik {$tenant->name} ({$owner->username}) berhasil direset!");
     }
 
     public function updateTenantSubscription(Request $request, Tenant $tenant)

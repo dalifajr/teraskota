@@ -488,26 +488,31 @@ class SalesTest extends TestCase
     }
 
     /**
-     * Test System Update page loads gracefully.
+     * Test System Update page loads gracefully for Super Admin (and is blocked for Tenant Admin).
      */
     public function test_system_update_page_loads_gracefully(): void
     {
-        $admin = User::where('username', 'admin')->first();
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $tenantAdmin = User::where('username', 'admin')->firstOrFail();
 
-        $response = $this->actingAs($admin)->get('/settings/update');
+        // Tenant Admin cannot access Super Admin System Update
+        $this->actingAs($tenantAdmin)->get('/superadmin/system-update')->assertRedirect('/dashboard');
+
+        // Super Admin can access System Update
+        $response = $this->actingAs($superAdmin)->get('/superadmin/system-update');
         $response->assertStatus(200);
         $response->assertSee('Sinkronisasi & Pembaruan Sistem', false);
         $response->assertSee('Migrasi DB');
     }
 
     /**
-     * Test Admin can run database migration via web endpoint (safe for shared hosting like InfinityFree).
+     * Test Super Admin can run database migration via web endpoint.
      */
     public function test_admin_can_run_database_migration_via_web(): void
     {
-        $admin = User::where('username', 'admin')->first();
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
 
-        $response = $this->actingAs($admin)->post('/settings/update/migrate');
+        $response = $this->actingAs($superAdmin)->post('/superadmin/system-update/migrate');
         $response->assertRedirect();
         $response->assertSessionHas('success');
     }
