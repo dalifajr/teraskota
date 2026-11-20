@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PaymentListenerLog;
 use App\Models\Plan;
 use App\Models\PlatformSetting;
 use App\Models\SubscriptionInvoice;
@@ -14,6 +15,7 @@ use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SuperAdminController extends Controller
 {
@@ -37,7 +39,21 @@ class SuperAdminController extends Controller
         $totalTenants = $tenants->count();
         $activeTenants = $tenants->filter(fn($t) => in_array($t->subscriptionState(), ['active', 'lifetime'], true))->count();
         $trialTenants = $tenants->filter(fn($t) => $t->subscriptionState() === 'trial')->count();
+        $graceTenants = $tenants->filter(fn($t) => $t->subscriptionState() === 'grace')->count();
         $expiredTenants = $tenants->filter(fn($t) => in_array($t->subscriptionState(), ['expired', 'suspended'], true))->count();
+
+        // Watchlist: tenants expiring in <= 7 days or currently in grace period (prime conversion/retention leads)
+        $expiringSoonTenants = $tenants->filter(function ($t) {
+            $state = $t->subscriptionState();
+            if ($state === 'grace') {
+                return true;
+            }
+            if (in_array($state, ['active', 'trial'], true)) {
+                $days = $t->daysRemaining();
+                return $days !== null && $days <= 7;
+            }
+            return false;
+        })->sortBy(fn($t) => $t->daysRemaining() ?? 999)->take(8)->values();
 
         // Estimate Monthly Recurring Revenue (MRR) from active paid non-lifetime subscriptions
         $mrr = 0.0;
@@ -62,6 +78,24 @@ class SuperAdminController extends Controller
         $pendingInvoicesCount = SubscriptionInvoice::where('status', 'unpaid')->count();
         $totalPlatformTransactions = Transaction::withoutGlobalScope('tenant')->paid()->count();
 
+        // 6-Month SaaS Revenue & New Tenant Acquisition Trend for Chart.js
+        $monthlyTrend = [
+            'labels' => [],
+            'revenues' => [],
+            'new_tenants' => [],
+        ];
+        for ($i = 5; $i >= 0; $i--) {
+            $m = Carbon::now()->startOfMonth()->subMonths($i);
+            $monthlyTrend['labels'][] = $m->translatedFormat('M Y');
+            $monthlyTrend['revenues'][] = (float) SubscriptionInvoice::where('status', 'paid')
+                ->whereYear('paid_at', $m->year)
+                ->whereMonth('paid_at', $m->month)
+                ->sum('base_amount');
+            $monthlyTrend['new_tenants'][] = Tenant::whereYear('created_at', $m->year)
+                ->whereMonth('created_at', $m->month)
+                ->count();
+        }
+
         $recentTenants = $tenants->take(8);
         $pendingInvoices = SubscriptionInvoice::with(['tenant', 'plan'])
             ->where('status', 'unpaid')
@@ -73,7 +107,10 @@ class SuperAdminController extends Controller
             'totalTenants',
             'activeTenants',
             'trialTenants',
+            'graceTenants',
             'expiredTenants',
+            'expiringSoonTenants',
+            'monthlyTrend',
             'mrr',
             'revenueThisMonth',
             'revenueAllTime',
@@ -88,7 +125,8 @@ class SuperAdminController extends Controller
     {
         $query = Tenant::with([
             'activeSubscription.plan',
-            'users' => fn($q) => $q->where('role', 'admin')->orderBy('id'),
+            'users' => fn($q) => $q->orderByRaw("CASE WHEN role = 'admin' THEN 0 ELSE 1 END")->orderBy('id'),
+            'invoices' => fn($q) => $q->with('plan')->latest('id')->limit(5),
         ])->withCount(['users', 'menus', 'transactions']);
 
         if ($request->filled('search')) {
@@ -149,6 +187,8 @@ class SuperAdminController extends Controller
         $validated = $request->validate([
             'store_name' => ['required', 'string', 'max:120'],
             'business_type' => ['required', 'string', 'max:60'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:255'],
             'owner_name' => ['required', 'string', 'max:120'],
             'username' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:users,username'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
@@ -162,6 +202,8 @@ class SuperAdminController extends Controller
             [
                 'name' => $validated['store_name'],
                 'business_type' => $validated['business_type'],
+                'phone' => $validated['phone'] ?? null,
+                'address' => $validated['address'] ?? null,
             ],
             [
                 'name' => $validated['owner_name'],
@@ -184,6 +226,45 @@ class SuperAdminController extends Controller
         }
 
         return back()->with('success', "Usaha {$provisioned['tenant']->name} (Owner: {$provisioned['user']->username}) berhasil ditambahkan!");
+    }
+
+    public function updateTenant(Request $request, Tenant $tenant)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'business_type' => ['required', 'string', 'max:60'],
+            'phone' => ['nullable', 'string', 'max:30'],
+            'address' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $tenant->update($validated);
+
+        return back()->with('success', "Informasi usaha {$tenant->name} berhasil diperbarui!");
+    }
+
+    public function destroyTenant(Tenant $tenant)
+    {
+        if ($tenant->is_active) {
+            return back()->with('error', "Usaha {$tenant->name} masih aktif. Nonaktifkan (Suspend) terlebih dahulu sebelum menghapus permanen.");
+        }
+
+        if ($tenant->is_lifetime) {
+            return back()->with('error', "Usaha VIP Lifetime ({$tenant->name}) dilindungi dari penghapusan permanen.");
+        }
+
+        $hasSuperAdmin = User::where('tenant_id', $tenant->id)->where('role', 'super_admin')->exists();
+        if ($hasSuperAdmin) {
+            return back()->with('error', 'Usaha ini terhubung dengan akun Super Admin dan tidak dapat dihapus.');
+        }
+
+        $tenantName = $tenant->name;
+
+        DB::transaction(function () use ($tenant) {
+            User::where('tenant_id', $tenant->id)->delete();
+            $tenant->forceDelete();
+        });
+
+        return back()->with('success', "Usaha {$tenantName} beserta seluruh datanya berhasil dihapus secara permanen.");
     }
 
     public function resetOwnerPassword(Request $request, Tenant $tenant)
@@ -258,15 +339,88 @@ class SuperAdminController extends Controller
 
     public function invoices(Request $request)
     {
+        $query = $this->buildInvoiceQuery($request);
+        $invoices = $query->paginate(20)->withQueryString();
+
+        return view('superadmin.invoices', compact('invoices'));
+    }
+
+    public function exportInvoices(Request $request)
+    {
+        $invoices = $this->buildInvoiceQuery($request)->get();
+        $platformName = strtoupper(PlatformSetting::platformName());
+        $filename = 'laporan-invoice-saas-' . Carbon::now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($invoices, $platformName) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, ["LAPORAN TAGIHAN & REVENUE SAAS {$platformName}"]);
+            fputcsv($file, ['Tanggal Export', Carbon::now()->translatedFormat('d F Y H:i')]);
+            fputcsv($file, ['Total Baris Invoice', $invoices->count()]);
+            fputcsv($file, ['Total Revenue Lunas (Rp)', number_format((float) $invoices->where('status', 'paid')->sum('base_amount'), 0, ',', '.')]);
+            fputcsv($file, []);
+
+            fputcsv($file, ['No. Invoice', 'Tanggal Buat', 'Nama Usaha', 'Paket', 'Siklus', 'Harga Dasar (Rp)', 'Kode Unik', 'Total Tagihan (Rp)', 'Metode', 'Status', 'Tanggal Lunas', 'Referensi']);
+
+            foreach ($invoices as $inv) {
+                fputcsv($file, [
+                    $inv->invoice_number,
+                    $inv->created_at?->format('Y-m-d H:i') ?? '-',
+                    $inv->tenant?->name ?? '-',
+                    $inv->plan?->name ?? '-',
+                    $inv->billing_cycle,
+                    (float) $inv->base_amount,
+                    $inv->unique_code,
+                    (float) $inv->final_amount,
+                    strtoupper($inv->payment_method),
+                    strtoupper($inv->status),
+                    $inv->paid_at?->format('Y-m-d H:i') ?? '-',
+                    $inv->payment_reference ?? '-',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function buildInvoiceQuery(Request $request)
+    {
         $query = SubscriptionInvoice::with(['tenant', 'plan', 'approver'])->latest();
 
         if ($request->filled('status') && in_array($request->status, ['unpaid', 'paid', 'expired', 'cancelled'], true)) {
             $query->where('status', $request->status);
         }
 
-        $invoices = $query->paginate(20)->withQueryString();
+        if ($request->filled('search')) {
+            $s = trim((string) $request->search);
+            $numeric = preg_replace('/[^0-9]/', '', $s);
+            $query->where(function ($q) use ($s, $numeric) {
+                $q->where('invoice_number', 'like', "%{$s}%")
+                  ->orWhere('payment_reference', 'like', "%{$s}%")
+                  ->orWhereHas('tenant', function ($tq) use ($s) {
+                      $tq->where('name', 'like', "%{$s}%")
+                         ->orWhere('slug', 'like', "%{$s}%");
+                  });
 
-        return view('superadmin.invoices', compact('invoices'));
+                if ($numeric !== '') {
+                    $q->orWhere('unique_code', (int) $numeric)
+                      ->orWhere('final_amount', (float) $numeric);
+                }
+            });
+        }
+
+        return $query;
     }
 
     public function approveInvoice(SubscriptionInvoice $invoice)
@@ -297,7 +451,16 @@ class SuperAdminController extends Controller
     public function plans()
     {
         $plans = Plan::orderBy('sort_order')->get();
-        return view('superadmin.plans', compact('plans'));
+        $tenants = Tenant::with('activeSubscription')->get();
+        $planUsageCounts = [];
+        foreach ($tenants as $t) {
+            $planId = $t->activeSubscription?->plan_id;
+            if ($planId) {
+                $planUsageCounts[$planId] = ($planUsageCounts[$planId] ?? 0) + 1;
+            }
+        }
+
+        return view('superadmin.plans', compact('plans', 'planUsageCounts'));
     }
 
     public function updatePlan(Request $request, Plan $plan)
@@ -351,12 +514,21 @@ class SuperAdminController extends Controller
             'platform_qris_secret' => PlatformSetting::getValue('platform_qris_secret', ''),
             'trial_days' => PlatformSetting::getValue('trial_days', '14'),
             'grace_days' => PlatformSetting::getValue('grace_days', '3'),
+            'announcement_enabled' => PlatformSetting::getValue('announcement_enabled', '0'),
+            'announcement_type' => PlatformSetting::getValue('announcement_type', 'info'),
+            'announcement_message' => PlatformSetting::getValue('announcement_message', ''),
         ];
 
         $platformWebhookUrl = url('/listener/platform/payment');
         $platformTestUrl = url('/listener/platform/test-connection');
+        $platformWebhookLogs = PaymentListenerLog::withoutGlobalScope('tenant')
+            ->where('is_platform_billing', true)
+            ->with('invoice.tenant')
+            ->latest('id')
+            ->take(20)
+            ->get();
 
-        return view('superadmin.settings', compact('settings', 'platformWebhookUrl', 'platformTestUrl'));
+        return view('superadmin.settings', compact('settings', 'platformWebhookUrl', 'platformTestUrl', 'platformWebhookLogs'));
     }
 
     public function updateSettings(Request $request)
@@ -372,7 +544,13 @@ class SuperAdminController extends Controller
             'platform_qris_secret' => ['required', 'string', 'min:8'],
             'trial_days' => ['required', 'integer', 'min:1', 'max:90'],
             'grace_days' => ['required', 'integer', 'min:0', 'max:30'],
+            'announcement_type' => ['nullable', 'in:info,warning,success,danger'],
+            'announcement_message' => ['nullable', 'string', 'max:500'],
         ]);
+
+        $validated['announcement_enabled'] = $request->has('announcement_enabled') ? '1' : '0';
+        $validated['announcement_type'] = $validated['announcement_type'] ?? 'info';
+        $validated['announcement_message'] = trim((string) ($validated['announcement_message'] ?? ''));
 
         $qrisPayload = trim($validated['platform_qris_payload'] ?? '', " \t\n\r\0\x0B");
         $qrisPayload = str_replace(["\r\n", "\r", "\n", "\t"], '', $qrisPayload);

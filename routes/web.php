@@ -117,12 +117,15 @@ Route::middleware('auth')->group(function () {
             Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
             Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
             Route::post('/tenants', [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
+            Route::put('/tenants/{tenant}', [SuperAdminController::class, 'updateTenant'])->name('tenants.update');
+            Route::delete('/tenants/{tenant}', [SuperAdminController::class, 'destroyTenant'])->name('tenants.destroy');
             Route::post('/tenants/{tenant}/subscription', [SuperAdminController::class, 'updateTenantSubscription'])->name('tenants.subscription');
             Route::post('/tenants/{tenant}/reset-password', [SuperAdminController::class, 'resetOwnerPassword'])->name('tenants.reset-password');
             Route::post('/tenants/{tenant}/toggle', [SuperAdminController::class, 'toggleTenantStatus'])->name('tenants.toggle');
             Route::post('/tenants/{tenant}/impersonate', [SuperAdminController::class, 'impersonateTenant'])->name('tenants.impersonate');
 
             Route::get('/invoices', [SuperAdminController::class, 'invoices'])->name('invoices');
+            Route::get('/invoices/export', [SuperAdminController::class, 'exportInvoices'])->name('invoices.export');
             Route::post('/invoices/{invoice}/approve', [SuperAdminController::class, 'approveInvoice'])->name('invoices.approve');
             Route::post('/invoices/{invoice}/cancel', [SuperAdminController::class, 'cancelInvoice'])->name('invoices.cancel');
 

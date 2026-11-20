@@ -559,4 +559,115 @@ class SaasMultiTenantTest extends TestCase
             ->assertStatus(200)
             ->assertSee('RotiHarum Bakery');
     }
+
+    public function test_super_admin_upgrade_suite_analytics_tenant_crud_invoice_search_webhook_logs_and_broadcast(): void
+    {
+        $subService = app(SubscriptionService::class);
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $proPlan = Plan::where('slug', 'pro')->firstOrFail();
+
+        // Provision a tenant expiring in 3 days with a phone number
+        $soonStore = $subService->provisionTenant(
+            ['name' => 'Warung Segera Habis', 'business_type' => 'Warung Makan / Resto', 'phone' => '081234560000', 'address' => 'Jl. Kenanga 10'],
+            ['name' => 'Owner Soon', 'username' => 'soon_owner', 'email' => 'soon@test.id', 'password' => 'secret123'],
+            true
+        );
+        $soonStore['subscription']->update(['ends_at' => Carbon::now()->addDays(3)]);
+
+        // Create an unpaid invoice with unique code
+        $invoice = $subService->createInvoice($soonStore['tenant'], $proPlan, 'monthly', 'qris');
+
+        // 1. Dashboard shows expiring watchlist, chart canvas, and sidebar unpaid badge
+        $this->actingAs($superAdmin)->get('/superadmin')
+            ->assertStatus(200)
+            ->assertSee('saasGrowthChart')
+            ->assertSee('Warung Segera Habis')
+            ->assertSee('https://wa.me/6281234560000');
+
+        // 2. Invoice search by 3-digit unique_code & CSV revenue export
+        $this->actingAs($superAdmin)->get('/superadmin/invoices?search=' . $invoice->unique_code)
+            ->assertStatus(200)
+            ->assertSee($invoice->invoice_number);
+
+        $csvRes = $this->actingAs($superAdmin)->get('/superadmin/invoices/export');
+        $csvRes->assertStatus(200);
+        $csvBody = $csvRes->streamedContent();
+        $this->assertStringContainsString('LAPORAN TAGIHAN & REVENUE SAAS', $csvBody);
+        $this->assertStringContainsString($invoice->invoice_number, $csvBody);
+
+        // 3. Platform webhook logs persisted (unmatched & matched) and visible in /superadmin/settings
+        $platformSecret = 'plat-log-secret-8888';
+        PlatformSetting::setValue('platform_qris_secret', $platformSecret);
+
+        $unmatchedBody = json_encode(['amount' => 12345, 'source_app' => 'BRI', 'reference' => 'UNM-001']);
+        $ts1 = (string) time();
+        $this->call('POST', '/listener/platform/payment', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_TIMESTAMP' => $ts1,
+            'HTTP_X_SIGNATURE' => hash_hmac('sha256', $ts1 . '.' . $unmatchedBody, $platformSecret),
+        ], $unmatchedBody)->assertStatus(200)->assertJson(['matched' => false]);
+
+        $matchedBody = json_encode(['amount' => (float) $invoice->final_amount, 'source_app' => 'GoPay', 'reference' => 'MTC-001']);
+        $ts2 = (string) time();
+        $this->call('POST', '/listener/platform/payment', [], [], [], [
+            'CONTENT_TYPE' => 'application/json',
+            'HTTP_ACCEPT' => 'application/json',
+            'HTTP_X_TIMESTAMP' => $ts2,
+            'HTTP_X_SIGNATURE' => hash_hmac('sha256', $ts2 . '.' . $matchedBody, $platformSecret),
+        ], $matchedBody)->assertStatus(200)->assertJson(['matched' => true]);
+
+        $this->assertEquals(2, \App\Models\PaymentListenerLog::withoutGlobalScope('tenant')->where('is_platform_billing', true)->count());
+
+        $this->actingAs($superAdmin)->get('/superadmin/settings')
+            ->assertStatus(200)
+            ->assertSee('Log Webhook Billing Terbaru')
+            ->assertSee($invoice->invoice_number)
+            ->assertSee('UNMATCHED');
+
+        // 4. Broadcast Announcement Banner appears on Tenant Dashboard
+        $this->actingAs($superAdmin)->put('/superadmin/settings', [
+            'platform_name' => 'KasirLoka',
+            'platform_tagline' => 'POS UMKM',
+            'platform_qris_secret' => $platformSecret,
+            'trial_days' => 14,
+            'grace_days' => 3,
+            'announcement_enabled' => '1',
+            'announcement_type' => 'warning',
+            'announcement_message' => 'Pemeliharaan server pukul 23:00 WIB.',
+        ])->assertRedirect();
+
+        $this->actingAs($soonStore['user'])->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('Pemeliharaan server pukul 23:00 WIB.');
+
+        // 5. Edit Tenant Info & Safe Delete Guard (Blocked when Active, Allowed after Suspend)
+        $this->actingAs($superAdmin)->put('/superadmin/tenants/' . $soonStore['tenant']->id, [
+            'name' => 'Warung Segera Habis Updated',
+            'business_type' => 'Warung Makan / Resto',
+            'phone' => '081299998888',
+            'address' => 'Jl. Baru No. 99',
+        ])->assertRedirect();
+
+        $this->assertEquals('Warung Segera Habis Updated', $soonStore['tenant']->fresh()->name);
+
+        // Cannot delete while active
+        $this->actingAs($superAdmin)->delete('/superadmin/tenants/' . $soonStore['tenant']->id)
+            ->assertRedirect()
+            ->assertSessionHas('error');
+        $this->assertNotNull(Tenant::find($soonStore['tenant']->id));
+
+        // Suspend first, then permanent delete succeeds
+        $this->actingAs($superAdmin)->post('/superadmin/tenants/' . $soonStore['tenant']->id . '/toggle')->assertRedirect();
+        $this->actingAs($superAdmin)->delete('/superadmin/tenants/' . $soonStore['tenant']->id)
+            ->assertRedirect()
+            ->assertSessionHas('success');
+        $this->assertNull(Tenant::withTrashed()->find($soonStore['tenant']->id));
+
+        // 6. System Update Health Diagnostics loads cleanly
+        $this->actingAs($superAdmin)->get('/superadmin/system-update')
+            ->assertStatus(200)
+            ->assertSee('Kesehatan Server')
+            ->assertSee('TERHUBUNG');
+    }
 }

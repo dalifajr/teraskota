@@ -24,9 +24,14 @@
             </a>
         </li>
         <li class="sidebar-item {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
-            <a href="{{ route('superadmin.invoices') }}" class="sidebar-link">
-                <i class="fa-solid fa-file-invoice-dollar"></i>
-                <span>Tagihan &amp; Pembayaran</span>
+            <a href="{{ route('superadmin.invoices') }}" class="sidebar-link d-flex justify-content-between align-items-center">
+                <span>
+                    <i class="fa-solid fa-file-invoice-dollar"></i>
+                    <span>Tagihan &amp; Pembayaran</span>
+                </span>
+                @if(($pendingInvoicesBadgeCount ?? 0) > 0)
+                    <span class="badge rounded-pill bg-warning text-dark fw-bold" style="font-size: 0.7rem;">{{ $pendingInvoicesBadgeCount }}</span>
+                @endif
             </a>
         </li>
 
@@ -92,7 +97,12 @@
                 <a href="{{ route('superadmin.tenants') }}" class="sidebar-link"><i class="fa-solid fa-store"></i><span>Daftar Usaha (Tenant)</span></a>
             </li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
-                <a href="{{ route('superadmin.invoices') }}" class="sidebar-link"><i class="fa-solid fa-file-invoice-dollar"></i><span>Tagihan &amp; Pembayaran</span></a>
+                <a href="{{ route('superadmin.invoices') }}" class="sidebar-link d-flex justify-content-between align-items-center">
+                    <span><i class="fa-solid fa-file-invoice-dollar"></i><span>Tagihan &amp; Pembayaran</span></span>
+                    @if(($pendingInvoicesBadgeCount ?? 0) > 0)
+                        <span class="badge rounded-pill bg-warning text-dark fw-bold" style="font-size: 0.7rem;">{{ $pendingInvoicesBadgeCount }}</span>
+                    @endif
+                </a>
             </li>
             <li class="sidebar-section-label">Monetisasi &amp; Sistem</li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.plans*') ? 'active' : '' }}">

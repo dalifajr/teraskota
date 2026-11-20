@@ -143,6 +143,31 @@
             </div>
         @endif
 
+        <!-- Global Platform Broadcast Announcement Banner (Tenant Admin Only) -->
+        @if(!$isSuperAdminPanel && !$isKasirOnly && !empty($platformAnnouncement))
+            @php
+                $annType = $platformAnnouncement['type'] ?? 'info';
+                $annBg = match($annType) {
+                    'warning' => 'bg-warning text-dark',
+                    'danger' => 'bg-danger text-white',
+                    'success' => 'bg-success text-white',
+                    default => 'bg-primary text-white',
+                };
+                $annIcon = match($annType) {
+                    'warning' => 'fa-triangle-exclamation',
+                    'danger' => 'fa-circle-exclamation',
+                    'success' => 'fa-bullhorn',
+                    default => 'fa-circle-info',
+                };
+            @endphp
+            <div class="{{ $annBg }} py-2 px-3 px-md-4 d-flex align-items-center justify-content-between gap-2 small shadow-sm" role="status">
+                <div class="fw-semibold">
+                    <i class="fa-solid {{ $annIcon }} me-2"></i>
+                    <span>{{ $platformAnnouncement['message'] }}</span>
+                </div>
+            </div>
+        @endif
+
         <!-- Subscription Status Banner (Grace / Expired / Trial <= 5 days) -->
         @if(!$isSuperAdminPanel && !$isKasirOnly && $currentTenant && !Request::routeIs('billing.*'))
             @php $daysLeft = $currentTenant->daysRemaining(); @endphp

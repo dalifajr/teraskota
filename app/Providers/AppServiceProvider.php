@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\PlatformSetting;
+use App\Models\SubscriptionInvoice;
 use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -56,24 +57,52 @@ class AppServiceProvider extends ServiceProvider
             URL::forceScheme('https');
         }
 
-        // Share platform branding & active tenant context to all Blade views
+        // Share platform branding, active tenant context, superadmin badge & broadcast banner to all Blade views
         View::composer('*', function ($view) {
-            static $cachedPlatformName = null;
-            if ($cachedPlatformName === null) {
-                $cachedPlatformName = PlatformSetting::platformName();
+            $req = request();
+            $shared = $req->attributes->get('_kl_view_shared');
+
+            if ($shared === null) {
+                $platformName = PlatformSetting::platformName();
+                $user = Auth::user();
+                $tenant = $user ? TenantContext::current() : null;
+                $isImpersonating = $user
+                    && $user->isSuperAdmin()
+                    && session()->has('impersonating_tenant_id');
+
+                $pendingInvoicesBadgeCount = 0;
+                if ($user && $user->isSuperAdmin() && !$isImpersonating) {
+                    try {
+                        $pendingInvoicesBadgeCount = SubscriptionInvoice::where('status', 'unpaid')->count();
+                    } catch (\Throwable $e) {
+                        $pendingInvoicesBadgeCount = 0;
+                    }
+                }
+
+                $announcementEnabled = PlatformSetting::getValue('announcement_enabled', '0') === '1';
+                $announcementMessage = trim((string) PlatformSetting::getValue('announcement_message', ''));
+                $announcementType = (string) PlatformSetting::getValue('announcement_type', 'info');
+
+                $platformAnnouncement = ($announcementEnabled && $announcementMessage !== '')
+                    ? [
+                        'message' => $announcementMessage,
+                        'type' => in_array($announcementType, ['info', 'warning', 'success', 'danger'], true) ? $announcementType : 'info',
+                    ]
+                    : null;
+
+                $shared = [
+                    'platformName' => $platformName,
+                    'currentTenant' => $tenant,
+                    'subscriptionState' => $tenant ? $tenant->subscriptionState() : null,
+                    'isImpersonatingTenant' => $isImpersonating,
+                    'pendingInvoicesBadgeCount' => $pendingInvoicesBadgeCount,
+                    'platformAnnouncement' => $platformAnnouncement,
+                ];
+
+                $req->attributes->set('_kl_view_shared', $shared);
             }
 
-            $tenant = Auth::check() ? TenantContext::current() : null;
-            $isImpersonating = Auth::check()
-                && Auth::user()->isSuperAdmin()
-                && session()->has('impersonating_tenant_id');
-
-            $view->with([
-                'platformName' => $cachedPlatformName,
-                'currentTenant' => $tenant,
-                'subscriptionState' => $tenant ? $tenant->subscriptionState() : null,
-                'isImpersonatingTenant' => $isImpersonating,
-            ]);
+            $view->with($shared);
         });
     }
 }

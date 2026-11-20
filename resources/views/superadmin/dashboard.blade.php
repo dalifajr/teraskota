@@ -9,11 +9,14 @@
 
 @section('content')
 <!-- KPI Cards -->
-<div class="row g-3 mb-4">
+<div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
     <div class="col-md-6 col-xl-3">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
-                <small class="text-uppercase text-muted fw-bold">Estimasi MRR (Bulanan)</small>
+                <div class="d-flex justify-content-between align-items-start">
+                    <small class="text-uppercase text-muted fw-bold">Estimasi MRR (Bulanan)</small>
+                    <span class="badge bg-success bg-opacity-10 text-success rounded-pill"><i class="fa-solid fa-chart-line"></i></span>
+                </div>
                 <h3 class="fw-bold text-success mt-2 mb-1">Rp{{ number_format($mrr, 0, ',', '.') }}</h3>
                 <small class="text-muted">Pendapatan berulang aktif / bulan</small>
             </div>
@@ -22,32 +25,136 @@
     <div class="col-md-6 col-xl-3">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
-                <small class="text-uppercase text-muted fw-bold">Revenue Bulan Ini</small>
+                <div class="d-flex justify-content-between align-items-start">
+                    <small class="text-uppercase text-muted fw-bold">Revenue Bulan Ini</small>
+                    <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill"><i class="fa-solid fa-wallet"></i></span>
+                </div>
                 <h3 class="fw-bold text-dark mt-2 mb-1">Rp{{ number_format($revenueThisMonth, 0, ',', '.') }}</h3>
-                <small class="text-muted">Total semua waktu: Rp{{ number_format($revenueAllTime, 0, ',', '.') }}</small>
+                <small class="text-muted">Semua waktu: Rp{{ number_format($revenueAllTime, 0, ',', '.') }}</small>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
-                <small class="text-uppercase text-muted fw-bold">Total Usaha (Tenant)</small>
+                <div class="d-flex justify-content-between align-items-start">
+                    <small class="text-uppercase text-muted fw-bold">Total Usaha (Tenant)</small>
+                    <span class="badge bg-info bg-opacity-10 text-info rounded-pill"><i class="fa-solid fa-store"></i></span>
+                </div>
                 <h3 class="fw-bold text-primary mt-2 mb-1">{{ $totalTenants }}</h3>
-                <small class="text-muted">{{ $activeTenants }} Aktif · {{ $trialTenants }} Trial · {{ $expiredTenants }} Expired</small>
+                <small class="text-muted">
+                    {{ $activeTenants }} Aktif · {{ $trialTenants }} Trial
+                    @if(($graceTenants ?? 0) > 0)
+                        · <span class="text-warning fw-semibold">{{ $graceTenants }} Grace</span>
+                    @endif
+                    · {{ $expiredTenants }} Expired
+                </small>
             </div>
         </div>
     </div>
     <div class="col-md-6 col-xl-3">
         <div class="card border-0 shadow-sm rounded-4 h-100">
             <div class="card-body p-4">
-                <small class="text-uppercase text-muted fw-bold">Invoice Menunggu</small>
+                <div class="d-flex justify-content-between align-items-start">
+                    <small class="text-uppercase text-muted fw-bold">Invoice Menunggu</small>
+                    <span class="badge {{ $pendingInvoicesCount > 0 ? 'bg-warning text-dark' : 'bg-secondary bg-opacity-10 text-secondary' }} rounded-pill"><i class="fa-solid fa-clock"></i></span>
+                </div>
                 <h3 class="fw-bold {{ $pendingInvoicesCount > 0 ? 'text-warning' : 'text-secondary' }} mt-2 mb-1">{{ $pendingInvoicesCount }}</h3>
-                <small class="text-muted">Total transaksi POS global: {{ number_format($totalPlatformTransactions, 0, ',', '.') }}</small>
+                <small class="text-muted">Transaksi POS global: {{ number_format($totalPlatformTransactions, 0, ',', '.') }}</small>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Row 2: 6-Month SaaS Growth Chart + Expiring Soon Watchlist -->
+<div class="row g-4 mb-4">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div>
+                    <h6 class="fw-bold m-0"><i class="fa-solid fa-chart-column text-success me-2"></i>Tren Revenue &amp; Pertumbuhan Tenant (6 Bulan)</h6>
+                    <small class="text-muted">Perbandingan pendapatan langganan lunas vs pendaftar usaha baru</small>
+                </div>
+            </div>
+            <div class="card-body p-3 p-md-4">
+                <div style="height: 250px; position: relative;">
+                    <canvas id="saasGrowthChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+            <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+                <div>
+                    <h6 class="fw-bold m-0"><i class="fa-solid fa-hourglass-half text-danger me-2"></i>Segera Berakhir (&le; 7 Hari / Grace)</h6>
+                    <small class="text-muted">Prioritas follow-up perpanjangan &amp; konversi trial</small>
+                </div>
+                <span class="badge {{ ($expiringSoonTenants->count() ?? 0) > 0 ? 'bg-danger' : 'bg-success' }} rounded-pill">
+                    {{ $expiringSoonTenants->count() }}
+                </span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0 small">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Usaha</th>
+                            <th>Sisa Waktu</th>
+                            <th class="text-end">Follow-up</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @forelse($expiringSoonTenants as $et)
+                            @php
+                                $etState = $et->subscriptionState();
+                                $etDays = $et->daysRemaining();
+                                $etPhone = preg_replace('/[^0-9]/', '', (string) $et->phone);
+                                if (str_starts_with($etPhone, '0')) {
+                                    $etPhone = '62' . substr($etPhone, 1);
+                                }
+                                $waMsg = "Halo {$et->name}, masa " . ($etState === 'trial' ? 'uji coba gratis' : 'aktif langganan') . " {$platformName} Anda " . ($etState === 'grace' ? 'sedang dalam masa tenggang' : 'akan segera berakhir') . ". Yuk perpanjang paket melalui menu Langganan & Paket agar operasional kasir tetap lancar.";
+                            @endphp
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ $et->name }}</div>
+                                    <small class="text-muted">{{ $et->currentPlan()?->name ?? '-' }} · {{ strtoupper($etState) }}</small>
+                                </td>
+                                <td>
+                                    @if($etState === 'grace')
+                                        <span class="badge bg-warning text-dark">Masa Tenggang</span>
+                                    @elseif($etDays !== null && $etDays <= 0)
+                                        <span class="badge bg-danger">Hari Ini</span>
+                                    @else
+                                        <span class="badge bg-danger bg-opacity-10 text-danger fw-bold">{{ $etDays }} hari lagi</span>
+                                    @endif
+                                </td>
+                                <td class="text-end">
+                                    @if($etPhone !== '')
+                                        <a href="https://wa.me/{{ $etPhone }}?text={{ urlencode($waMsg) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-success py-0 px-2" title="Follow-up via WhatsApp">
+                                            <i class="fa-brands fa-whatsapp me-1"></i>WA
+                                        </a>
+                                    @else
+                                        <a href="{{ route('superadmin.tenants', ['search' => $et->slug]) }}" class="btn btn-sm btn-outline-secondary py-0 px-2">Lihat</a>
+                                    @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="3" class="text-center text-muted py-4">
+                                    <i class="fa-solid fa-circle-check text-success fs-4 d-block mb-2"></i>
+                                    Semua tenant masih memiliki masa aktif aman (&gt; 7 hari).
+                                </td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Pending Invoices + Recent Tenants -->
 <div class="row g-4">
     <!-- Pending Invoices -->
     <div class="col-lg-6">
@@ -72,9 +179,9 @@
                                     <div class="fw-bold">{{ $inv->tenant?->name ?? '-' }}</div>
                                     <small class="text-muted font-monospace">{{ $inv->invoice_number }} · {{ $inv->plan?->name }} ({{ $inv->billing_cycle }})</small>
                                 </td>
-                                <td class="fw-bold text-success">Rp{{ number_format((float)$inv->final_amount, 0, ',', '.') }}</td>
+                                <td class="fw-bold text-success" style="font-variant-numeric: tabular-nums;">Rp{{ number_format((float)$inv->final_amount, 0, ',', '.') }}</td>
                                 <td class="text-end">
-                                    <form action="{{ route('superadmin.invoices.approve', $inv->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Konfirmasi invoice ini LUNAS dan aktifkan paket usaha?');">
+                                    <form action="{{ route('superadmin.invoices.approve', $inv->id) }}" method="POST" class="d-inline" data-confirm="Konfirmasi invoice {{ $inv->invoice_number }} LUNAS dan aktifkan paket usaha {{ $inv->tenant?->name }}?">
                                         @csrf
                                         <button type="submit" class="btn btn-sm btn-success py-0 px-2">Konfirmasi Lunas</button>
                                     </form>
@@ -114,7 +221,7 @@
                                     <small class="text-muted">{{ $t->business_type }} · {{ $t->transactions_count }} trx</small>
                                 </td>
                                 <td>
-                                    <span class="badge {{ in_array($st, ['active','lifetime']) ? 'bg-success' : ($st === 'trial' ? 'bg-info text-dark' : 'bg-danger') }}">
+                                    <span class="badge {{ in_array($st, ['active','lifetime']) ? 'bg-success' : ($st === 'trial' ? 'bg-info text-dark' : ($st === 'grace' ? 'bg-warning text-dark' : 'bg-danger')) }}">
                                         {{ strtoupper($st) }}
                                     </span>
                                     <div class="text-muted" style="font-size: 0.72rem;">{{ $t->currentPlan()?->name ?? '-' }}</div>
@@ -135,4 +242,84 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    (function() {
+        const ctx = document.getElementById('saasGrowthChart');
+        if (!ctx || typeof Chart === 'undefined') return;
+
+        const trend = @json($monthlyTrend);
+
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: trend.labels || [],
+                datasets: [
+                    {
+                        label: 'Revenue Langganan (Rp)',
+                        data: trend.revenues || [],
+                        backgroundColor: 'rgba(22, 163, 74, 0.78)',
+                        borderColor: '#15803d',
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        yAxisID: 'y',
+                        order: 2
+                    },
+                    {
+                        label: 'Usaha Baru',
+                        data: trend.new_tenants || [],
+                        type: 'line',
+                        borderColor: '#0284c7',
+                        backgroundColor: 'rgba(2, 132, 199, 0.14)',
+                        borderWidth: 2.5,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#0284c7',
+                        tension: 0.35,
+                        fill: true,
+                        yAxisID: 'y1',
+                        order: 1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                if (context.datasetIndex === 0) {
+                                    return ' Revenue: Rp' + new Intl.NumberFormat('id-ID').format(context.parsed.y || 0);
+                                }
+                                return ' Usaha Baru: ' + (context.parsed.y || 0) + ' tenant';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        position: 'left',
+                        ticks: {
+                            callback: function(value) {
+                                return 'Rp' + new Intl.NumberFormat('id-ID', { notation: 'compact' }).format(value);
+                            }
+                        },
+                        grid: { color: 'rgba(148, 163, 184, 0.15)' }
+                    },
+                    y1: {
+                        beginAtZero: true,
+                        position: 'right',
+                        ticks: { stepSize: 1, precision: 0 },
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            }
+        });
+    })();
+</script>
 @endsection

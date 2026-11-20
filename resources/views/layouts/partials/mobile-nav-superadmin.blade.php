@@ -8,9 +8,12 @@
         <i class="fa-solid fa-store"></i>
         <span>Tenant</span>
     </a>
-    <a href="{{ route('superadmin.invoices') }}" class="mobile-nav-item {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
+    <a href="{{ route('superadmin.invoices') }}" class="mobile-nav-item position-relative {{ Request::routeIs('superadmin.invoices*') ? 'active' : '' }}">
         <i class="fa-solid fa-file-invoice-dollar"></i>
         <span>Invoice</span>
+        @if(($pendingInvoicesBadgeCount ?? 0) > 0)
+            <span class="position-absolute top-0 start-50 translate-middle-y badge rounded-pill bg-warning text-dark fw-bold" style="font-size: 0.62rem; margin-left: 10px; margin-top: 8px;">{{ $pendingInvoicesBadgeCount }}</span>
+        @endif
     </a>
     <a href="{{ route('superadmin.plans') }}" class="mobile-nav-item {{ Request::routeIs('superadmin.plans*') ? 'active' : '' }}">
         <i class="fa-solid fa-layer-group"></i>

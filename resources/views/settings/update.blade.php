@@ -67,6 +67,55 @@
     </div>
 </div>
 
+@if(isset($health))
+<!-- Platform Health Check Diagnostics -->
+<div class="card premium-card mb-4">
+    <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <h6 class="m-0 fw-bold text-dark"><i class="fa-solid fa-heart-pulse text-danger me-2"></i>Kesehatan Server &amp; Diagnostik Platform</h6>
+        @if($health['app_env'] === 'production' && $health['app_debug'])
+            <span class="badge bg-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>PERINGATAN: APP_DEBUG aktif di Production!</span>
+        @else
+            <span class="badge bg-success bg-opacity-10 text-success"><i class="fa-solid fa-shield-check me-1"></i>Konfigurasi Aman</span>
+        @endif
+    </div>
+    <div class="card-body p-3 p-md-4">
+        <div class="row g-3 small" style="font-variant-numeric: tabular-nums;">
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                    <div class="text-muted mb-1">Database ({{ strtoupper($health['db_driver']) }})</div>
+                    <span class="badge {{ $health['db_ok'] ? 'bg-success' : 'bg-danger' }}">{{ $health['db_ok'] ? 'TERHUBUNG' : 'GAGAL' }}</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                    <div class="text-muted mb-1">Environment / Debug</div>
+                    <div class="fw-bold text-dark text-uppercase">{{ $health['app_env'] }} · Debug: <span class="{{ $health['app_debug'] ? 'text-danger' : 'text-success' }}">{{ $health['app_debug'] ? 'ON' : 'OFF' }}</span></div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                    <div class="text-muted mb-1">Cache / Session Driver</div>
+                    <div class="fw-bold text-dark">{{ $health['cache_driver'] }} / {{ $health['session_driver'] }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="p-3 bg-light rounded-3 border h-100">
+                    <div class="text-muted mb-1">Storage &amp; Log</div>
+                    <div class="fw-bold text-dark">
+                        @if($health['disk_free_gb'] !== null)
+                            Sisa {{ $health['disk_free_gb'] }} GB
+                        @else
+                            {{ $health['storage_writable'] ? 'Writable' : 'Read-Only' }}
+                        @endif
+                        · Log {{ $health['log_size_mb'] }} MB
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Main Update Control Card -->
 <div class="card premium-card mb-4">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -78,7 +127,7 @@
         </div>
         <div class="d-flex flex-wrap gap-2">
             <!-- Form Migrasi Basis Data -->
-            <form action="{{ route('superadmin.update.migrate') }}" method="POST" class="d-inline" onsubmit="return confirm('Jalankan migrasi basis data (php artisan migrate)?');">
+            <form action="{{ route('superadmin.update.migrate') }}" method="POST" class="d-inline" data-confirm="Jalankan migrasi basis data (php artisan migrate) sekarang?">
                 @csrf
                 <button type="submit" class="btn btn-outline-primary" title="Jalankan migrasi tabel database secara mandiri">
                     <i class="fa-solid fa-database me-1"></i> Migrasi DB
@@ -170,7 +219,7 @@
                             <pre class="m-0 text-muted" style="font-size: 0.8rem;">{{ $upInfo['commits'] }}</pre>
                         </div>
 
-                        <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteUpdate" onsubmit="return confirmUpdate();">
+                        <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteUpdate" data-confirm="Apakah Anda yakin ingin memperbarui sistem sekarang? Aplikasi akan memasuki mode pemeliharaan beberapa detik untuk menarik kode dan menjalankan migrasi.">
                             @csrf
                             <button type="submit" class="btn btn-primary-green px-4 py-2 fw-bold" id="btnUpdateNow">
                                 <i class="fa-solid fa-cloud-arrow-down me-2"></i> Perbarui Sistem Sekarang
@@ -188,7 +237,7 @@
                     Sistem pembaruan ini menjalankan pipeline otomatis: mengaktifkan mode pemeliharaan, menarik perubahan dari GitHub, menjalankan migrasi basis data, membersihkan seluruh cache, dan mengaktifkan kembali aplikasi tanpa risiko desinkronisasi.
                 </p>
 
-                <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteManual" onsubmit="return confirmUpdate();">
+                <form action="{{ route('superadmin.update.execute') }}" method="POST" id="formExecuteManual" data-confirm="Apakah Anda yakin ingin menjalankan sinkronisasi GitHub (Pull & Migrate) sekarang?">
                     @csrf
                     <button type="submit" class="btn btn-primary-green px-4 py-2" id="btnManualSync">
                         <i class="fa-solid fa-rotate me-2"></i> Jalankan Sinkronisasi GitHub (Pull & Migrate)
@@ -233,12 +282,4 @@
         @endif
     </div>
 </div>
-@endsection
-
-@section('scripts')
-<script>
-    function confirmUpdate() {
-        return confirm("Apakah Anda yakin ingin memperbarui sistem sekarang?\nAplikasi akan memasuki mode pemeliharaan selama beberapa detik untuk menarik kode dan menjalankan migrasi.");
-    }
-</script>
 @endsection

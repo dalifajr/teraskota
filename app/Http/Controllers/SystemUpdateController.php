@@ -152,6 +152,32 @@ class SystemUpdateController extends Controller
         $phpVersion = PHP_VERSION;
         $laravelVersion = app()->version();
 
+        // System Health Diagnostics
+        $dbOk = false;
+        try {
+            \Illuminate\Support\Facades\DB::connection()->getPdo();
+            $dbOk = true;
+        } catch (\Throwable $e) {
+            $dbOk = false;
+        }
+
+        $diskFree = @disk_free_space(base_path());
+        $diskTotal = @disk_total_space(base_path());
+        $logFile = storage_path('logs/laravel.log');
+
+        $health = [
+            'db_ok' => $dbOk,
+            'db_driver' => config('database.default'),
+            'app_env' => config('app.env'),
+            'app_debug' => (bool) config('app.debug'),
+            'cache_driver' => config('cache.default'),
+            'session_driver' => config('session.driver'),
+            'storage_writable' => is_writable(storage_path()),
+            'disk_free_gb' => $diskFree !== false ? round($diskFree / (1024 ** 3), 2) : null,
+            'disk_total_gb' => $diskTotal !== false ? round($diskTotal / (1024 ** 3), 2) : null,
+            'log_size_mb' => file_exists($logFile) ? round(filesize($logFile) / (1024 ** 2), 2) : 0,
+        ];
+
         return view('settings.update', compact(
             'isGitAvailable',
             'isShellAllowed',
@@ -164,7 +190,8 @@ class SystemUpdateController extends Controller
             'lastCommitDate',
             'lastCommitAuthor',
             'phpVersion',
-            'laravelVersion'
+            'laravelVersion',
+            'health'
         ));
     }
 

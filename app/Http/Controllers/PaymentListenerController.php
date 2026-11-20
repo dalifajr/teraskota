@@ -256,6 +256,15 @@ class PaymentListenerController extends Controller
         $signature = $request->header('X-Signature', '');
         $secret = (string) PlatformSetting::getValue('platform_qris_secret', '');
 
+        $idempotencyKey = $request->header('X-Idempotency-Key')
+            ?: $request->input('reference')
+            ?: ('plat-' . md5($rawContent . microtime(true)));
+
+        $amount = (float) $request->input('amount', 0);
+        $sourceApp = $request->input('source_app', 'Android Listener');
+        $reference = $request->input('reference', 'AUTO-' . strtoupper(uniqid()));
+        $rawText = (string) $request->input('raw_text', '');
+
         if (!empty($secret)) {
             $expectedSignature = hash_hmac('sha256', $timestamp . '.' . $rawContent, $secret);
             $bodySecret = $request->input('secret');
@@ -265,16 +274,27 @@ class PaymentListenerController extends Controller
 
             if (!$isValid) {
                 Log::warning('[PlatformPaymentListener] Invalid HMAC signature');
+                try {
+                    PaymentListenerLog::withoutGlobalScope('tenant')->create([
+                        'tenant_id' => null,
+                        'is_platform_billing' => true,
+                        'idempotency_key' => 'invsig-' . md5($rawContent . microtime(true)),
+                        'amount' => max(0, $amount),
+                        'source_app' => $sourceApp,
+                        'reference' => $reference,
+                        'raw_text' => $rawText ?: 'Invalid HMAC signature',
+                        'status' => 'invalid_signature',
+                        'matched_invoice_id' => null,
+                    ]);
+                } catch (\Throwable $e) {
+                }
+
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Invalid HMAC-SHA256 signature or secret',
                 ], 401);
             }
         }
-
-        $amount = (float) $request->input('amount', 0);
-        $sourceApp = $request->input('source_app', 'Android Listener');
-        $reference = $request->input('reference', 'AUTO-' . strtoupper(uniqid()));
 
         if ($amount <= 0) {
             return response()->json([
@@ -283,9 +303,35 @@ class PaymentListenerController extends Controller
             ], 422);
         }
 
+        $existingLog = PaymentListenerLog::withoutGlobalScope('tenant')
+            ->where('is_platform_billing', true)
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if ($existingLog) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Payment already processed (idempotent)',
+                'matched' => $existingLog->status === 'matched',
+                'invoice_number' => $existingLog->invoice?->invoice_number,
+            ]);
+        }
+
         $invoice = $this->subscriptionService->matchPlatformPayment($amount, $reference, $sourceApp);
 
         if ($invoice) {
+            PaymentListenerLog::withoutGlobalScope('tenant')->create([
+                'tenant_id' => null,
+                'is_platform_billing' => true,
+                'idempotency_key' => $idempotencyKey,
+                'amount' => $amount,
+                'source_app' => $sourceApp,
+                'reference' => $reference,
+                'raw_text' => $rawText,
+                'status' => 'matched',
+                'matched_invoice_id' => $invoice->id,
+            ]);
+
             Log::info("[PlatformPaymentListener] Subscription Invoice {$invoice->invoice_number} auto-activated via {$sourceApp} Rp{$amount}");
 
             return response()->json([
@@ -296,6 +342,18 @@ class PaymentListenerController extends Controller
                 'tenant_id' => $invoice->tenant_id,
             ]);
         }
+
+        PaymentListenerLog::withoutGlobalScope('tenant')->create([
+            'tenant_id' => null,
+            'is_platform_billing' => true,
+            'idempotency_key' => $idempotencyKey,
+            'amount' => $amount,
+            'source_app' => $sourceApp,
+            'reference' => $reference,
+            'raw_text' => $rawText,
+            'status' => 'unmatched',
+            'matched_invoice_id' => null,
+        ]);
 
         return response()->json([
             'status' => 'success',
