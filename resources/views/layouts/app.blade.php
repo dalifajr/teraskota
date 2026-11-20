@@ -13,6 +13,12 @@
         $brandLogo = (!$isSuperAdminPanel && $currentTenant && $currentTenant->logo_path)
             ? $currentTenant->logoUrl()
             : asset('assets/images/logo.png');
+        $klStorePayload = [
+            'name' => $brandTitle,
+            'address' => $currentTenant?->address ?? '',
+            'phone' => $currentTenant?->phone ?? '',
+            'footer' => $currentTenant?->receipt_footer ?? 'Terima kasih atas kunjungan Anda!',
+        ];
     @endphp
     <title>@yield('title', $brandTitle) - {{ $platformName ?? 'KasirLoka' }}</title>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -236,12 +242,7 @@
     <!-- SweetAlert2 Unified Dialog Engine -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        window.KL_STORE_INFO = @json([
-            'name' => $brandTitle,
-            'address' => $currentTenant?->address ?? '',
-            'phone' => $currentTenant?->phone ?? '',
-            'footer' => $currentTenant?->receipt_footer ?? 'Terima kasih atas kunjungan Anda!',
-        ]);
+        window.KL_STORE_INFO = @json($klStorePayload);
     </script>
 
     <!-- UI Transitions & Progress Bar Engine -->
