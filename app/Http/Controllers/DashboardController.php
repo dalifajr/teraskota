@@ -100,7 +100,35 @@ class DashboardController extends Controller
         $totalExpenses = (float) Expense::whereDate('expense_date', '>=', $startStr)
             ->whereDate('expense_date', '<=', $endStr)
             ->sum('amount');
+        $totalCashExpenses = (float) Expense::whereDate('expense_date', '>=', $startStr)
+            ->whereDate('expense_date', '<=', $endStr)
+            ->where('payment_method', 'tunai')
+            ->sum('amount');
         $netProfit = $totalProfit - $totalExpenses;
+
+        // Previous period comparison (same day span immediately preceding startDate)
+        $spanDays = max(1, (int) $startDate->diffInDays($endDate) + 1);
+        $prevEndDate = $startDate->copy()->subDay();
+        $prevStartDate = $prevEndDate->copy()->subDays($spanDays - 1);
+        $prevStartStr = $prevStartDate->format('Y-m-d');
+        $prevEndStr = $prevEndDate->format('Y-m-d');
+
+        $prevTxQuery = Transaction::paid()
+            ->whereDate('transaction_date', '>=', $prevStartStr)
+            ->whereDate('transaction_date', '<=', $prevEndStr);
+        $prevTotalSales = (float) (clone $prevTxQuery)->sum('total_sales');
+        $prevTotalProfit = (float) (clone $prevTxQuery)->sum('total_profit');
+        $prevTotalExpenses = (float) Expense::whereDate('expense_date', '>=', $prevStartStr)
+            ->whereDate('expense_date', '<=', $prevEndStr)
+            ->sum('amount');
+        $prevNetProfit = $prevTotalProfit - $prevTotalExpenses;
+
+        $salesGrowthPct = $prevTotalSales > 0
+            ? round((($totalSales - $prevTotalSales) / $prevTotalSales) * 100, 1)
+            : ($totalSales > 0 ? 100.0 : null);
+        $netProfitGrowthPct = abs($prevNetProfit) > 0
+            ? round((($netProfit - $prevNetProfit) / abs($prevNetProfit)) * 100, 1)
+            : ($netProfit > 0 ? 100.0 : null);
 
         // Get grouping for charts
         $groupBy = $request->get('group_by', 'daily');
@@ -248,14 +276,49 @@ class DashboardController extends Controller
         $totalQrisSales = (float) (clone $qrisQuery)->sum('total_sales');
         $totalQrisCount = (int) (clone $qrisQuery)->count();
 
+        // Estimated physical cash in drawer (Cash Sales - Cash Expenses)
+        $cashDrawerEstimate = $totalCashSales - $totalCashExpenses;
+
+        // Per-Cashier Performance Breakdown for Shift Reconciliation
+        $cashierRaw = Transaction::paid()
+            ->whereDate('transaction_date', '>=', $startStr)
+            ->whereDate('transaction_date', '<=', $endStr)
+            ->select(
+                'created_by',
+                DB::raw('COUNT(*) as tx_count'),
+                DB::raw('SUM(total_sales) as total_sales'),
+                DB::raw("SUM(CASE WHEN payment_method = 'tunai' THEN total_sales ELSE 0 END) as cash_sales"),
+                DB::raw("SUM(CASE WHEN payment_method = 'qris' THEN total_sales ELSE 0 END) as qris_sales")
+            )
+            ->groupBy('created_by')
+            ->orderByDesc('total_sales')
+            ->get();
+
+        $cashierUsers = \App\Models\User::whereIn('id', $cashierRaw->pluck('created_by')->filter()->all())
+            ->pluck('name', 'id');
+
+        $cashierStats = $cashierRaw->map(function ($row) use ($cashierUsers) {
+            return (object) [
+                'name' => $cashierUsers[$row->created_by] ?? 'Sistem / Kasir',
+                'tx_count' => (int) $row->tx_count,
+                'total_sales' => (float) $row->total_sales,
+                'cash_sales' => (float) $row->cash_sales,
+                'qris_sales' => (float) $row->qris_sales,
+            ];
+        });
+
         // Today's Pulse Metrics (WIB)
         $todayStr = Carbon::today()->format('Y-m-d');
         $todayTxQuery = Transaction::paid()->whereDate('transaction_date', $todayStr);
         $todaySales = (float) (clone $todayTxQuery)->sum('total_sales');
+        $todayCashSales = (float) (clone $todayTxQuery)->where('payment_method', 'tunai')->sum('total_sales');
+        $todayQrisSales = (float) (clone $todayTxQuery)->where('payment_method', 'qris')->sum('total_sales');
         $todayProfit = (float) (clone $todayTxQuery)->sum('total_profit');
         $todayTransactions = (int) (clone $todayTxQuery)->count();
         $todayExpenses = (float) Expense::whereDate('expense_date', $todayStr)->sum('amount');
+        $todayCashExpenses = (float) Expense::whereDate('expense_date', $todayStr)->where('payment_method', 'tunai')->sum('amount');
         $todayNetProfit = $todayProfit - $todayExpenses;
+        $todayCashDrawer = $todayCashSales - $todayCashExpenses;
 
         // Recent 5 Transactions for Admin Monitoring
         $recentTransactions = Transaction::paid()
@@ -276,7 +339,11 @@ class DashboardController extends Controller
             'estimatedCost',
             'totalDiscount',
             'totalExpenses',
+            'totalCashExpenses',
+            'cashDrawerEstimate',
             'netProfit',
+            'salesGrowthPct',
+            'netProfitGrowthPct',
             'totalTransactions',
             'totalQuantity',
             'averageSales',
@@ -284,9 +351,14 @@ class DashboardController extends Controller
             'totalCashCount',
             'totalQrisSales',
             'totalQrisCount',
+            'cashierStats',
             'todaySales',
+            'todayCashSales',
+            'todayQrisSales',
             'todayTransactions',
             'todayExpenses',
+            'todayCashExpenses',
+            'todayCashDrawer',
             'todayNetProfit',
             'recentTransactions',
             'totalActiveMenus',

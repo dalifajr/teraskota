@@ -270,6 +270,15 @@ class ReportController extends Controller
             $dateRangeLabel = $startDate->translatedFormat('d F Y') . ' - ' . $endDate->translatedFormat('d F Y');
         }
 
+        // Payment method breakdown for period
+        $periodTxBase = Transaction::paid()
+            ->whereDate('transaction_date', '>=', $startStr)
+            ->whereDate('transaction_date', '<=', $endStr);
+        $cashSales = (float) (clone $periodTxBase)->where('payment_method', 'tunai')->sum('total_sales');
+        $cashCount = (int) (clone $periodTxBase)->where('payment_method', 'tunai')->count();
+        $qrisSales = (float) (clone $periodTxBase)->where('payment_method', 'qris')->sum('total_sales');
+        $qrisCount = (int) (clone $periodTxBase)->where('payment_method', 'qris')->count();
+
         return [
             'start_date' => $startStr,
             'end_date' => $endStr,
@@ -283,6 +292,10 @@ class ReportController extends Controller
             'expenses_list' => $expensesList,
             'total_quantity' => $totalQuantity,
             'total_transactions' => $totalTransactions,
+            'cash_sales' => $cashSales,
+            'cash_count' => $cashCount,
+            'qris_sales' => $qrisSales,
+            'qris_count' => $qrisCount,
             'average_sales_per_day' => $averageSalesPerDay,
             'best_seller' => $bestSeller ? $bestSeller->menu_name_snapshot . ' (' . $bestSeller->qty . ' pcs)' : '-',
             'least_seller' => $leastSeller ? $leastSeller->menu_name_snapshot . ' (' . $leastSeller->qty . ' pcs)' : '-',

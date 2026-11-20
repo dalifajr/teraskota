@@ -71,7 +71,7 @@
             <div class="card border-2 border-warning shadow-sm rounded-4 h-100" id="activeInvoiceCard" data-invoice-id="{{ $activeInvoice->id }}">
                 <div class="card-header bg-warning bg-opacity-10 py-3 d-flex justify-content-between align-items-center">
                     <h6 class="fw-bold m-0 text-dark"><i class="fa-solid fa-clock text-warning me-2"></i>Menunggu Pembayaran · {{ $activeInvoice->invoice_number }}</h6>
-                    <form action="{{ route('billing.invoice.cancel', $activeInvoice->id) }}" method="POST" class="m-0">
+                    <form action="{{ route('billing.invoice.cancel', $activeInvoice->id) }}" method="POST" class="m-0" data-confirm="Batalkan tagihan {{ $activeInvoice->invoice_number }}? Anda dapat membuat tagihan baru kapan saja.">
                         @csrf
                         <button type="submit" class="btn btn-sm btn-outline-danger py-0">Batalkan</button>
                     </form>
@@ -82,14 +82,24 @@
                             <div class="small text-muted">Paket: <strong>{{ $activeInvoice->plan->name }} ({{ $activeInvoice->billing_cycle === 'yearly' ? 'Tahunan' : 'Bulanan' }})</strong></div>
                             <div class="mt-2 p-3 bg-light rounded-3 border">
                                 <small class="text-muted d-block">Total Transfer / Scan (Harus PERSIS hingga 3 digit akhir!):</small>
-                                <div class="fs-3 fw-bold text-success font-monospace">Rp{{ number_format((float)$activeInvoice->final_amount, 0, ',', '.') }}</div>
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <div class="fs-3 fw-bold text-success font-monospace" style="font-variant-numeric: tabular-nums;">Rp{{ number_format((float)$activeInvoice->final_amount, 0, ',', '.') }}</div>
+                                    <button type="button" class="btn btn-sm btn-outline-success js-billing-copy" data-copy-value="{{ (int) round((float) $activeInvoice->final_amount) }}" title="Salin nominal persis untuk transfer">
+                                        <i class="fa-regular fa-copy me-1"></i>Salin
+                                    </button>
+                                </div>
                                 <small class="text-muted">Harga Rp{{ number_format((float)$activeInvoice->base_amount, 0, ',', '.') }} + Kode Unik <strong>{{ $activeInvoice->unique_code }}</strong></small>
                             </div>
 
                             @if(!empty($bankInfo['account_number']))
                                 <div class="mt-3 small">
                                     <div class="fw-bold text-dark">Transfer Bank Manual:</div>
-                                    <div>{{ $bankInfo['bank_name'] }} — <strong class="font-monospace">{{ $bankInfo['account_number'] }}</strong></div>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <span>{{ $bankInfo['bank_name'] }} — <strong class="font-monospace">{{ $bankInfo['account_number'] }}</strong></span>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 js-billing-copy" data-copy-value="{{ $bankInfo['account_number'] }}" title="Salin nomor rekening">
+                                            <i class="fa-regular fa-copy me-1"></i>Salin Rek
+                                        </button>
+                                    </div>
                                     <div class="text-muted">a.n. {{ $bankInfo['account_name'] }}</div>
                                 </div>
                             @endif
@@ -253,10 +263,13 @@
 @endsection
 
 @section('scripts')
-@if($activeInvoice && !empty($activeInvoice->qris_payload))
+@if($activeInvoice)
+@if(!empty($activeInvoice->qris_payload))
 <script src="{{ asset('assets/js/qrcode.min.js') }}"></script>
+@endif
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        @if(!empty($activeInvoice->qris_payload))
         const container = document.getElementById('invoiceQrisCanvas');
         if (container && window.QRCode) {
             new QRCode(container, {
@@ -266,8 +279,37 @@
                 correctLevel: QRCode.CorrectLevel.M
             });
         }
+        @endif
 
-        // Auto-poll invoice payment status every 5 seconds
+        // Copy buttons (Nominal & Account Number) via Modern Clipboard API + fallback
+        document.querySelectorAll('.js-billing-copy').forEach(function (btn) {
+            btn.addEventListener('click', async function () {
+                const val = btn.getAttribute('data-copy-value') || '';
+                if (!val) return;
+                let ok = false;
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    try {
+                        await navigator.clipboard.writeText(val);
+                        ok = true;
+                    } catch (e) {}
+                }
+                if (!ok) {
+                    const tmp = document.createElement('textarea');
+                    tmp.value = val;
+                    tmp.style.position = 'fixed';
+                    tmp.style.opacity = '0';
+                    document.body.appendChild(tmp);
+                    tmp.select();
+                    document.execCommand('copy');
+                    tmp.remove();
+                }
+                const orig = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check me-1"></i>Tersalin';
+                setTimeout(() => { btn.innerHTML = orig; }, 1400);
+            });
+        });
+
+        // Auto-poll invoice payment status every 5 seconds for BOTH QRIS and Bank Transfer
         setInterval(async () => {
             try {
                 const res = await fetch("{{ route('billing.invoice.status', $activeInvoice->id) }}", {

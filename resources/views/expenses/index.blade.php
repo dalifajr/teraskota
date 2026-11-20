@@ -9,31 +9,45 @@
 
 @section('content')
 <!-- Summary Metrics -->
-<div class="row g-3 mb-4">
-    <div class="col-md-6">
+<div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
+    <div class="col-md-4">
         <div class="card premium-card border-0 bg-white shadow-sm h-100">
             <div class="card-body p-4 d-flex align-items-center justify-content-between">
                 <div>
-                    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Total Pengeluaran (Sesuai Filter)</small>
-                    <h2 class="fw-bold text-danger m-0">Rp{{ number_format($totalExpenses, 0, ',', '.') }}</h2>
-                    <small class="text-muted">Mengurangi laba kotor pada perhitungan Laba Bersih</small>
+                    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Total Pengeluaran (Filter)</small>
+                    <h3 class="fw-bold text-danger m-0">Rp{{ number_format($totalExpenses, 0, ',', '.') }}</h3>
+                    <small class="text-muted">{{ number_format($expenseCount, 0, ',', '.') }} catatan kas keluar</small>
                 </div>
-                <div class="card-icon-wrapper" style="background-color:#fee2e2; color:#dc2626; width: 52px; height: 52px; font-size: 1.4rem;">
+                <div class="card-icon-wrapper" style="background-color:#fee2e2; color:#dc2626; width: 48px; height: 48px; font-size: 1.3rem;">
                     <i class="fa-solid fa-money-bill-transfer"></i>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
+    <div class="col-md-4">
         <div class="card premium-card border-0 bg-white shadow-sm h-100">
             <div class="card-body p-4 d-flex align-items-center justify-content-between">
                 <div>
-                    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Frekuensi Pengeluaran</small>
-                    <h2 class="fw-bold text-dark m-0">{{ number_format($expenseCount, 0, ',', '.') }} Catatan</h2>
-                    <small class="text-muted">Total transaksi kas keluar tercatat</small>
+                    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Dari Kas Tunai (Laci)</small>
+                    <h3 class="fw-bold text-success m-0">Rp{{ number_format($cashExpenses ?? 0, 0, ',', '.') }}</h3>
+                    <small class="text-muted">Mengurangi kas fisik laci kasir</small>
                 </div>
-                <div class="card-icon-wrapper bg-mint-soft" style="width: 52px; height: 52px; font-size: 1.4rem;">
-                    <i class="fa-solid fa-receipt"></i>
+                <div class="card-icon-wrapper bg-mint-soft" style="width: 48px; height: 48px; font-size: 1.3rem;">
+                    <i class="fa-solid fa-money-bill-wave"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card premium-card border-0 bg-white shadow-sm h-100">
+            <div class="card-body p-4 d-flex align-items-center justify-content-between">
+                <div>
+                    <small class="text-muted fw-semibold text-uppercase d-block mb-1">Dari Transfer / Non-Tunai</small>
+                    <h3 class="fw-bold text-primary m-0">Rp{{ number_format($nonCashExpenses ?? 0, 0, ',', '.') }}</h3>
+                    <small class="text-muted">Pembayaran via rekening / e-wallet</small>
+                </div>
+                <div class="card-icon-wrapper bg-primary bg-opacity-10 text-primary" style="width: 48px; height: 48px; font-size: 1.3rem;">
+                    <i class="fa-solid fa-building-columns"></i>
                 </div>
             </div>
         </div>
@@ -45,33 +59,42 @@
     <div class="card-body p-4">
         <form action="{{ route('expenses.index') }}" method="GET" class="row g-3 align-items-end">
             <div class="col-md-3">
-                <label for="search" class="form-label fw-medium text-dark">Cari Keterangan / No. Bukti</label>
-                <input type="text" name="search" id="search" class="form-control" placeholder="Contoh: Es batu, cup, listrik..." value="{{ request('search') }}">
+                <label for="search" class="form-label fw-medium text-dark small">Cari Keterangan / No. Bukti</label>
+                <input type="text" name="search" id="search" class="form-control form-control-sm" placeholder="Contoh: Es batu, bahan, listrik..." value="{{ request('search') }}">
             </div>
 
-            <div class="col-md-3">
-                <label for="category" class="form-label fw-medium text-dark">Kategori Biaya</label>
-                <select name="category" id="category" class="form-select">
-                    <option value="">-- Semua Kategori --</option>
+            <div class="col-md-2 col-6">
+                <label for="category" class="form-label fw-medium text-dark small">Kategori Biaya</label>
+                <select name="category" id="category" class="form-select form-select-sm">
+                    <option value="">Semua Kategori</option>
                     @foreach($categories as $key => $label)
                         <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
                 </select>
             </div>
 
-            <div class="col-md-2">
-                <label for="start_date" class="form-label fw-medium text-dark">Dari Tanggal</label>
-                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ request('start_date') }}">
+            <div class="col-md-2 col-6">
+                <label for="payment_method" class="form-label fw-medium text-dark small">Sumber Dana</label>
+                <select name="payment_method" id="payment_method" class="form-select form-select-sm">
+                    <option value="">Semua Sumber</option>
+                    <option value="tunai" {{ request('payment_method') === 'tunai' ? 'selected' : '' }}>Kas Tunai</option>
+                    <option value="non-tunai" {{ request('payment_method') === 'non-tunai' ? 'selected' : '' }}>Transfer / Non-Tunai</option>
+                </select>
             </div>
 
-            <div class="col-md-2">
-                <label for="end_date" class="form-label fw-medium text-dark">Sampai Tanggal</label>
-                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ request('end_date') }}">
+            <div class="col-md-2 col-6">
+                <label for="start_date" class="form-label fw-medium text-dark small">Dari Tanggal</label>
+                <input type="date" name="start_date" id="start_date" class="form-control form-control-sm" value="{{ request('start_date') }}">
             </div>
 
-            <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-filter me-1"></i> Filter</button>
-                <a href="{{ route('expenses.index') }}" class="btn btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
+            <div class="col-md-2 col-6">
+                <label for="end_date" class="form-label fw-medium text-dark small">Sampai Tanggal</label>
+                <input type="date" name="end_date" id="end_date" class="form-control form-control-sm" value="{{ request('end_date') }}">
+            </div>
+
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-sm btn-primary-green flex-grow-1" title="Terapkan Filter"><i class="fa-solid fa-filter"></i></button>
+                <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
             </div>
         </form>
     </div>
@@ -81,14 +104,19 @@
 <div class="card premium-card">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-wallet text-danger me-2"></i> Daftar Pengeluaran Operasional</h5>
-        <button type="button" class="btn btn-primary-green btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#createExpenseModal">
-            <i class="fa-solid fa-plus me-1"></i> Catat Pengeluaran Baru
-        </button>
+        <div class="d-flex gap-2">
+            <a href="{{ route('expenses.export', request()->query()) }}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+            </a>
+            <button type="button" class="btn btn-primary-green btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#createExpenseModal">
+                <i class="fa-solid fa-plus me-1"></i> Catat Pengeluaran Baru
+            </button>
+        </div>
     </div>
     <div class="card-body p-4">
         @if($expenses->count() > 0)
             <div class="table-responsive">
-                <table class="table table-hover align-middle border mb-4">
+                <table class="table table-hover align-middle border mb-4" style="font-variant-numeric: tabular-nums;">
                     <thead>
                         <tr>
                             <th>No. Bukti</th>
@@ -136,7 +164,7 @@
                                         >
                                             <i class="fa-solid fa-edit"></i>
                                         </button>
-                                        <form action="{{ route('expenses.destroy', $exp->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus catatan pengeluaran {{ $exp->expense_number }}?')">
+                                        <form action="{{ route('expenses.destroy', $exp->id) }}" method="POST" class="d-inline" data-confirm="Hapus catatan pengeluaran {{ $exp->expense_number }} ({{ $exp->description }})?">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
@@ -157,7 +185,7 @@
             <div class="text-center text-muted py-5">
                 <i class="fa-solid fa-file-invoice-dollar fs-1 mb-3 text-secondary opacity-50"></i>
                 <p class="m-0 fw-semibold">Belum ada catatan pengeluaran operasional</p>
-                <small>Klik tombol "Catat Pengeluaran Baru" untuk mencatat pembelian bahan, es batu, cup, atau biaya harian.</small>
+                <small>Klik tombol "Catat Pengeluaran Baru" untuk mencatat pembelian bahan baku, kemasan, atau biaya operasional harian.</small>
             </div>
         @endif
     </div>
@@ -166,28 +194,28 @@
 <!-- Modal Create Expense -->
 <div class="modal fade" id="createExpenseModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-content">
             <form action="{{ route('expenses.store') }}" method="POST">
                 @csrf
-                <div class="modal-header bg-dark text-white border-0" style="background-color: var(--primary-green) !important;">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-plus-circle me-2"></i> Catat Pengeluaran Baru</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark"><i class="fa-solid fa-plus-circle text-success me-2"></i>Catat Pengeluaran Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">Tanggal Pengeluaran</label>
+                            <label class="form-label fw-semibold small">Tanggal Pengeluaran</label>
                             <input type="date" name="expense_date" class="form-control" value="{{ date('Y-m-d') }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">Sumber Dana</label>
+                            <label class="form-label fw-semibold small">Sumber Dana</label>
                             <select name="payment_method" class="form-select" required>
                                 <option value="tunai">Kas Tunai</option>
                                 <option value="non-tunai">Transfer / Non-Tunai</option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Kategori Biaya</label>
+                            <label class="form-label fw-semibold small">Kategori Biaya</label>
                             <select name="category" class="form-select" required>
                                 @foreach($categories as $key => $label)
                                     <option value="{{ $key }}">{{ $label }}</option>
@@ -195,25 +223,25 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Deskripsi / Nama Pengeluaran</label>
-                            <input type="text" name="description" class="form-control" placeholder="Contoh: Beli Es Batu 5 Bal & Cup 16oz" required>
+                            <label class="form-label fw-semibold small">Deskripsi / Nama Pengeluaran</label>
+                            <input type="text" name="description" class="form-control" placeholder="Contoh: Beli bahan baku & kemasan harian" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Nominal Pengeluaran (Rp)</label>
+                            <label class="form-label fw-semibold small">Nominal Pengeluaran (Rp)</label>
                             <div class="input-group">
                                 <span class="input-group-text fw-bold">Rp</span>
-                                <input type="number" name="amount" class="form-control fw-bold" min="1" step="1" placeholder="50000" required>
+                                <input type="number" name="amount" class="form-control fw-bold" inputmode="numeric" min="1" step="1" placeholder="50000" required>
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Catatan Tambahan (Opsional)</label>
+                            <label class="form-label fw-semibold small">Catatan Tambahan (Opsional)</label>
                             <textarea name="notes" class="form-control" rows="2" placeholder="Nama toko / supplier atau keterangan tambahan..."></textarea>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-green fw-bold"><i class="fa-solid fa-save me-1"></i> Simpan Pengeluaran</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary-green fw-bold"><i class="fa-solid fa-save me-1"></i>Simpan Pengeluaran</button>
                 </div>
             </form>
         </div>
@@ -223,29 +251,29 @@
 <!-- Modal Edit Expense -->
 <div class="modal fade" id="editExpenseModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg rounded-4">
+        <div class="modal-content">
             <form id="editExpenseForm" method="POST">
                 @csrf
                 @method('PUT')
-                <div class="modal-header bg-dark text-white border-0" style="background-color: var(--primary-green) !important;">
-                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i> Edit Pengeluaran</h5>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold text-dark"><i class="fa-solid fa-pen-to-square text-primary me-2"></i>Edit Pengeluaran</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
                 </div>
-                <div class="modal-body p-4">
+                <div class="modal-body">
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">Tanggal Pengeluaran</label>
+                            <label class="form-label fw-semibold small">Tanggal Pengeluaran</label>
                             <input type="date" name="expense_date" id="edit_expense_date" class="form-control" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold text-dark">Sumber Dana</label>
+                            <label class="form-label fw-semibold small">Sumber Dana</label>
                             <select name="payment_method" id="edit_payment_method" class="form-select" required>
                                 <option value="tunai">Kas Tunai</option>
                                 <option value="non-tunai">Transfer / Non-Tunai</option>
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Kategori Biaya</label>
+                            <label class="form-label fw-semibold small">Kategori Biaya</label>
                             <select name="category" id="edit_category" class="form-select" required>
                                 @foreach($categories as $key => $label)
                                     <option value="{{ $key }}">{{ $label }}</option>
@@ -253,25 +281,25 @@
                             </select>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Deskripsi / Nama Pengeluaran</label>
+                            <label class="form-label fw-semibold small">Deskripsi / Nama Pengeluaran</label>
                             <input type="text" name="description" id="edit_description" class="form-control" required>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Nominal Pengeluaran (Rp)</label>
+                            <label class="form-label fw-semibold small">Nominal Pengeluaran (Rp)</label>
                             <div class="input-group">
                                 <span class="input-group-text fw-bold">Rp</span>
-                                <input type="number" name="amount" id="edit_amount" class="form-control fw-bold" min="1" step="1" required>
+                                <input type="number" name="amount" id="edit_amount" class="form-control fw-bold" inputmode="numeric" min="1" step="1" required>
                             </div>
                         </div>
                         <div class="col-12">
-                            <label class="form-label fw-semibold text-dark">Catatan Tambahan (Opsional)</label>
+                            <label class="form-label fw-semibold small">Catatan Tambahan (Opsional)</label>
                             <textarea name="notes" id="edit_notes" class="form-control" rows="2"></textarea>
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light border-0">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-green fw-bold"><i class="fa-solid fa-save me-1"></i> Perbarui</button>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary-green fw-bold"><i class="fa-solid fa-save me-1"></i>Perbarui</button>
                 </div>
             </form>
         </div>
@@ -302,4 +330,3 @@
     });
 </script>
 @endsection
-

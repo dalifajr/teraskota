@@ -670,4 +670,111 @@ class SaasMultiTenantTest extends TestCase
             ->assertSee('Kesehatan Server')
             ->assertSee('TERHUBUNG');
     }
+
+    public function test_tenant_admin_upgrade_suite_dashboard_reconciliation_exports_filters_and_billing(): void
+    {
+        $subService = app(SubscriptionService::class);
+
+        $storeA = $subService->provisionTenant(
+            ['name' => 'Kopi Harmoni', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Admin Harmoni', 'username' => 'harmoni_admin', 'email' => 'harmoni@test.id', 'password' => 'secret123'],
+            true
+        );
+        $storeB = $subService->provisionTenant(
+            ['name' => 'Warung Lain', 'business_type' => 'Warung Makan / Resto'],
+            ['name' => 'Admin Lain', 'username' => 'lain_admin', 'email' => 'lain@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        $menuA = Menu::withoutGlobalScope('tenant')->where('tenant_id', $storeA['tenant']->id)->firstOrFail();
+        $catA = Category::withoutGlobalScope('tenant')->where('tenant_id', $storeA['tenant']->id)->firstOrFail();
+
+        // Create cash transaction + cash expense for Store A
+        $this->actingAs($storeA['user'])->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menuA->id, 'quantity' => 2]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 50000,
+            'customer_name' => 'Budi Santoso',
+        ])->assertStatus(200);
+
+        $this->actingAs($storeA['user'])->post('/expenses', [
+            'expense_date' => now()->format('Y-m-d'),
+            'category' => 'Bahan Baku',
+            'description' => 'Beli Es Batu',
+            'amount' => 5000,
+            'payment_method' => 'tunai',
+        ])->assertRedirect('/expenses');
+
+        // 1. Dashboard shows Cash Drawer Estimate, Cashier Reconciliation, and WA Rekap
+        $this->actingAs($storeA['user'])->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('Estimasi Kas Fisik Laci')
+            ->assertSee('Rekap Penjualan per Kasir')
+            ->assertSee('Admin Harmoni')
+            ->assertSee('Item / Produk Terjual')
+            ->assertSee('Rekap WA');
+
+        // 2. Transactions filter by payment_method & cashier_id + CSV export
+        $this->actingAs($storeA['user'])->get('/transactions?payment_method=tunai&cashier_id=' . $storeA['user']->id)
+            ->assertStatus(200)
+            ->assertSee('Budi Santoso')
+            ->assertSee('Total Nota (Sesuai Filter)');
+
+        $txCsv = $this->actingAs($storeA['user'])->get('/transactions/export?payment_method=tunai');
+        $txCsv->assertStatus(200);
+        $txCsvBody = $txCsv->streamedContent();
+        $this->assertStringContainsString('LOG TRANSAKSI KOPI HARMONI', $txCsvBody);
+        $this->assertStringContainsString('Budi Santoso', $txCsvBody);
+
+        // 3. Expenses filter by payment_method & CSV export
+        $this->actingAs($storeA['user'])->get('/expenses?payment_method=tunai')
+            ->assertStatus(200)
+            ->assertSee('Dari Kas Tunai (Laci)')
+            ->assertSee('Beli Es Batu');
+
+        $expCsv = $this->actingAs($storeA['user'])->get('/expenses/export?payment_method=tunai');
+        $expCsv->assertStatus(200);
+        $expCsvBody = $expCsv->streamedContent();
+        $this->assertStringContainsString('LAPORAN PENGELUARAN KAS KOPI HARMONI', $expCsvBody);
+        $this->assertStringContainsString('Beli Es Batu', $expCsvBody);
+
+        // 4. Menu status filter & 1-click category toggle + cross-tenant isolation
+        $this->actingAs($storeA['user'])->patch('/menus/' . $menuA->id . '/toggle-status')->assertRedirect();
+        $this->actingAs($storeA['user'])->get('/menus?status=inactive')
+            ->assertStatus(200)
+            ->assertSee($menuA->name);
+
+        $this->assertTrue((bool) $catA->status);
+        $this->actingAs($storeA['user'])->patch('/categories/' . $catA->id . '/toggle-status')->assertRedirect();
+        $this->assertFalse((bool) $catA->fresh()->status);
+
+        // Store B cannot toggle Store A's category (404)
+        $this->actingAs($storeB['user'])->patch('/categories/' . $catA->id . '/toggle-status')->assertStatus(404);
+
+        // 5. Reports 5-col grid + Store live preview + Profit live simulator
+        $this->actingAs($storeA['user'])->get('/reports')
+            ->assertStatus(200)
+            ->assertSee('row-cols-xl-5')
+            ->assertSee('Bagikan WA')
+            ->assertSee('Omzet Tunai');
+
+        $this->actingAs($storeA['user'])->get('/settings/store')
+            ->assertStatus(200)
+            ->assertSee('Live Preview')
+            ->assertSee('previewStoreName');
+
+        $this->actingAs($storeA['user'])->get('/settings/profit')
+            ->assertStatus(200)
+            ->assertSee('semua menu produk')
+            ->assertSee('simProfitText');
+
+        // 6. Billing transfer invoice loads copy button + auto-poll script even without QRIS
+        $starterPlan = Plan::where('slug', 'starter')->firstOrFail();
+        $subService->createInvoice($storeA['tenant'], $starterPlan, 'monthly', 'transfer');
+
+        $this->actingAs($storeA['user'])->get('/billing')
+            ->assertStatus(200)
+            ->assertSee('js-billing-copy')
+            ->assertSee('billing/invoice/');
+    }
 }

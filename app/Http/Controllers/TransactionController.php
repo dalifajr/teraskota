@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use App\Models\Menu;
+use App\Models\PlatformSetting;
 use App\Models\Transaction;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\TransactionService;
 use App\Support\TenantContext;
 use Illuminate\Http\Request;
@@ -29,6 +31,74 @@ class TransactionController extends Controller
     {
         Transaction::expireOverdueQris();
 
+        $query = $this->buildFilteredQuery($request);
+
+        $summaryStats = [
+            'count' => (clone $query)->count(),
+            'total_sales' => (float) (clone $query)->where('status', 'paid')->sum('total_sales'),
+            'total_profit' => (float) (clone $query)->where('status', 'paid')->sum('total_profit'),
+        ];
+
+        $transactions = $query->paginate(15)->withQueryString();
+
+        $tenantId = TenantContext::id();
+        $cashiers = User::when($tenantId !== null, fn($q) => $q->where('tenant_id', $tenantId))
+            ->where('role', '!=', 'super_admin')
+            ->orderBy('name')
+            ->get(['id', 'name', 'role']);
+
+        return view('transactions.index', compact('transactions', 'summaryStats', 'cashiers'));
+    }
+
+    public function export(Request $request)
+    {
+        Transaction::expireOverdueQris();
+
+        $rows = $this->buildFilteredQuery($request)->get();
+        $storeName = strtoupper(TenantContext::current()?->name ?? PlatformSetting::platformName());
+        $filename = 'riwayat-transaksi-' . Carbon::now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($rows, $storeName) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, ["LOG TRANSAKSI {$storeName}"]);
+            fputcsv($file, ['Tanggal Export', Carbon::now()->translatedFormat('d F Y H:i')]);
+            fputcsv($file, []);
+            fputcsv($file, ['No. Transaksi', 'Tanggal', 'Waktu', 'Pelanggan', 'Metode', 'Status', 'Qty', 'Omzet (Rp)', 'Keuntungan (Rp)', 'Kasir/Admin', 'Catatan']);
+
+            foreach ($rows as $trx) {
+                fputcsv($file, [
+                    $trx->transaction_number,
+                    $trx->transaction_date?->format('Y-m-d') ?? '-',
+                    $trx->transaction_time ? substr((string) $trx->transaction_time, 0, 5) : '-',
+                    $trx->customer_name ?: 'Pelanggan',
+                    strtoupper($trx->payment_method ?? 'tunai'),
+                    strtoupper($trx->status ?? 'paid'),
+                    (int) $trx->total_quantity,
+                    (float) $trx->total_sales,
+                    (float) $trx->total_profit,
+                    $trx->admin?->name ?? 'System',
+                    $trx->notes ?? '',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function buildFilteredQuery(Request $request)
+    {
         $query = Transaction::with(['admin'])->withCount('details');
 
         // Search by Transaction Number or Customer Name
@@ -43,6 +113,16 @@ class TransactionController extends Controller
         // Filter by Status
         if ($request->filled('status') && in_array($request->status, ['paid', 'pending', 'expired', 'cancelled'], true)) {
             $query->where('status', $request->status);
+        }
+
+        // Filter by Payment Method
+        if ($request->filled('payment_method') && in_array($request->payment_method, ['tunai', 'qris'], true)) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
+        // Filter by Cashier / Admin
+        if ($request->filled('cashier_id')) {
+            $query->where('created_by', (int) $request->cashier_id);
         }
 
         // Filter by Date
@@ -63,9 +143,7 @@ class TransactionController extends Controller
         $query->orderBy('transaction_date', $sortOrder)
               ->orderBy('transaction_time', $sortOrder);
 
-        $transactions = $query->paginate(15)->withQueryString();
-
-        return view('transactions.index', compact('transactions'));
+        return $query;
     }
 
     /**

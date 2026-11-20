@@ -65,6 +65,17 @@ class CategoryController extends Controller
             ->with('success', 'Kategori berhasil diperbarui!');
     }
 
+    public function toggleStatus(Category $category)
+    {
+        $category->update([
+            'status' => !$category->status,
+        ]);
+
+        $label = $category->status ? 'diaktifkan' : 'dinonaktifkan';
+
+        return back()->with('success', "Kategori {$category->name} berhasil {$label}.");
+    }
+
     public function destroy(Category $category)
     {
         if ($category->menus()->exists()) {

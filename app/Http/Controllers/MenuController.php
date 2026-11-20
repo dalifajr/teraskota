@@ -39,6 +39,15 @@ class MenuController extends Controller
             $query->where('category_id', $request->category_id);
         }
 
+        // Filter by Status (Aktif / Habis)
+        if ($request->filled('status')) {
+            if ($request->status === 'active') {
+                $query->where('status', true);
+            } elseif ($request->status === 'inactive') {
+                $query->where('status', false);
+            }
+        }
+
         $menus = $query->orderBy('code', 'asc')->paginate(15)->withQueryString();
         $categories = Category::all();
         $tenant = TenantContext::current();

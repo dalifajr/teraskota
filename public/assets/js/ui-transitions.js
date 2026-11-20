@@ -118,7 +118,8 @@
             // Ignore silent background polling endpoints so the bar only reacts to user actions
             const isSilentBackgroundPoll =
                 urlStr.includes('/notifications/unread') ||
-                urlStr.includes('/pos/qris/check-status/');
+                urlStr.includes('/pos/qris/check-status/') ||
+                urlStr.includes('/billing/invoice/');
 
             if (!isSilentBackgroundPoll) {
                 activeInteractiveRequests++;

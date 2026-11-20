@@ -21,11 +21,30 @@
         </div>
 
         <!-- Quick Action Buttons for Admin -->
+        @php
+            $storeTitleWa = $currentTenant?->name ?? ($platformName ?? 'KasirLoka');
+            $dailyWaMsg = "*REKAP HARIAN " . strtoupper($storeTitleWa) . "*\n"
+                . "Tanggal: " . now()->translatedFormat('d M Y') . " (WIB)\n"
+                . "--------------------------------\n"
+                . "Transaksi Lunas : " . number_format($todayTransactions, 0, ',', '.') . " nota\n"
+                . "Total Omzet     : Rp" . number_format($todaySales, 0, ',', '.') . "\n"
+                . "  - Tunai       : Rp" . number_format($todayCashSales ?? 0, 0, ',', '.') . "\n"
+                . "  - QRIS        : Rp" . number_format($todayQrisSales ?? 0, 0, ',', '.') . "\n"
+                . "Pengeluaran Kas : Rp" . number_format($todayExpenses, 0, ',', '.') . "\n"
+                . "Est. Kas Laci   : Rp" . number_format($todayCashDrawer ?? 0, 0, ',', '.') . "\n"
+                . "--------------------------------\n"
+                . "*LABA BERSIH HARI INI: Rp" . number_format($todayNetProfit, 0, ',', '.') . "*";
+        @endphp
         <div class="d-flex align-items-center flex-wrap gap-2">
             <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-primary-green quick-action-btn shadow-sm" title="Buka Aplikasi Kasir POS di Tab Baru">
                 <i class="fa-solid fa-cash-register text-lime"></i>
                 <span>Buka Kasir POS</span>
                 <i class="fa-solid fa-arrow-up-right-from-square small opacity-75"></i>
+            </a>
+
+            <a href="https://wa.me/?text={{ urlencode($dailyWaMsg) }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-success quick-action-btn bg-white" title="Kirim Ringkasan Penjualan Hari Ini ke WhatsApp">
+                <i class="fa-brands fa-whatsapp text-success"></i>
+                <span>Rekap WA</span>
             </a>
 
             <a href="{{ route('expenses.index') }}" class="btn btn-outline-danger quick-action-btn bg-white" title="Catat Pengeluaran Kas Operasional">
@@ -128,12 +147,19 @@
     </div>
 
     <!-- SECTION 1: CORE FINANCIAL OVERVIEW (4 HERO CARDS) -->
-    <div class="row g-3 mb-4">
+    <div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
         <!-- 1. Total Omzet Penjualan -->
         <div class="col-12 col-sm-6 col-xl-3">
             <div class="card premium-card stat-hero-card hero-omzet h-100 p-3">
                 <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="stat-hero-label">Total Omzet</span>
+                    <div>
+                        <span class="stat-hero-label">Total Omzet</span>
+                        @if(isset($salesGrowthPct) && $salesGrowthPct !== null)
+                            <span class="badge ms-1 rounded-pill {{ $salesGrowthPct >= 0 ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger' }}" style="font-size:0.68rem;" title="Dibanding periode sebelumnya dengan durasi sama">
+                                <i class="fa-solid {{ $salesGrowthPct >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down' }} me-1"></i>{{ $salesGrowthPct >= 0 ? '+' : '' }}{{ $salesGrowthPct }}%
+                            </span>
+                        @endif
+                    </div>
                     <div class="card-icon-wrapper bg-mint-soft" style="width:40px; height:40px; font-size:1.15rem;">
                         <i class="fa-solid fa-wallet"></i>
                     </div>
@@ -194,6 +220,11 @@
                 <div class="d-flex justify-content-between align-items-start mb-2">
                     <div>
                         <span class="stat-hero-label text-success">Laba Bersih Aktual</span>
+                        @if(isset($netProfitGrowthPct) && $netProfitGrowthPct !== null)
+                            <span class="badge ms-1 rounded-pill {{ $netProfitGrowthPct >= 0 ? 'bg-success bg-opacity-10 text-success' : 'bg-danger bg-opacity-10 text-danger' }}" style="font-size:0.68rem;" title="Dibanding periode sebelumnya">
+                                <i class="fa-solid {{ $netProfitGrowthPct >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down' }} me-1"></i>{{ $netProfitGrowthPct >= 0 ? '+' : '' }}{{ $netProfitGrowthPct }}%
+                            </span>
+                        @endif
                         <small class="d-block text-muted" style="font-size:0.7rem;">(Laba Kotor &minus; Pengeluaran Kas)</small>
                     </div>
                     <div class="card-icon-wrapper bg-mint-soft" style="width:40px; height:40px; font-size:1.15rem;">
@@ -241,7 +272,7 @@
                     </div>
                     <div>
                         <div class="stat-value fs-4 text-dark mb-0">{{ number_format($totalQuantity, 0, ',', '.') }} <span class="fs-6 fw-normal text-muted">pcs</span></div>
-                        <div class="stat-label small">Cup / Produk Terjual</div>
+                        <div class="stat-label small">Item / Produk Terjual</div>
                     </div>
                 </div>
             </div>
@@ -344,7 +375,21 @@
                         </div>
                     </div>
 
-                    <!-- Today's Pulse Strip (WIB) -->
+                    <!-- Today's Pulse Strip & Cash Drawer Reconciliation (WIB) -->
+                    <div class="p-3 bg-light rounded-3 border mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold text-dark small">
+                                <i class="fa-solid fa-cash-register text-success me-1"></i> Estimasi Kas Fisik Laci (Periode)
+                            </span>
+                            <strong class="fs-6 {{ ($cashDrawerEstimate ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">
+                                Rp{{ number_format($cashDrawerEstimate ?? 0, 0, ',', '.') }}
+                            </strong>
+                        </div>
+                        <small class="text-muted d-block" style="font-size:0.73rem;">
+                            Tunai Masuk (Rp{{ number_format($totalCashSales, 0, ',', '.') }}) &minus; Pengeluaran Tunai (Rp{{ number_format($totalCashExpenses ?? 0, 0, ',', '.') }})
+                        </small>
+                    </div>
+
                     <div class="p-3 bg-light rounded-3 border">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="fw-bold text-dark small">
@@ -352,9 +397,9 @@
                             </span>
                             <span class="badge bg-white text-secondary border small">{{ date('d M Y') }}</span>
                         </div>
-                        <div class="d-flex justify-content-between small text-muted mt-2 pt-2 border-top">
+                        <div class="d-flex justify-content-between flex-wrap gap-2 small text-muted mt-2 pt-2 border-top">
                             <span>Omzet: <strong class="text-dark">Rp{{ number_format($todaySales, 0, ',', '.') }}</strong></span>
-                            <span>Pengeluaran: <strong class="text-danger">Rp{{ number_format($todayExpenses, 0, ',', '.') }}</strong></span>
+                            <span>Kas Laci: <strong class="text-primary">Rp{{ number_format($todayCashDrawer ?? 0, 0, ',', '.') }}</strong></span>
                             <span>Bersih: <strong class="{{ $todayNetProfit >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($todayNetProfit, 0, ',', '.') }}</strong></span>
                         </div>
                     </div>
@@ -430,6 +475,42 @@
             </div>
         </div>
     </div>
+
+    <!-- SECTION 3.5: PER-CASHIER SHIFT RECONCILIATION -->
+    @if(isset($cashierStats) && $cashierStats->count() > 0)
+    <div class="card premium-card mb-4">
+        <div class="premium-header py-3 px-4 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 fw-bold text-dark">
+                <i class="fa-solid fa-user-check text-success me-2"></i> Rekap Penjualan per Kasir / Penginput
+            </h6>
+            <span class="badge bg-light text-muted border">Serah Terima Shift</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 small" style="font-variant-numeric: tabular-nums;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Nama Kasir / Admin</th>
+                        <th class="text-center">Jumlah Nota</th>
+                        <th class="text-end">Tunai Diterima</th>
+                        <th class="text-end">QRIS</th>
+                        <th class="text-end pe-4">Total Omzet</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach($cashierStats as $cs)
+                        <tr>
+                            <td class="ps-4 fw-semibold text-dark">{{ $cs->name }}</td>
+                            <td class="text-center"><span class="badge bg-secondary bg-opacity-10 text-dark">{{ $cs->tx_count }} trx</span></td>
+                            <td class="text-end text-success fw-semibold">Rp{{ number_format($cs->cash_sales, 0, ',', '.') }}</td>
+                            <td class="text-end text-info fw-semibold">Rp{{ number_format($cs->qris_sales, 0, ',', '.') }}</td>
+                            <td class="text-end pe-4 fw-bold text-dark">Rp{{ number_format($cs->total_sales, 0, ',', '.') }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    </div>
+    @endif
 
     <!-- SECTION 4: CHARTS (TREND & CATEGORY BREAKDOWN) -->
     <div class="row g-3 mb-4">

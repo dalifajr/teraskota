@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Expense;
+use App\Models\PlatformSetting;
+use App\Support\TenantContext;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +16,79 @@ class ExpenseController extends Controller
      * Display a listing of operational expenses.
      */
     public function index(Request $request)
+    {
+        $query = $this->buildFilteredQuery($request);
+
+        $totalExpenses = (float) (clone $query)->sum('amount');
+        $cashExpenses = (float) (clone $query)->where('payment_method', 'tunai')->sum('amount');
+        $nonCashExpenses = (float) (clone $query)->where('payment_method', 'non-tunai')->sum('amount');
+        $expenseCount = (clone $query)->count();
+
+        $expenses = $query->orderBy('expense_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(15)
+            ->withQueryString();
+
+        $categories = Expense::CATEGORIES;
+
+        return view('expenses.index', compact(
+            'expenses',
+            'categories',
+            'totalExpenses',
+            'cashExpenses',
+            'nonCashExpenses',
+            'expenseCount'
+        ));
+    }
+
+    public function export(Request $request)
+    {
+        $rows = $this->buildFilteredQuery($request)
+            ->orderBy('expense_date', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $storeName = strtoupper(TenantContext::current()?->name ?? PlatformSetting::platformName());
+        $filename = 'pengeluaran-kas-' . Carbon::now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($rows, $storeName) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, ["LAPORAN PENGELUARAN KAS {$storeName}"]);
+            fputcsv($file, ['Tanggal Export', Carbon::now()->translatedFormat('d F Y H:i')]);
+            fputcsv($file, ['Total Pengeluaran (Rp)', (float) $rows->sum('amount')]);
+            fputcsv($file, []);
+            fputcsv($file, ['No. Bukti', 'Tanggal', 'Kategori', 'Deskripsi', 'Sumber Dana', 'Nominal (Rp)', 'Dicatat Oleh', 'Catatan']);
+
+            foreach ($rows as $exp) {
+                fputcsv($file, [
+                    $exp->expense_number,
+                    $exp->expense_date?->format('Y-m-d') ?? '-',
+                    $exp->category,
+                    $exp->description,
+                    strtoupper($exp->payment_method),
+                    (float) $exp->amount,
+                    $exp->creator?->name ?? 'Admin',
+                    $exp->notes ?? '',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function buildFilteredQuery(Request $request)
     {
         $query = Expense::with('creator');
 
@@ -30,6 +105,10 @@ class ExpenseController extends Controller
             $query->where('category', $request->category);
         }
 
+        if ($request->filled('payment_method') && in_array($request->payment_method, ['tunai', 'non-tunai'], true)) {
+            $query->where('payment_method', $request->payment_method);
+        }
+
         if ($request->filled('start_date')) {
             $query->whereDate('expense_date', '>=', $request->start_date);
         }
@@ -38,22 +117,7 @@ class ExpenseController extends Controller
             $query->whereDate('expense_date', '<=', $request->end_date);
         }
 
-        $totalExpenses = (float) (clone $query)->sum('amount');
-        $expenseCount = (clone $query)->count();
-
-        $expenses = $query->orderBy('expense_date', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(15)
-            ->withQueryString();
-
-        $categories = Expense::CATEGORIES;
-
-        return view('expenses.index', compact(
-            'expenses',
-            'categories',
-            'totalExpenses',
-            'expenseCount'
-        ));
+        return $query;
     }
 
     /**

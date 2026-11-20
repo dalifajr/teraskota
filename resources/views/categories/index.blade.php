@@ -24,28 +24,44 @@
                                     <th>Nama Kategori</th>
                                     <th>Slug</th>
                                     <th class="text-center">Jumlah Menu</th>
-                                    <th class="text-center">Status</th>
-                                    <th class="text-center" style="width: 150px;">Aksi</th>
+                                    <th class="text-center">Status (1-Klik)</th>
+                                    <th class="text-center" style="width: 140px;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($categories as $cat)
                                     <tr>
                                         <td class="fw-semibold text-dark">{{ $cat->name }}</td>
-                                        <td class="text-muted small">{{ $cat->slug }}</td>
+                                        <td class="text-muted small"><code>{{ $cat->slug }}</code></td>
                                         <td class="text-center"><span class="badge bg-secondary">{{ $cat->menus_count }} menu</span></td>
                                         <td class="text-center">
-                                            @if($cat->status)
-                                                <span class="badge bg-success">Aktif</span>
-                                            @else
-                                                <span class="badge bg-danger">Nonaktif</span>
-                                            @endif
+                                            <form action="{{ route('categories.toggle-status', $cat->id) }}" method="POST" class="d-inline">
+                                                @csrf
+                                                @method('PATCH')
+                                                @if($cat->status)
+                                                    <button type="submit" class="btn btn-sm btn-success rounded-pill px-3 py-0 fw-semibold" title="Klik untuk Nonaktifkan Kategori">
+                                                        Aktif
+                                                    </button>
+                                                @else
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-0 fw-semibold" title="Klik untuk Aktifkan Kategori">
+                                                        Nonaktif
+                                                    </button>
+                                                @endif
+                                            </form>
                                         </td>
                                         <td class="text-center">
                                             <div class="btn-group btn-group-sm" role="group">
-                                                <button type="button" class="btn btn-outline-primary" onclick="editCategory({{ $cat->id }}, '{{ addslashes($cat->name) }}', {{ $cat->status ? 1 : 0 }})" title="Edit"><i class="fa-solid fa-edit"></i></button>
-                                                
-                                                <form action="{{ route('categories.destroy', $cat->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus kategori {{ $cat->name }}? Kategori yang memiliki menu di dalamnya tidak dapat dihapus.')">
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-outline-primary btn-edit-category"
+                                                    data-id="{{ $cat->id }}"
+                                                    data-name="{{ $cat->name }}"
+                                                    data-status="{{ $cat->status ? '1' : '0' }}"
+                                                    title="Edit Kategori"
+                                                >
+                                                    <i class="fa-solid fa-edit"></i>
+                                                </button>
+                                                <form action="{{ route('categories.destroy', $cat->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus kategori {{ $cat->name }}? Kategori yang masih memiliki menu di dalamnya tidak dapat dihapus.">
                                                     @csrf
                                                     @method('DELETE')
                                                     <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
@@ -71,10 +87,12 @@
     <div class="col-lg-5">
         <div class="card premium-card" id="formCard">
             <div class="premium-header">
-                <h5 class="m-0 fw-semibold text-dark" id="formTitle"><i class="fa-solid fa-plus-circle text-success me-2"></i> Tambah Kategori Baru</h5>
+                <h5 class="m-0 fw-semibold text-dark" id="formTitle">
+                    <i class="fa-solid fa-plus-circle text-success me-2" id="formTitleIcon"></i>
+                    <span id="formTitleText">Tambah Kategori Baru</span>
+                </h5>
             </div>
             <div class="card-body p-4">
-                
                 @if ($errors->any())
                     <div class="alert alert-danger border-0 rounded-3 mb-4">
                         <ul class="mb-0 ps-3">
@@ -91,7 +109,7 @@
 
                     <div class="mb-3">
                         <label for="name" class="form-label fw-medium text-dark">Nama Kategori <span class="text-danger">*</span></label>
-                        <input type="text" name="name" id="name" class="form-control" placeholder="Contoh: Varian Tea" value="{{ old('name') }}" required>
+                        <input type="text" name="name" id="name" class="form-control" placeholder="Contoh: Makanan Utama / Minuman" value="{{ old('name') }}" required>
                     </div>
 
                     <div class="mb-4" id="statusCheckboxContainer" style="display: none;">
@@ -100,16 +118,15 @@
                             <label class="form-check-label fw-medium text-dark" for="status">
                                 Kategori Aktif
                             </label>
-                            <div class="text-muted small">Jika tidak aktif, menu dalam kategori ini juga akan terpengaruh.</div>
+                            <div class="text-muted small">Jika tidak aktif, menu dalam kategori ini juga akan disembunyikan dari filter kasir.</div>
                         </div>
                     </div>
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary-green flex-grow-1" id="submitBtn"><i class="fa-solid fa-save me-1"></i> Simpan Kategori</button>
-                        <button type="button" class="btn btn-outline-secondary" id="cancelBtn" style="display: none;" onclick="resetForm()"><i class="fa-solid fa-xmark me-1"></i> Batal</button>
+                        <button type="button" class="btn btn-outline-secondary" id="cancelBtn" style="display: none;"><i class="fa-solid fa-xmark me-1"></i> Batal</button>
                     </div>
                 </form>
-
             </div>
         </div>
     </div>
@@ -118,48 +135,63 @@
 
 @section('scripts')
 <script>
-    const formCard = document.getElementById('formCard');
-    const formTitle = document.getElementById('formTitle');
-    const categoryForm = document.getElementById('categoryForm');
-    const methodPlaceholder = document.getElementById('methodPlaceholder');
-    const nameInput = document.getElementById('name');
-    const statusContainer = document.getElementById('statusCheckboxContainer');
-    const statusCheckbox = document.getElementById('status');
-    const submitBtn = document.getElementById('submitBtn');
-    const cancelBtn = document.getElementById('cancelBtn');
+    (function () {
+        const formCard = document.getElementById('formCard');
+        const formTitleIcon = document.getElementById('formTitleIcon');
+        const formTitleText = document.getElementById('formTitleText');
+        const categoryForm = document.getElementById('categoryForm');
+        const methodPlaceholder = document.getElementById('methodPlaceholder');
+        const nameInput = document.getElementById('name');
+        const statusContainer = document.getElementById('statusCheckboxContainer');
+        const statusCheckbox = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
 
-    function editCategory(id, name, status) {
-        // Switch form layout to Edit
-        formCard.classList.add('border-primary-subtle');
-        formTitle.innerHTML = `<i class="fa-solid fa-edit text-primary me-2"></i> Edit Kategori: ${name}`;
-        categoryForm.action = `/categories/${id}`;
-        methodPlaceholder.innerHTML = `<input type="hidden" name="_method" value="PUT">`;
-        nameInput.value = name;
-        
-        statusContainer.style.display = 'block';
-        statusCheckbox.checked = status === 1;
+        function editCategory(id, name, isActive) {
+            formCard.classList.add('border-primary-subtle');
+            formTitleIcon.className = 'fa-solid fa-edit text-primary me-2';
+            formTitleText.textContent = 'Edit Kategori: ' + name;
+            categoryForm.action = `/categories/${id}`;
+            methodPlaceholder.innerHTML = '<input type="hidden" name="_method" value="PUT">';
+            nameInput.value = name;
 
-        submitBtn.className = 'btn btn-primary flex-grow-1';
-        submitBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Simpan Perubahan';
-        cancelBtn.style.display = 'block';
+            statusContainer.style.display = 'block';
+            statusCheckbox.checked = isActive;
 
-        nameInput.focus();
-    }
+            submitBtn.className = 'btn btn-primary flex-grow-1';
+            submitBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Simpan Perubahan';
+            cancelBtn.style.display = 'block';
 
-    function resetForm() {
-        // Restore layout to Create
-        formCard.classList.remove('border-primary-subtle');
-        formTitle.innerHTML = '<i class="fa-solid fa-plus-circle text-success me-2"></i> Tambah Kategori Baru';
-        categoryForm.action = '{{ route("categories.store") }}';
-        methodPlaceholder.innerHTML = '';
-        nameInput.value = '';
-        
-        statusContainer.style.display = 'none';
-        statusCheckbox.checked = true;
+            nameInput.focus();
+        }
 
-        submitBtn.className = 'btn btn-primary-green flex-grow-1';
-        submitBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Simpan Kategori';
-        cancelBtn.style.display = 'none';
-    }
+        function resetForm() {
+            formCard.classList.remove('border-primary-subtle');
+            formTitleIcon.className = 'fa-solid fa-plus-circle text-success me-2';
+            formTitleText.textContent = 'Tambah Kategori Baru';
+            categoryForm.action = '{{ route("categories.store") }}';
+            methodPlaceholder.innerHTML = '';
+            nameInput.value = '';
+
+            statusContainer.style.display = 'none';
+            statusCheckbox.checked = true;
+
+            submitBtn.className = 'btn btn-primary-green flex-grow-1';
+            submitBtn.innerHTML = '<i class="fa-solid fa-save me-1"></i> Simpan Kategori';
+            cancelBtn.style.display = 'none';
+        }
+
+        document.querySelectorAll('.btn-edit-category').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                editCategory(
+                    btn.getAttribute('data-id'),
+                    btn.getAttribute('data-name') || '',
+                    btn.getAttribute('data-status') === '1'
+                );
+            });
+        });
+
+        cancelBtn?.addEventListener('click', resetForm);
+    })();
 </script>
 @endsection

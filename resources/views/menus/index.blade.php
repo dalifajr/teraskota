@@ -44,11 +44,11 @@
             <!-- Search Menu -->
             <div class="col-md-4">
                 <label for="search" class="form-label fw-medium text-dark">Cari Nama atau Kode Menu</label>
-                <input type="text" name="search" id="search" class="form-control" placeholder="Contoh: Jasmine Tea atau TEA-001..." value="{{ request('search') }}">
+                <input type="text" name="search" id="search" class="form-control" placeholder="Contoh: Kopi Susu atau MNM-001..." value="{{ request('search') }}">
             </div>
             
             <!-- Category Filter -->
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label for="category_id" class="form-label fw-medium text-dark">Kategori</label>
                 <select name="category_id" id="category_id" class="form-select">
                     <option value="">-- Semua Kategori --</option>
@@ -60,10 +60,20 @@
                 </select>
             </div>
 
+            <!-- Status Filter -->
+            <div class="col-md-2">
+                <label for="status" class="form-label fw-medium text-dark">Status</label>
+                <select name="status" id="status" class="form-select">
+                    <option value="">Semua Status</option>
+                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktif (Tersedia)</option>
+                    <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Habis / Nonaktif</option>
+                </select>
+            </div>
+
             <!-- Buttons -->
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-search"></i> Cari</button>
-                <a href="{{ route('menus.index') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-rotate-left"></i></a>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-search me-1"></i> Cari</button>
+                <a href="{{ route('menus.index') }}" class="btn btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
             </div>
         </form>
     </div>

@@ -8,39 +8,84 @@
 @endsection
 
 @section('content')
+@if(isset($summaryStats))
+<!-- Summary Strip -->
+<div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
+    <div class="col-md-4">
+        <div class="card premium-card border-0 shadow-sm p-3 h-100">
+            <small class="text-muted text-uppercase fw-semibold">Total Nota (Sesuai Filter)</small>
+            <h4 class="fw-bold text-dark mt-1 mb-0">{{ number_format($summaryStats['count'], 0, ',', '.') }} Transaksi</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card premium-card border-0 shadow-sm p-3 h-100">
+            <small class="text-muted text-uppercase fw-semibold">Total Omzet Lunas</small>
+            <h4 class="fw-bold text-success mt-1 mb-0">Rp{{ number_format($summaryStats['total_sales'], 0, ',', '.') }}</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card premium-card border-0 shadow-sm p-3 h-100">
+            <small class="text-muted text-uppercase fw-semibold">Total Keuntungan Kotor</small>
+            <h4 class="fw-bold text-primary mt-1 mb-0">Rp{{ number_format($summaryStats['total_profit'], 0, ',', '.') }}</h4>
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Filter Panel -->
 <div class="card premium-card mb-4">
     <div class="card-body p-4">
         <form action="{{ route('transactions.index') }}" method="GET" class="row g-3 align-items-end">
             <!-- Search Transaction Number -->
-            <div class="col-md-2">
-                <label for="search" class="form-label fw-medium text-dark">Cari No. Transaksi</label>
-                <input type="text" name="search" id="search" class="form-control" placeholder="TRX-2026... / Nama" value="{{ request('search') }}">
+            <div class="col-md-3">
+                <label for="search" class="form-label fw-medium text-dark small">Cari No. Transaksi / Pelanggan</label>
+                <input type="text" name="search" id="search" class="form-control form-control-sm" placeholder="TRX-2026... / Nama" value="{{ request('search') }}">
             </div>
 
             <!-- Status Filter -->
-            <div class="col-md-2">
-                <label for="status" class="form-label fw-medium text-dark">Status</label>
-                <select name="status" id="status" class="form-select">
-                    <option value="">-- Semua Status --</option>
+            <div class="col-md-2 col-6">
+                <label for="status" class="form-label fw-medium text-dark small">Status</label>
+                <select name="status" id="status" class="form-select form-select-sm">
+                    <option value="">Semua Status</option>
                     <option value="paid" {{ request('status') === 'paid' ? 'selected' : '' }}>Lunas (Paid)</option>
                     <option value="pending" {{ request('status') === 'pending' ? 'selected' : '' }}>Menunggu (Pending)</option>
-                    <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Kadaluarsa (Expired)</option>
-                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Dibatalkan (Cancelled)</option>
+                    <option value="expired" {{ request('status') === 'expired' ? 'selected' : '' }}>Kadaluarsa</option>
+                    <option value="cancelled" {{ request('status') === 'cancelled' ? 'selected' : '' }}>Dibatalkan</option>
                 </select>
             </div>
-            
+
+            <!-- Payment Method Filter -->
+            <div class="col-md-2 col-6">
+                <label for="payment_method" class="form-label fw-medium text-dark small">Metode Bayar</label>
+                <select name="payment_method" id="payment_method" class="form-select form-select-sm">
+                    <option value="">Semua Metode</option>
+                    <option value="tunai" {{ request('payment_method') === 'tunai' ? 'selected' : '' }}>Tunai</option>
+                    <option value="qris" {{ request('payment_method') === 'qris' ? 'selected' : '' }}>QRIS</option>
+                </select>
+            </div>
+
+            <!-- Cashier Filter -->
+            <div class="col-md-2 col-6">
+                <label for="cashier_id" class="form-label fw-medium text-dark small">Kasir / Admin</label>
+                <select name="cashier_id" id="cashier_id" class="form-select form-select-sm">
+                    <option value="">Semua Kasir</option>
+                    @foreach($cashiers ?? [] as $c)
+                        <option value="{{ $c->id }}" {{ (string) request('cashier_id') === (string) $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             <!-- Date Filter -->
-            <div class="col-md-2">
-                <label for="date" class="form-label fw-medium text-dark">Filter Tanggal</label>
-                <input type="date" name="date" id="date" class="form-control" value="{{ request('date') }}">
+            <div class="col-md-3 col-6">
+                <label for="date" class="form-label fw-medium text-dark small">Tanggal Spesifik</label>
+                <input type="date" name="date" id="date" class="form-control form-control-sm" value="{{ request('date') }}">
             </div>
 
             <!-- Month Filter -->
-            <div class="col-md-2">
-                <label for="month" class="form-label fw-medium text-dark">Filter Bulan</label>
-                <select name="month" id="month" class="form-select">
-                    <option value="">-- Semua Bulan --</option>
+            <div class="col-md-3 col-6">
+                <label for="month" class="form-label fw-medium text-dark small">Bulan</label>
+                <select name="month" id="month" class="form-select form-select-sm">
+                    <option value="">Semua Bulan</option>
                     @for($m = 1; $m <= 12; $m++)
                         <option value="{{ $m }}" {{ request('month') == $m ? 'selected' : '' }}>
                             {{ Carbon\Carbon::create()->month($m)->translatedFormat('F') }}
@@ -50,9 +95,9 @@
             </div>
 
             <!-- Year Filter -->
-            <div class="col-md-1">
-                <label for="year" class="form-label fw-medium text-dark">Tahun</label>
-                <select name="year" id="year" class="form-select">
+            <div class="col-md-2 col-6">
+                <label for="year" class="form-label fw-medium text-dark small">Tahun</label>
+                <select name="year" id="year" class="form-select form-select-sm">
                     <option value="">Semua</option>
                     @for($y = date('Y'); $y >= 2020; $y--)
                         <option value="{{ $y }}" {{ request('year') == $y ? 'selected' : '' }}>{{ $y }}</option>
@@ -61,18 +106,18 @@
             </div>
 
             <!-- Sort Order -->
-            <div class="col-md-1">
-                <label for="sort" class="form-label fw-medium text-dark">Urutan</label>
-                <select name="sort" id="sort" class="form-select">
+            <div class="col-md-2 col-6">
+                <label for="sort" class="form-label fw-medium text-dark small">Urutan</label>
+                <select name="sort" id="sort" class="form-select form-select-sm">
                     <option value="desc" {{ request('sort') !== 'asc' ? 'selected' : '' }}>Terbaru</option>
                     <option value="asc" {{ request('sort') === 'asc' ? 'selected' : '' }}>Terlama</option>
                 </select>
             </div>
 
             <!-- Buttons -->
-            <div class="col-md-2 d-flex gap-2">
-                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-search"></i> Cari</button>
-                <a href="{{ route('transactions.index') }}" class="btn btn-outline-secondary"><i class="fa-solid fa-rotate-left"></i></a>
+            <div class="col-md-5 col-6 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary-green flex-grow-1"><i class="fa-solid fa-search me-1"></i> Terapkan Filter</button>
+                <a href="{{ route('transactions.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset Filter"><i class="fa-solid fa-rotate-left"></i></a>
             </div>
         </form>
     </div>
@@ -82,24 +127,31 @@
 <div class="card premium-card">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
         <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-list-check text-success me-2"></i> Daftar Log Transaksi</h5>
-        <a href="{{ route('transactions.create') }}" class="btn btn-primary-green btn-sm shadow-sm"><i class="fa-solid fa-plus me-1"></i> Transaksi Baru</a>
+        <div class="d-flex gap-2">
+            <a href="{{ route('transactions.export', request()->query()) }}" class="btn btn-outline-dark btn-sm">
+                <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+            </a>
+            <a href="{{ route('transactions.create') }}" class="btn btn-primary-green btn-sm shadow-sm">
+                <i class="fa-solid fa-plus me-1"></i> Transaksi Baru
+            </a>
+        </div>
     </div>
     <div class="card-body p-4">
         @if($transactions->count() > 0)
             <div class="table-responsive">
-                <table class="table table-hover align-middle border mb-4">
+                <table class="table table-hover align-middle border mb-4" style="font-variant-numeric: tabular-nums;">
                     <thead>
                         <tr>
                             <th>No. Transaksi</th>
-                            <th>Tanggal & Waktu</th>
-                            <th class="text-center">Metode & Status</th>
+                            <th>Tanggal &amp; Waktu</th>
+                            <th class="text-center">Metode &amp; Status</th>
                             <th class="text-center">Menu Unik</th>
                             <th class="text-center">Qty Terjual</th>
                             <th class="text-end">Total Omzet</th>
                             <th class="text-end">Total Keuntungan</th>
                             <th>Catatan</th>
-                            <th>Admin</th>
-                            <th class="text-center" style="width: 150px;">Aksi</th>
+                            <th>Kasir / Admin</th>
+                            <th class="text-center" style="width: 175px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -132,17 +184,17 @@
                                 <td class="text-end fw-bold text-success">Rp{{ number_format($trx->total_sales, 0, ',', '.') }}</td>
                                 <td class="text-end text-primary">Rp{{ number_format($trx->total_profit, 0, ',', '.') }}</td>
                                 <td>
-                                    <span class="small text-truncate d-inline-block" style="max-width: 150px;" title="{{ $trx->notes }}">
+                                    <span class="small text-truncate d-inline-block" style="max-width: 140px;" title="{{ $trx->notes }}">
                                         {{ $trx->notes ?: '-' }}
                                     </span>
                                 </td>
                                 <td><span class="small fw-semibold">{{ $trx->admin->name ?? 'System' }}</span></td>
                                 <td class="text-center">
                                     <div class="btn-group btn-group-sm" role="group">
+                                        <a href="{{ route('pos.receipt', $trx->id) }}" target="_blank" class="btn btn-outline-dark" title="Cetak Struk Thermal"><i class="fa-solid fa-print"></i></a>
                                         <a href="{{ route('transactions.show', $trx->id) }}" class="btn btn-outline-success" title="Detail"><i class="fa-solid fa-eye"></i></a>
                                         <a href="{{ route('transactions.edit', $trx->id) }}" class="btn btn-outline-primary" title="Edit"><i class="fa-solid fa-edit"></i></a>
-                                        
-                                        <form action="{{ route('transactions.destroy', $trx->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin menghapus transaksi {{ $trx->transaction_number }}? Transaksi ini akan dipindahkan ke folder sampah (soft delete).')">
+                                        <form action="{{ route('transactions.destroy', $trx->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus transaksi {{ $trx->transaction_number }}? Transaksi ini akan dipindahkan ke folder sampah (soft delete).">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
@@ -154,7 +206,7 @@
                     </tbody>
                 </table>
             </div>
-            
+
             <!-- Pagination -->
             <div class="d-flex justify-content-between align-items-center flex-wrap">
                 <small class="text-muted">Menampilkan {{ $transactions->firstItem() }} sampai {{ $transactions->lastItem() }} dari {{ $transactions->total() }} transaksi</small>
@@ -166,7 +218,7 @@
             <div class="text-center text-muted py-5">
                 <i class="fa-solid fa-folder-open fs-1 mb-3 text-secondary"></i>
                 <p class="m-0">Tidak ada riwayat transaksi ditemukan</p>
-                <small>Silakan buat transaksi baru terlebih dahulu.</small>
+                <small>Coba ubah filter atau buat transaksi baru terlebih dahulu.</small>
             </div>
         @endif
     </div>

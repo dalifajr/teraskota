@@ -70,10 +70,10 @@
     </div>
 </div>
 
-<!-- Metrics summary boxes -->
-<div class="row g-3 mb-4">
+<!-- Metrics summary boxes (Fixed valid Bootstrap 5 5-column responsive grid) -->
+<div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4" style="font-variant-numeric: tabular-nums;">
     <!-- Transactions count -->
-    <div class="col-md-4 col-lg-2.4 col-sm-6">
+    <div class="col">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
                 <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Transaksi</small>
@@ -84,7 +84,7 @@
     </div>
     
     <!-- Product quantity count -->
-    <div class="col-md-4 col-lg-2.4 col-sm-6">
+    <div class="col">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
                 <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Item Terjual</small>
@@ -95,7 +95,7 @@
     </div>
 
     <!-- Sales Omzet -->
-    <div class="col-md-4 col-lg-2.4 col-sm-6">
+    <div class="col">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
                 <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Total Omzet</small>
@@ -106,18 +106,18 @@
     </div>
 
     <!-- Total profit -->
-    <div class="col-md-6 col-lg-2.4 col-sm-6">
+    <div class="col">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
-                <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Total Keuntungan</small>
+                <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Laba Kotor</small>
                 <h3 class="fw-bold text-success m-0">Rp{{ number_format($total_profit, 0, ',', '.') }}</h3>
-                <small class="text-muted">Laba bersih (pendapatan - modal)</small>
+                <small class="text-muted">Omzet &minus; estimasi modal</small>
             </div>
         </div>
     </div>
 
     <!-- Estimated cost -->
-    <div class="col-md-6 col-lg-2.4 col-sm-6">
+    <div class="col">
         <div class="card premium-card border-0 bg-white h-100 shadow-sm">
             <div class="card-body p-3">
                 <small class="text-muted d-block fw-semibold mb-2 text-uppercase">Estimasi Modal</small>
@@ -128,33 +128,63 @@
     </div>
 </div>
 
-<!-- Secondary metrics cards -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
+<!-- Secondary metrics cards + Payment Channel Breakdown -->
+<div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
-            <span class="small text-muted d-block mb-1">Total Diskon Promo</span>
-            <strong class="fs-5 text-warning">Rp{{ number_format($total_discount ?? 0, 0, ',', '.') }}</strong>
+            <span class="small text-muted d-block mb-1"><i class="fa-solid fa-money-bill-wave text-success me-1"></i>Omzet Tunai</span>
+            <strong class="fs-6 text-dark">Rp{{ number_format($cash_sales ?? 0, 0, ',', '.') }}</strong>
+            <small class="text-muted d-block">{{ $cash_count ?? 0 }} nota</small>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
-            <span class="small text-muted d-block mb-1">Pengeluaran Operasional</span>
-            <strong class="fs-5 text-danger">Rp{{ number_format($total_expenses ?? 0, 0, ',', '.') }}</strong>
+            <span class="small text-muted d-block mb-1"><i class="fa-solid fa-qrcode text-info me-1"></i>Omzet QRIS</span>
+            <strong class="fs-6 text-dark">Rp{{ number_format($qris_sales ?? 0, 0, ',', '.') }}</strong>
+            <small class="text-muted d-block">{{ $qris_count ?? 0 }} nota</small>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+            <span class="small text-muted d-block mb-1">Diskon Promo</span>
+            <strong class="fs-6 text-warning">Rp{{ number_format($total_discount ?? 0, 0, ',', '.') }}</strong>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+        <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
+            <span class="small text-muted d-block mb-1">Pengeluaran Kas</span>
+            <strong class="fs-6 text-danger">Rp{{ number_format($total_expenses ?? 0, 0, ',', '.') }}</strong>
+        </div>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100" style="border-left: 4px solid var(--primary-green) !important;">
-            <span class="small text-muted d-block mb-1">Laba Bersih Aktual (Net Profit)</span>
-            <strong class="fs-5 {{ ($net_profit ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($net_profit ?? 0, 0, ',', '.') }}</strong>
+            <span class="small text-muted d-block mb-1">Laba Bersih Aktual</span>
+            <strong class="fs-6 {{ ($net_profit ?? 0) >= 0 ? 'text-success' : 'text-danger' }}">Rp{{ number_format($net_profit ?? 0, 0, ',', '.') }}</strong>
         </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-6 col-md-4 col-xl-2">
         <div class="card premium-card border-0 p-3 bg-white shadow-sm h-100">
-            <span class="small text-muted d-block mb-1"><i class="fa-solid fa-trophy text-warning"></i> Menu Terlaris</span>
-            <strong class="fs-6 text-success text-truncate d-block" title="{{ $best_seller }}">{{ $best_seller }}</strong>
+            <span class="small text-muted d-block mb-1"><i class="fa-solid fa-trophy text-warning me-1"></i>Terlaris</span>
+            <strong class="small text-success text-truncate d-block" title="{{ $best_seller }}">{{ $best_seller }}</strong>
         </div>
     </div>
 </div>
+
+@php
+    $repStoreName = $currentTenant?->name ?? ($platformName ?? 'KasirLoka');
+    $waReportSummary = "*LAPORAN PENJUALAN " . strtoupper($repStoreName) . "*\n"
+        . "Periode: {$date_range_label}\n"
+        . "--------------------------------\n"
+        . "Transaksi   : " . number_format($total_transactions, 0, ',', '.') . " nota (" . number_format($total_quantity, 0, ',', '.') . " pcs)\n"
+        . "Total Omzet : Rp" . number_format($total_sales, 0, ',', '.') . "\n"
+        . "  - Tunai   : Rp" . number_format($cash_sales ?? 0, 0, ',', '.') . "\n"
+        . "  - QRIS    : Rp" . number_format($qris_sales ?? 0, 0, ',', '.') . "\n"
+        . "Laba Kotor  : Rp" . number_format($total_profit, 0, ',', '.') . "\n"
+        . "Pengeluaran : Rp" . number_format($total_expenses ?? 0, 0, ',', '.') . "\n"
+        . "--------------------------------\n"
+        . "*LABA BERSIH: Rp" . number_format($net_profit ?? 0, 0, ',', '.') . "*\n"
+        . "Terlaris    : {$best_seller}";
+@endphp
 
 <!-- Laporan detail table -->
 <div class="card premium-card">
@@ -164,8 +194,11 @@
             <small class="text-muted">Menampilkan data periode: <strong>{{ $date_range_label }}</strong></small>
         </div>
         
-        <!-- Print & Export Buttons -->
-        <div class="d-flex gap-2">
+        <!-- Print, Share WA & Export Buttons -->
+        <div class="d-flex flex-wrap gap-2">
+            <a href="https://wa.me/?text={{ urlencode($waReportSummary) }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm fw-semibold">
+                <i class="fa-brands fa-whatsapp me-1"></i> Bagikan WA
+            </a>
             <!-- Cetak PDF -->
             <a href="{{ route('reports.pdf', request()->query()) }}" target="_blank" class="btn btn-outline-danger btn-sm fw-semibold">
                 <i class="fa-solid fa-file-pdf me-1"></i> Cetak PDF

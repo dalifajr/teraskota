@@ -176,10 +176,13 @@ Route::middleware('auth')->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
             Route::get('/notifications/unread-transactions', [DashboardController::class, 'unreadTransactions'])->name('notifications.unread');
 
+            Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
             Route::resource('transactions', TransactionController::class);
+            Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
             Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
             Route::patch('/menus/{menu}/toggle-status', [MenuController::class, 'toggleStatus'])->name('menus.toggle-status');
             Route::resource('menus', MenuController::class);
+            Route::patch('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
             Route::resource('categories', CategoryController::class);
             Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
 
