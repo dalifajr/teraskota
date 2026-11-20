@@ -1,17 +1,42 @@
 #!/usr/bin/env bash
 # language: bash, file: vps/install.sh, target: Ubuntu 24/26 x86_64/arm64
-# Teras Kota — Interactive VPS Installer
-# Usage: curl -sSL <raw-url> | sudo bash
-#    or: sudo bash install.sh
+# KasirLoka / Teras Kota — Interactive VPS Installer (Multi-Tenant SaaS Ready)
+# Usage: sudo bash vps/install.sh
+#    or: curl -sSL <raw-url> | sudo bash
 
 set -euo pipefail
 
-# ── Resolve script directory ──────────────────────────────────────────────────
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LIB_DIR="${SCRIPT_DIR}/lib"
-CONFIG_DIR="${SCRIPT_DIR}/config"
+# ── Bootstrap when executed via `curl | sudo bash` (no local lib/ dir) ────────
+_SELF_SOURCE="${BASH_SOURCE[0]:-}"
+if [ -n "$_SELF_SOURCE" ] && [ -f "$_SELF_SOURCE" ]; then
+    INSTALLER_DIR="$(cd "$(dirname "$_SELF_SOURCE")" && pwd)"
+else
+    INSTALLER_DIR=""
+fi
 
-# Source libraries
+if [ -z "$INSTALLER_DIR" ] || [ ! -f "${INSTALLER_DIR}/lib/common.sh" ]; then
+    if [ "$(id -u)" -ne 0 ]; then
+        echo "[ERR] Script harus dijalankan sebagai root (sudo)." >&2
+        exit 1
+    fi
+    BOOTSTRAP_REPO="${TERASKOTA_BOOTSTRAP_REPO:-https://github.com/dzulfikrialifajri/teraskota.git}"
+    BOOTSTRAP_BRANCH="${TERASKOTA_BOOTSTRAP_BRANCH:-main}"
+    BOOTSTRAP_DIR="/tmp/teraskota-installer"
+
+    echo "[INFO] Mode remote pipe terdeteksi. Mengunduh installer ke ${BOOTSTRAP_DIR}..."
+    if ! command -v git &>/dev/null; then
+        apt-get update -y >/dev/null 2>&1 || true
+        DEBIAN_FRONTEND=noninteractive apt-get install -y git >/dev/null 2>&1
+    fi
+    rm -rf "$BOOTSTRAP_DIR"
+    git clone --depth 1 -b "$BOOTSTRAP_BRANCH" "$BOOTSTRAP_REPO" "$BOOTSTRAP_DIR"
+    exec bash "${BOOTSTRAP_DIR}/vps/install.sh" "$@" < /dev/tty
+fi
+
+LIB_DIR="${INSTALLER_DIR}/lib"
+CONFIG_DIR="${INSTALLER_DIR}/config"
+
+# Source libraries (libraries use private _*_LIB_DIR so INSTALLER_DIR is never overwritten)
 source "${LIB_DIR}/common.sh"
 source "${LIB_DIR}/php-install.sh"
 source "${LIB_DIR}/node-install.sh"
@@ -26,7 +51,11 @@ require_ubuntu
 
 # Init log
 mkdir -p "$(dirname "${TERASKOTA_LOG}")"
-echo "=== Teras Kota Installation $(date) ===" > "${TERASKOTA_LOG}"
+echo "=== KasirLoka / Teras Kota Installation $(date) ===" > "${TERASKOTA_LOG}"
+
+# Staged Cloudflare Origin SSL temp files (if chosen during interactive dialog)
+STAGED_CF_CERT=""
+STAGED_CF_KEY=""
 
 # ══════════════════════════════════════════════════════════════════════════════
 # STEP 1: System Check
@@ -50,7 +79,6 @@ system_check() {
     save_config "OS_CODENAME" "$codename"
     save_config "OS_VERSION" "$version"
 
-    # Warnings
     if [ "$ram_mb" -lt 512 ]; then
         log_error "RAM terlalu kecil (${ram_mb} MB). Minimal 512MB."
         exit 1
@@ -77,14 +105,25 @@ collect_config() {
     echo
 
     # Domain
-    INSTALL_DOMAIN=$(prompt_input "Domain" "Domain website (contoh: teraskota.com)" "")
+    INSTALL_DOMAIN=$(prompt_input "Domain" "Domain website (contoh: kasirloka.id atau teh.belajaridn.id)" "")
     while [ -z "$INSTALL_DOMAIN" ]; do
         log_warn "Domain wajib diisi"
-        INSTALL_DOMAIN=$(prompt_input "Domain" "Domain website (contoh: teraskota.com)" "")
+        INSTALL_DOMAIN=$(prompt_input "Domain" "Domain website (contoh: kasirloka.id)" "")
     done
 
+    # Platform Name
+    INSTALL_PLATFORM_NAME=$(prompt_input "Nama Platform" "Nama brand platform SaaS" "KasirLoka")
+
     # GitHub repo
-    INSTALL_REPO=$(prompt_input "GitHub Repository" "URL repository GitHub" "https://github.com/username/teraskota.git")
+    local default_repo="https://github.com/dzulfikrialifajri/teraskota.git"
+    if [ -d "${INSTALLER_DIR}/../.git" ]; then
+        local detected_origin
+        detected_origin=$(git -C "${INSTALLER_DIR}/.." remote get-url origin 2>/dev/null || echo "")
+        if [ -n "$detected_origin" ]; then
+            default_repo="$detected_origin"
+        fi
+    fi
+    INSTALL_REPO=$(prompt_input "GitHub Repository" "URL repository GitHub" "$default_repo")
 
     # GitHub branch
     INSTALL_BRANCH=$(prompt_input "Branch" "Branch yang akan di-deploy" "main")
@@ -100,34 +139,92 @@ collect_config() {
     # Database name
     INSTALL_DB_NAME=$(prompt_input "Database" "Nama database" "db_teras_kota")
 
-    # Email for SSL (optional)
-    INSTALL_EMAIL=$(prompt_input "SSL" "Email untuk SSL certificate (kosongkan jika tidak ada)" "")
+    # SSL Mode Selection
+    echo
+    echo -e "${C_BOLD}━━━ Mode Sertifikat SSL ━━━${C_RESET}"
+    echo -e "  ${C_WHITE}1${C_RESET}) Let's Encrypt Otomatis (Certbot — DNS Only / Non-Cloudflare Proxy)"
+    echo -e "  ${C_WHITE}2${C_RESET}) Cloudflare Origin Server Certificate (Full Strict — Cocok untuk Orange Cloud)"
+    echo -e "  ${C_WHITE}3${C_RESET}) Lewati SSL dulu (HTTP saja, bisa pasang nanti via teraskota-ctl)"
+    echo
+
+    local ssl_choice=""
+    read -rp "$(echo -e "${C_CYAN}Pilih Mode SSL [1-3]${C_RESET} [1]: ")" ssl_choice
+    ssl_choice="${ssl_choice:-1}"
+
+    INSTALL_SSL_MODE="certbot"
+    INSTALL_EMAIL=""
+
+    case "$ssl_choice" in
+        2)
+            INSTALL_SSL_MODE="cloudflare"
+            echo
+            log_info "Anda memilih Cloudflare Origin Server Certificate."
+            echo -e "${C_DIM}Di Dashboard Cloudflare: SSL/TLS → Origin Server → Create Certificate (PEM).${C_RESET}"
+
+            STAGED_CF_CERT=$(mktemp)
+            STAGED_CF_KEY=$(mktemp)
+
+            while true; do
+                if read_pem_input "Origin Certificate (PEM)" "END CERTIFICATE" "$STAGED_CF_CERT" && \
+                   read_pem_input "Private Key (PEM)" "PRIVATE KEY-----" "$STAGED_CF_KEY" && \
+                   validate_cloudflare_cert_pair "$STAGED_CF_CERT" "$STAGED_CF_KEY"; then
+                    log_ok "Cloudflare Origin Certificate & Private Key valid dan cocok!"
+                    break
+                else
+                    if ! prompt_yesno "SSL Error" "Sertifikat tidak valid / tidak cocok. Coba input ulang?"; then
+                        log_warn "Beralih ke mode tanpa SSL (HTTP dulu). Anda bisa pasang nanti lewat: sudo teraskota-ctl ssl-cloudflare"
+                        INSTALL_SSL_MODE="none"
+                        rm -f "$STAGED_CF_CERT" "$STAGED_CF_KEY"
+                        STAGED_CF_CERT=""
+                        STAGED_CF_KEY=""
+                        break
+                    fi
+                fi
+            done
+            ;;
+        3)
+            INSTALL_SSL_MODE="none"
+            ;;
+        *)
+            INSTALL_SSL_MODE="certbot"
+            INSTALL_EMAIL=$(prompt_input "SSL" "Email untuk Let's Encrypt SSL (opsional, kosongkan jika tidak ada)" "")
+            ;;
+    esac
 
     # Confirm
     echo
     echo -e "${C_BOLD}━━━ Konfirmasi Konfigurasi ━━━${C_RESET}"
     echo -e "  Domain      : ${C_GREEN}${INSTALL_DOMAIN}${C_RESET}"
+    echo -e "  Platform    : ${C_GREEN}${INSTALL_PLATFORM_NAME}${C_RESET}"
     echo -e "  Repository  : ${C_GREEN}${INSTALL_REPO}${C_RESET}"
     echo -e "  Branch      : ${C_GREEN}${INSTALL_BRANCH}${C_RESET}"
     echo -e "  Database    : ${C_GREEN}${INSTALL_DB_NAME}${C_RESET}"
     echo -e "  DB Password : ${C_GREEN}********${C_RESET}"
-    echo -e "  SSL Email   : ${C_GREEN}${INSTALL_EMAIL:-<none>}${C_RESET}"
+    echo -e "  Mode SSL    : ${C_GREEN}${INSTALL_SSL_MODE}${C_RESET}"
+    if [ "$INSTALL_SSL_MODE" = "certbot" ]; then
+        echo -e "  SSL Email   : ${C_GREEN}${INSTALL_EMAIL:-<none>}${C_RESET}"
+    fi
     echo
 
     if ! prompt_yesno "Konfirmasi" "Lanjutkan instalasi dengan konfigurasi di atas?"; then
         log_info "Instalasi dibatalkan oleh user"
+        rm -f "${STAGED_CF_CERT:-}" "${STAGED_CF_KEY:-}"
         exit 0
     fi
 
     # Save to config
     save_config "DOMAIN" "$INSTALL_DOMAIN"
+    save_config "PLATFORM_NAME" "$INSTALL_PLATFORM_NAME"
     save_config "REPO_URL" "$INSTALL_REPO"
     save_config "REPO_BRANCH" "$INSTALL_BRANCH"
     save_config "DB_NAME" "$INSTALL_DB_NAME"
     save_config "DB_USER" "teraskota"
+    save_config "SSL_MODE" "$INSTALL_SSL_MODE"
     save_config "SSL_EMAIL" "$INSTALL_EMAIL"
-    # DB password stored separately with restricted permissions
-    echo "$INSTALL_DB_PASS" > "${TERASKOTA_CONFIG}/db_password"
+
+    # DB password stored separately with restricted permissions (no trailing newline issues)
+    mkdir -p "${TERASKOTA_CONFIG}"
+    printf '%s' "$INSTALL_DB_PASS" > "${TERASKOTA_CONFIG}/db_password"
     chmod 600 "${TERASKOTA_CONFIG}/db_password"
 }
 
@@ -147,7 +244,6 @@ setup_swap() {
     local ram_mb
     ram_mb=$(detect_total_ram_mb)
 
-    # Swap = RAM size, max 2GB
     local swap_mb=$ram_mb
     [ "$swap_mb" -gt 2048 ] && swap_mb=2048
 
@@ -158,12 +254,10 @@ setup_swap() {
     mkswap /swapfile
     swapon /swapfile
 
-    # Persist
     if ! grep -q '/swapfile' /etc/fstab; then
         echo '/swapfile none swap sw 0 0' >> /etc/fstab
     fi
 
-    # Tune swappiness for VPS (low — prefer RAM)
     sysctl vm.swappiness=10
     if ! grep -q 'vm.swappiness' /etc/sysctl.conf; then
         echo 'vm.swappiness=10' >> /etc/sysctl.conf
@@ -173,13 +267,36 @@ setup_swap() {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 3: PHP — delegated to lib/php-install.sh
-# ══════════════════════════════════════════════════════════════════════════════
-# install_php() is sourced from php-install.sh
-
-# ══════════════════════════════════════════════════════════════════════════════
 # STEP 4: MariaDB
 # ══════════════════════════════════════════════════════════════════════════════
+ensure_mariadb_user() {
+    local db_name="$1"
+    local db_user="$2"
+    local db_pass="$3"
+    local esc_pass
+    esc_pass=$(sql_escape "$db_pass")
+
+    mariadb -u root <<-EOSQL
+CREATE DATABASE IF NOT EXISTS \`${db_name}\`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${esc_pass}';
+ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${esc_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+
+CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${esc_pass}';
+ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${esc_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';
+
+CREATE USER IF NOT EXISTS '${db_user}'@'::1' IDENTIFIED BY '${esc_pass}';
+ALTER USER '${db_user}'@'::1' IDENTIFIED BY '${esc_pass}';
+GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'::1';
+
+FLUSH PRIVILEGES;
+EOSQL
+}
+
 install_mariadb() {
     log_step "[4/7] Install MariaDB"
 
@@ -190,10 +307,8 @@ install_mariadb() {
         DEBIAN_FRONTEND=noninteractive apt-get install -y mariadb-server mariadb-client 2>&1 | tail -3
     fi
 
-    # Ensure running
     systemctl enable --now mariadb
 
-    # Apply tuning config
     local tuning_src="${CONFIG_DIR}/mysql-tuning.cnf"
     local tuning_dst=""
 
@@ -210,40 +325,17 @@ install_mariadb() {
         log_ok "Tuning config applied: ${tuning_dst}"
     fi
 
-    # Create database and user
     local db_name db_user db_pass
     db_name=$(load_config "DB_NAME" "db_teras_kota")
     db_user=$(load_config "DB_USER" "teraskota")
     db_pass=$(cat "${TERASKOTA_CONFIG}/db_password" 2>/dev/null || echo "")
 
     log_substep "Membuat database '${db_name}' dan user '${db_user}'..."
+    ensure_mariadb_user "$db_name" "$db_user" "$db_pass"
 
-    mariadb -u root <<-EOSQL
-CREATE DATABASE IF NOT EXISTS \`${db_name}\`
-    CHARACTER SET utf8mb4
-    COLLATE utf8mb4_unicode_ci;
-
-CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
-
-CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';
-
-CREATE USER IF NOT EXISTS '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'::1';
-
-FLUSH PRIVILEGES;
-EOSQL
-
-    # Restart with tuning applied
     systemctl restart mariadb
-
     log_ok "Database '${db_name}' dan user '${db_user}' siap"
 
-    # Secure installation (non-interactive)
     log_substep "Mengamankan MariaDB..."
     mariadb -u root <<-EOSQL2
 DELETE FROM mysql.user WHERE User='';
@@ -270,9 +362,8 @@ install_nginx() {
 
     systemctl enable --now nginx
 
-    # Configure vhost from template
     local php_ver domain
-    php_ver=$(load_config "PHP_VERSION" "8.3")
+    php_ver=$(load_config "PHP_VERSION" "8.4")
     domain=$(load_config "DOMAIN")
 
     local template="${CONFIG_DIR}/nginx.conf.template"
@@ -283,16 +374,13 @@ install_nginx() {
         exit 1
     fi
 
-    # Replace placeholders
     sed -e "s/{{DOMAIN}}/${domain}/g" \
         -e "s/{{PHP_VERSION}}/${php_ver}/g" \
         "$template" > "$vhost"
 
-    # Enable site, disable default
     ln -sf "$vhost" /etc/nginx/sites-enabled/teraskota
     rm -f /etc/nginx/sites-enabled/default
 
-    # Test config
     if nginx -t 2>&1; then
         systemctl reload nginx
         log_ok "Nginx dikonfigurasi untuk ${domain}"
@@ -307,32 +395,28 @@ install_nginx() {
 # STEP 5.5: Clone & Setup Application
 # ══════════════════════════════════════════════════════════════════════════════
 setup_application() {
-    log_step "Setup Aplikasi Teras Kota"
+    log_step "Setup Aplikasi KasirLoka / Teras Kota"
 
     local repo_url branch
     repo_url=$(load_config "REPO_URL")
     branch=$(load_config "REPO_BRANCH" "main")
 
-    # Install git if needed
     if ! check_command git; then
         DEBIAN_FRONTEND=noninteractive apt-get install -y git 2>&1 | tail -1
     fi
 
-    # Install composer if needed
     if ! check_command composer; then
         log_substep "Menginstall Composer..."
-        local expected_sig
+        local expected_sig actual_sig
         expected_sig=$(curl -fsSL https://composer.github.io/installer.sig)
         curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
-        local actual_sig
         actual_sig=$(php -r "echo hash_file('sha384', '/tmp/composer-setup.php');")
 
         if [ "$expected_sig" = "$actual_sig" ]; then
             php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
             log_ok "Composer $(composer --version 2>&1 | head -1)"
         else
-            log_error "Composer installer signature mismatch"
-            # Install anyway — many systems skip this check
+            log_warn "Composer signature check warning — mencoba instalasi fallback..."
             php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer 2>/dev/null || {
                 log_error "Composer install gagal"
                 exit 1
@@ -341,14 +425,11 @@ setup_application() {
         rm -f /tmp/composer-setup.php
     fi
 
-    # Install unzip (needed by composer)
     DEBIAN_FRONTEND=noninteractive apt-get install -y unzip 2>&1 | tail -1
 
-    # Fix git dubious ownership (root vs www-data)
     git config --global --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
     git config --system --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
 
-    # Clone repository
     if [ -d "${TERASKOTA_ROOT}/.git" ]; then
         log_info "Repository sudah ada, pulling update..."
         cd "${TERASKOTA_ROOT}"
@@ -364,67 +445,54 @@ setup_application() {
 
     cd "${TERASKOTA_ROOT}"
 
-    # Composer install (production)
     log_substep "Menginstall PHP dependencies..."
     composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -5
 
-    # Configure .env
+    # Configure .env safely via set_env_var (immune to &, |, \, ' in DB passwords)
     log_substep "Mengkonfigurasi .env..."
     if [ ! -f .env ]; then
         cp .env.example .env
     fi
 
-    local domain db_name db_user db_pass
+    local domain platform_name db_name db_user db_pass ssl_mode app_scheme
     domain=$(load_config "DOMAIN")
+    platform_name=$(load_config "PLATFORM_NAME" "KasirLoka")
     db_name=$(load_config "DB_NAME" "db_teras_kota")
     db_user=$(load_config "DB_USER" "teraskota")
     db_pass=$(cat "${TERASKOTA_CONFIG}/db_password" 2>/dev/null || echo "")
+    ssl_mode=$(load_config "SSL_MODE" "certbot")
+    app_scheme="https"
+    if [ "$ssl_mode" = "none" ]; then
+        app_scheme="http"
+    fi
 
-    # Update .env values
-    sed -i "s|APP_NAME=.*|APP_NAME=\"Teras Kota Berlian Makmur\"|" .env
-    sed -i "s|APP_ENV=.*|APP_ENV=production|" .env
-    sed -i "s|APP_DEBUG=.*|APP_DEBUG=false|" .env
-    sed -i "s|APP_URL=.*|APP_URL=https://${domain}|" .env
+    set_env_var .env "APP_NAME" "$platform_name"
+    set_env_var .env "PLATFORM_NAME" "$platform_name"
+    set_env_var .env "APP_ENV" "production"
+    set_env_var .env "APP_DEBUG" "false"
+    set_env_var .env "APP_TIMEZONE" "Asia/Jakarta"
+    set_env_var .env "APP_LOCALE" "id"
+    set_env_var .env "APP_FALLBACK_LOCALE" "en"
+    set_env_var .env "APP_FAKER_LOCALE" "id_ID"
+    set_env_var .env "APP_URL" "${app_scheme}://${domain}"
 
-    # Database config — uncomment and set MySQL values
-    sed -i "s|DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
-    sed -i "s|.*DB_HOST=.*|DB_HOST=127.0.0.1|" .env
-    sed -i "s|.*DB_PORT=.*|DB_PORT=3306|" .env
-    sed -i "s|.*DB_DATABASE=.*|DB_DATABASE=${db_name}|" .env
-    sed -i "s|.*DB_USERNAME=.*|DB_USERNAME=${db_user}|" .env
-    sed -i "s|.*DB_PASSWORD=.*|DB_PASSWORD=${db_pass}|" .env
+    set_env_var .env "DB_CONNECTION" "mysql"
+    set_env_var .env "DB_HOST" "127.0.0.1"
+    set_env_var .env "DB_PORT" "3306"
+    set_env_var .env "DB_DATABASE" "$db_name"
+    set_env_var .env "DB_USERNAME" "$db_user"
+    set_env_var .env "DB_PASSWORD" "$db_pass"
 
-    # Session & Cache for production
-    sed -i "s|SESSION_DRIVER=.*|SESSION_DRIVER=file|" .env
-    sed -i "s|CACHE_STORE=.*|CACHE_STORE=file|" .env
-    sed -i "s|QUEUE_CONNECTION=.*|QUEUE_CONNECTION=sync|" .env
+    set_env_var .env "SESSION_DRIVER" "file"
+    set_env_var .env "CACHE_STORE" "file"
+    set_env_var .env "QUEUE_CONNECTION" "sync"
 
-    # Deduplicate .env keys (keep last occurrence of each, matches Laravel behavior)
-    local tmp_env
-    tmp_env=$(mktemp)
-    tac .env | awk -F= '!seen[$1]++' | tac > "$tmp_env" && mv "$tmp_env" .env
-
-    # Generate app key if missing
     if ! grep -q "^APP_KEY=base64:" .env 2>/dev/null; then
         php artisan key:generate --force
     fi
 
-    # Ensure database user permissions (covers 127.0.0.1, localhost, ::1)
-    mariadb -u root <<-EOSQL 2>/dev/null || true
-CREATE DATABASE IF NOT EXISTS \`${db_name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
-CREATE USER IF NOT EXISTS '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'127.0.0.1' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'127.0.0.1';
-CREATE USER IF NOT EXISTS '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
-ALTER USER '${db_user}'@'::1' IDENTIFIED BY '${db_pass}';
-GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'::1';
-FLUSH PRIVILEGES;
-EOSQL
+    ensure_mariadb_user "$db_name" "$db_user" "$db_pass" 2>/dev/null || true
 
-    # Disable skip_name_resolve if present in tuning configs (fixes 1130 error)
     local restart_mariadb=0
     for cnf in /etc/mysql/mariadb.conf.d/99-teraskota.cnf /etc/mysql/mysql.conf.d/99-teraskota.cnf /etc/mysql/conf.d/99-teraskota.cnf; do
         if [ -f "$cnf" ] && grep -q "^skip_name_resolve" "$cnf"; then
@@ -436,45 +504,64 @@ EOSQL
         systemctl restart mariadb
     fi
 
-    # Run migrations
     log_substep "Menjalankan database migrations..."
     php artisan migrate --force
 
-    # Seed initial data (admin, categories, menus, settings)
-    log_substep "Seeding database default..."
+    log_substep "Seeding database default (Super Admin, Tenant #1, Plans)..."
     php artisan db:seed --force
 
-    # Storage symlink (public/storage → storage/app/public)
+    # Ensure writable public upload & font cache directories exist
+    mkdir -p "${TERASKOTA_ROOT}/public/uploads/tenants"
+    mkdir -p "${TERASKOTA_ROOT}/storage/fonts"
+
     php artisan storage:link --force 2>/dev/null || true
 
-    # Optimize
     log_substep "Optimizing untuk production..."
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache
 
-    # Set permissions
     log_substep "Setting permissions..."
     chown -R www-data:www-data "${TERASKOTA_ROOT}"
     chmod -R 755 "${TERASKOTA_ROOT}"
     chmod -R 775 "${TERASKOTA_ROOT}/storage"
     chmod -R 775 "${TERASKOTA_ROOT}/bootstrap/cache"
+    chmod -R 775 "${TERASKOTA_ROOT}/public/uploads"
 
-    log_ok "Aplikasi Teras Kota siap"
+    log_ok "Aplikasi ${platform_name} siap"
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 6: Node.js + Build Assets — delegated to lib/node-install.sh
+# STEP 7: SSL Configuration (Certbot / Cloudflare Origin / None)
 # ══════════════════════════════════════════════════════════════════════════════
-# install_node() and build_assets() are sourced from node-install.sh
+setup_ssl() {
+    local ssl_mode domain email
+    ssl_mode=$(load_config "SSL_MODE" "certbot")
+    domain=$(load_config "DOMAIN")
+    email=$(load_config "SSL_EMAIL" "")
+
+    case "$ssl_mode" in
+        cloudflare)
+            if [ -n "$STAGED_CF_CERT" ] && [ -f "$STAGED_CF_CERT" ] && [ -n "$STAGED_CF_KEY" ] && [ -f "$STAGED_CF_KEY" ]; then
+                setup_cloudflare_origin_ssl "$domain" "$STAGED_CF_CERT" "$STAGED_CF_KEY" || true
+                rm -f "$STAGED_CF_CERT" "$STAGED_CF_KEY"
+            else
+                setup_cloudflare_origin_ssl "$domain" || true
+            fi
+            ;;
+        certbot)
+            install_certbot
+            obtain_ssl "$domain" "$email" || true
+            ;;
+        none|*)
+            log_step "[7/7] SSL Dilewati (Mode HTTP)"
+            log_info "Anda dapat memasang SSL kapan saja dengan: sudo teraskota-ctl ssl"
+            ;;
+    esac
+}
 
 # ══════════════════════════════════════════════════════════════════════════════
-# STEP 7: SSL — delegated to lib/ssl-install.sh
-# ══════════════════════════════════════════════════════════════════════════════
-# install_certbot() and obtain_ssl() are sourced from ssl-install.sh
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Post-install: Firewall, Backup Cron, Control Panel
+# Post-install: Firewall, Backup Schedule, Control Panel
 # ══════════════════════════════════════════════════════════════════════════════
 setup_firewall() {
     log_step "Setup Firewall (UFW)"
@@ -489,7 +576,6 @@ setup_firewall() {
     ufw allow 80/tcp   comment 'HTTP'
     ufw allow 443/tcp  comment 'HTTPS'
 
-    # Enable non-interactively
     echo "y" | ufw enable
 
     log_ok "Firewall aktif: SSH(22), HTTP(80), HTTPS(443)"
@@ -500,21 +586,21 @@ setup_backup_cron() {
 
     mkdir -p "${TERASKOTA_BACKUP_DIR}"
 
-    local db_name db_user db_pass
+    local db_name db_user
     db_name=$(load_config "DB_NAME" "db_teras_kota")
     db_user=$(load_config "DB_USER" "teraskota")
-    db_pass=$(cat "${TERASKOTA_CONFIG}/db_password" 2>/dev/null || echo "")
 
-    # Create backup script
+    # Backup script reads password via MYSQL_PWD (safe for special characters & hidden from `ps`)
     cat > /usr/local/bin/teraskota-backup <<EOFBACKUP
 #!/usr/bin/env bash
-# Auto-generated backup script for Teras Kota
+set -euo pipefail
 BACKUP_DIR="${TERASKOTA_BACKUP_DIR}"
 TIMESTAMP=\$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="\${BACKUP_DIR}/db_\${TIMESTAMP}.sql.gz"
+DB_PASS_FILE="${TERASKOTA_CONFIG}/db_password"
 
-# Dump and compress
-mysqldump -u ${db_user} -p'${db_pass}' ${db_name} 2>/dev/null | gzip > "\${BACKUP_FILE}"
+mkdir -p "\${BACKUP_DIR}"
+MYSQL_PWD="\$(cat "\${DB_PASS_FILE}")" mysqldump -u "${db_user}" "${db_name}" 2>/dev/null | gzip > "\${BACKUP_FILE}"
 
 # Retain last 7 days only
 find "\${BACKUP_DIR}" -name "db_*.sql.gz" -mtime +7 -delete
@@ -524,19 +610,10 @@ EOFBACKUP
 
     chmod 700 /usr/local/bin/teraskota-backup
 
-    # 1. Setup cron.d entry (works with any cron daemon without crontab pipe)
-    if [ -d /etc/cron.d ]; then
-        cat > /etc/cron.d/teraskota-backup <<'EOFCRON'
-# Daily backup for Teras Kota at 02:00 AM
-0 2 * * * root /usr/local/bin/teraskota-backup >/dev/null 2>&1
-EOFCRON
-        chmod 644 /etc/cron.d/teraskota-backup
-    fi
-
-    # 2. Setup native systemd timer (always supported on Ubuntu 24/26)
+    # Prefer systemd timer; fallback to cron.d ONLY if systemd timer fails (prevents double backup at 02:00!)
     cat > /etc/systemd/system/teraskota-backup.service <<'EOFSVC'
 [Unit]
-Description=Teras Kota Daily Backup
+Description=KasirLoka / Teras Kota Daily Database Backup
 
 [Service]
 Type=oneshot
@@ -545,7 +622,7 @@ EOFSVC
 
     cat > /etc/systemd/system/teraskota-backup.timer <<'EOFTMR'
 [Unit]
-Description=Daily Backup Timer for Teras Kota
+Description=Daily Database Backup Timer for KasirLoka / Teras Kota
 
 [Timer]
 OnCalendar=*-*-* 02:00:00
@@ -556,9 +633,18 @@ WantedBy=timers.target
 EOFTMR
 
     systemctl daemon-reload 2>/dev/null || true
-    systemctl enable --now teraskota-backup.timer 2>/dev/null || true
-
-    log_ok "Auto-backup daily at 02:00 aktif (cron.d & systemd timer, retain 7 days)"
+    if systemctl enable --now teraskota-backup.timer 2>/dev/null; then
+        # Remove legacy cron.d entry so backups never run twice simultaneously
+        rm -f /etc/cron.d/teraskota-backup
+        log_ok "Auto-backup harian 02:00 aktif via systemd timer (retensi 7 hari)"
+    elif [ -d /etc/cron.d ]; then
+        cat > /etc/cron.d/teraskota-backup <<'EOFCRON'
+# Daily backup at 02:00 AM
+0 2 * * * root /usr/local/bin/teraskota-backup >/dev/null 2>&1
+EOFCRON
+        chmod 644 /etc/cron.d/teraskota-backup
+        log_ok "Auto-backup harian 02:00 aktif via /etc/cron.d (retensi 7 hari)"
+    fi
 }
 
 install_control_panel() {
@@ -566,7 +652,7 @@ install_control_panel() {
 
     local ctl_src=""
     for candidate in \
-        "${SCRIPT_DIR}/teraskota-ctl" \
+        "${INSTALLER_DIR}/teraskota-ctl" \
         "${TERASKOTA_ROOT}/vps/teraskota-ctl" \
         "/tmp/teraskota-installer/vps/teraskota-ctl"; do
         if [ -f "$candidate" ]; then
@@ -594,16 +680,21 @@ install_control_panel() {
 # Summary
 # ══════════════════════════════════════════════════════════════════════════════
 print_summary() {
-    local domain php_ver site_url ssl_status
+    local domain php_ver ssl_mode site_url ssl_status platform_name
     domain=$(load_config "DOMAIN")
-    php_ver=$(load_config "PHP_VERSION" "8.3")
+    php_ver=$(load_config "PHP_VERSION" "8.4")
+    ssl_mode=$(load_config "SSL_MODE" "certbot")
+    platform_name=$(load_config "PLATFORM_NAME" "KasirLoka")
 
-    if [ -d "/etc/letsencrypt/live/${domain}" ]; then
+    if [ "$ssl_mode" = "cloudflare" ] && [ -f "${CLOUDFLARE_SSL_DIR}/${domain}.pem" ]; then
         site_url="https://${domain}"
-        ssl_status="${C_GREEN}Active (Certbot auto-renew)${C_RESET}"
+        ssl_status="${C_GREEN}Cloudflare Origin SSL (Full Strict)${C_RESET}"
+    elif [ -d "/etc/letsencrypt/live/${domain}" ]; then
+        site_url="https://${domain}"
+        ssl_status="${C_GREEN}Let's Encrypt Active (Certbot auto-renew)${C_RESET}"
     else
         site_url="http://${domain}"
-        ssl_status="${C_YELLOW}Pending (HTTP aktif — setup via teraskota-ctl)${C_RESET}"
+        ssl_status="${C_YELLOW}Pending (HTTP aktif — pasang via sudo teraskota-ctl ssl)${C_RESET}"
     fi
 
     echo
@@ -616,6 +707,7 @@ print_summary() {
   ╚════════════════════════════════════════════════════╝
 EOF
     echo -e "${C_RESET}"
+    echo -e "  ${C_BOLD}Platform${C_RESET}    : ${C_GREEN}${platform_name}${C_RESET}"
     echo -e "  ${C_BOLD}Website${C_RESET}     : ${C_GREEN}${site_url}${C_RESET}"
     echo -e "  ${C_BOLD}Root Dir${C_RESET}    : ${TERASKOTA_ROOT}"
     echo -e "  ${C_BOLD}PHP${C_RESET}         : ${php_ver}-fpm"
@@ -625,9 +717,15 @@ EOF
     echo -e "  ${C_BOLD}Backup${C_RESET}      : Daily 02:00 → ${TERASKOTA_BACKUP_DIR}"
     echo -e "  ${C_BOLD}Firewall${C_RESET}    : UFW (22, 80, 443)"
     echo
+    echo -e "  ${C_BOLD}Login Super Admin Default:${C_RESET}"
+    echo -e "    URL       : ${C_CYAN}${site_url}/login${C_RESET}"
+    echo -e "    Username  : ${C_YELLOW}superadmin${C_RESET}  |  Password: ${C_YELLOW}superadmin123${C_RESET}"
+    echo -e "    ${C_DIM}(Segera ganti kata sandi di menu Profil Akun!)${C_RESET}"
+    echo
     echo -e "  ${C_BOLD}Control Panel:${C_RESET}"
-    echo -e "    ${C_CYAN}sudo teraskota-ctl${C_RESET}         (interactive menu)"
-    echo -e "    ${C_CYAN}sudo teraskota-ctl status${C_RESET}  (direct command)"
+    echo -e "    ${C_CYAN}sudo teraskota-ctl${C_RESET}                (menu interaktif)"
+    echo -e "    ${C_CYAN}sudo teraskota-ctl ssl-cloudflare${C_RESET} (pasang Cloudflare Origin SSL)"
+    echo -e "    ${C_CYAN}sudo teraskota-ctl status${C_RESET}         (cek status & resources)"
     echo
     echo -e "  ${C_BOLD}Log:${C_RESET} ${TERASKOTA_LOG}"
     echo
@@ -639,11 +737,8 @@ EOF
 main() {
     print_banner
 
-    # Fix any interrupted dpkg states (e.g. if user aborted apt with Ctrl+C)
     dpkg --configure -a 2>/dev/null || true
 
-    # Purge broken/unsupported PPA entries (common: ondrej/php on Ubuntu 26+)
-    # Our PHP installer uses Sury direct repo or Ubuntu default — PPA not needed
     log_info "Membersihkan PPA yang tidak didukung..."
     for f in /etc/apt/sources.list.d/*ondrej* /etc/apt/sources.list.d/*sury* \
              /etc/apt/sources.list.d/*ppa_ondrej*; do
@@ -653,65 +748,39 @@ main() {
         fi
     done
 
-    # Update apt cache — tolerate individual repo failures
     log_info "Updating package cache..."
     apt-get update -y 2>&1 | tail -3 || true
 
-    # Install whiptail for dialogs if not available
     if ! check_command whiptail; then
         DEBIAN_FRONTEND=noninteractive apt-get install -y whiptail 2>/dev/null || true
     fi
 
-    # [1/7] System check
     system_check
-
-    # Interactive config
     collect_config
-
-    # [2/7] Swap
     setup_swap
-
-    # [3/7] PHP (from php-install.sh)
     install_php
-
-    # [4/7] MariaDB
     install_mariadb
-
-    # [5/7] Nginx
     install_nginx
-
-    # Clone & setup app (between Nginx and Node — needs repo for npm build)
     setup_application
-
-    # [6/7] Node.js + build assets
     install_node
     build_assets "${TERASKOTA_ROOT}"
 
-    # Re-set permissions after build
     chown -R www-data:www-data "${TERASKOTA_ROOT}"
 
-    # [7/7] SSL
-    install_certbot
-    obtain_ssl "$(load_config 'DOMAIN')" "$(load_config 'SSL_EMAIL')" || true
-
-    # Post-install
+    setup_ssl
     setup_firewall
     setup_backup_cron
     install_control_panel
 
-    # Restart all services
     log_step "Final: Restart Services"
     local php_ver
-    php_ver=$(load_config "PHP_VERSION" "8.3")
+    php_ver=$(load_config "PHP_VERSION" "8.4")
     systemctl restart "php${php_ver}-fpm"
     systemctl restart mariadb
     systemctl restart nginx
     log_ok "All services restarted"
 
-    # Done
     print_summary
-
-    # Remove trap since we succeeded
     trap - EXIT
 }
 

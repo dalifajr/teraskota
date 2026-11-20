@@ -1,38 +1,44 @@
 #!/usr/bin/env bash
 # language: bash, file: vps/teraskota-ctl, target: Ubuntu 24/26 x86_64/arm64
-# Teras Kota — Terminal Control Panel
-# Usage: sudo teraskota-ctl              (interactive menu)
-#        sudo teraskota-ctl <command>     (direct command)
+# KasirLoka / Teras Kota — Terminal Control Panel
+# Usage: sudo teraskota-ctl                    (interactive menu)
+#        sudo teraskota-ctl <command> [args]   (direct command)
 
 set -euo pipefail
 
-# ── Source common functions ───────────────────────────────────────────────────
-# When installed, lib is at the repo root. When running standalone, look in known locations.
+# ── Source libraries ──────────────────────────────────────────────────────────
+_CTL_LIB_DIR=""
 for search_dir in \
     "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib" \
     "/var/www/teraskota/vps/lib" \
     "/opt/teraskota/lib"; do
     if [ -f "${search_dir}/common.sh" ]; then
+        _CTL_LIB_DIR="$search_dir"
         source "${search_dir}/common.sh"
         break
     fi
 done
 
-# Verify common.sh loaded
 if ! declare -f log_info &>/dev/null; then
-    echo "ERROR: common.sh not found. Is Teras Kota installed?" >&2
+    echo "ERROR: common.sh not found. Is KasirLoka / Teras Kota installed?" >&2
     exit 1
+fi
+
+if [ -f "${_CTL_LIB_DIR}/ssl-install.sh" ]; then
+    source "${_CTL_LIB_DIR}/ssl-install.sh"
 fi
 
 require_root
 
 # ── Load config ───────────────────────────────────────────────────────────────
 DOMAIN=$(load_config "DOMAIN" "localhost")
-PHP_VER=$(load_config "PHP_VERSION" "8.3")
+PHP_VER=$(load_config "PHP_VERSION" "$(detect_php_version)")
+PHP_VER="${PHP_VER:-8.4}"
 DB_NAME=$(load_config "DB_NAME" "db_teras_kota")
 DB_USER=$(load_config "DB_USER" "teraskota")
-DB_PASS=$(cat "${TERASKOTA_CONFIG}/db_password" 2>/dev/null || echo "")
+DB_PASS_FILE="${TERASKOTA_CONFIG}/db_password"
 REPO_BRANCH=$(load_config "REPO_BRANCH" "main")
+PLATFORM_NAME=$(load_config "PLATFORM_NAME" "KasirLoka")
 
 # ── Service names ─────────────────────────────────────────────────────────────
 SVC_PHP="php${PHP_VER}-fpm"
@@ -44,9 +50,13 @@ SVC_DB="mariadb"
 # ══════════════════════════════════════════════════════════════════════════════
 
 cmd_status() {
+    local ssl_mode cf_cert
+    ssl_mode=$(load_config "SSL_MODE" "certbot")
+    cf_cert=$(load_config "CF_CERT_PATH" "${CLOUDFLARE_SSL_DIR}/${DOMAIN}.pem")
+
     echo
     echo -e "${C_BOLD}${C_CYAN}╔══════════════════════════════════════════════════╗${C_RESET}"
-    echo -e "${C_BOLD}${C_CYAN}║         TERAS KOTA — STATUS                     ║${C_RESET}"
+    echo -e "${C_BOLD}${C_CYAN}║       KASIRLOKA / TERAS KOTA — STATUS            ║${C_RESET}"
     echo -e "${C_BOLD}${C_CYAN}╚══════════════════════════════════════════════════╝${C_RESET}"
     echo
 
@@ -59,6 +69,7 @@ cmd_status() {
 
     # Website info
     echo -e "${C_BOLD}Website:${C_RESET}"
+    echo -e "  Platform   : ${C_GREEN}${PLATFORM_NAME}${C_RESET}"
     echo -e "  Domain     : ${C_GREEN}${DOMAIN}${C_RESET}"
     echo -e "  URL        : ${C_GREEN}https://${DOMAIN}${C_RESET}"
     echo -e "  Root       : ${TERASKOTA_ROOT}"
@@ -66,15 +77,23 @@ cmd_status() {
     echo -e "  Database   : ${DB_NAME}"
     echo
 
-    # SSL status
+    # SSL status (supports Cloudflare Origin & Let's Encrypt)
     echo -e "${C_BOLD}SSL Certificate:${C_RESET}"
-    if [ -d "/etc/letsencrypt/live/${DOMAIN}" ]; then
+    if [ "$ssl_mode" = "cloudflare" ] && [ -f "$cf_cert" ]; then
+        local expiry issuer
+        expiry=$(openssl x509 -enddate -noout -in "$cf_cert" 2>/dev/null | cut -d= -f2 || echo "unknown")
+        issuer=$(openssl x509 -issuer -noout -in "$cf_cert" 2>/dev/null | sed 's/^issuer=//' || echo "Cloudflare Origin")
+        echo -e "  Provider   : ${C_GREEN}Cloudflare Origin Server (Full Strict)${C_RESET}"
+        echo -e "  Cert File  : ${cf_cert}"
+        echo -e "  Expires    : ${expiry}"
+        echo -e "  Issuer     : ${C_DIM}${issuer}${C_RESET}"
+    elif [ -d "/etc/letsencrypt/live/${DOMAIN}" ] && [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
         local expiry
-        expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" 2>/dev/null | cut -d= -f2)
-        echo -e "  Status     : ${C_GREEN}Active${C_RESET}"
+        expiry=$(openssl x509 -enddate -noout -in "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" 2>/dev/null | cut -d= -f2 || echo "unknown")
+        echo -e "  Provider   : ${C_GREEN}Let's Encrypt (Certbot Auto-Renew)${C_RESET}"
         echo -e "  Expires    : ${expiry}"
     else
-        echo -e "  Status     : ${C_YELLOW}Not configured${C_RESET}"
+        echo -e "  Status     : ${C_YELLOW}Not configured (HTTP only)${C_RESET}"
     fi
     echo
 
@@ -83,7 +102,10 @@ cmd_status() {
     local ram_used ram_total ram_pct
     ram_total=$(free -m | awk '/Mem:/ {print $2}')
     ram_used=$(free -m | awk '/Mem:/ {print $3}')
-    ram_pct=$((ram_used * 100 / ram_total))
+    ram_pct=0
+    if [ "${ram_total:-0}" -gt 0 ]; then
+        ram_pct=$((ram_used * 100 / ram_total))
+    fi
     echo -e "  RAM        : ${ram_used}/${ram_total} MB (${ram_pct}%)"
 
     local disk_used disk_total disk_pct
@@ -95,19 +117,19 @@ cmd_status() {
     local swap_total
     swap_total=$(free -m | awk '/Swap:/ {print $2}')
     echo -e "  Swap       : ${swap_total} MB"
-
-    echo -e "  Uptime     : $(uptime -p)"
+    echo -e "  Uptime     : $(uptime -p 2>/dev/null || uptime)"
     echo
 
-    # Last backup
+    # Last backup (pipefail-safe when directory is empty)
     echo -e "${C_BOLD}Backup:${C_RESET}"
-    local last_backup
-    last_backup=$(ls -t "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null | head -1)
-    if [ -n "$last_backup" ]; then
+    local last_backup backup_count
+    last_backup=$(ls -t "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null | head -1 || true)
+    backup_count=$(ls "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null | wc -l || echo 0)
+    if [ -n "$last_backup" ] && [ -f "$last_backup" ]; then
         local backup_size
         backup_size=$(du -sh "$last_backup" | cut -f1)
         echo -e "  Last       : $(basename "$last_backup") (${backup_size})"
-        echo -e "  Count      : $(ls "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null | wc -l) files"
+        echo -e "  Count      : ${backup_count} files"
     else
         echo -e "  Last       : ${C_YELLOW}No backups found${C_RESET}"
     fi
@@ -149,19 +171,19 @@ cmd_change_domain() {
 
     log_info "Mengubah domain: ${DOMAIN} → ${new_domain}"
 
-    # 1. Update nginx config
+    # 1. Safely update all server_name lines in Nginx vhost
     local vhost="/etc/nginx/sites-available/teraskota"
     if [ -f "$vhost" ]; then
-        sed -i "s/server_name ${DOMAIN}/server_name ${new_domain}/" "$vhost"
+        cp "$vhost" "${vhost}.bak"
+        sed -i -E "s|^([[:space:]]*server_name[[:space:]]+)[^;]+;|\1${new_domain};|g" "$vhost"
         log_ok "Nginx config updated"
     fi
 
-    # 2. Update .env
+    # 2. Update .env safely via set_env_var
     local env_file="${TERASKOTA_ROOT}/.env"
     if [ -f "$env_file" ]; then
-        sed -i "s|APP_URL=.*|APP_URL=https://${new_domain}|" "$env_file"
-        cd "${TERASKOTA_ROOT}"
-        php artisan config:cache 2>/dev/null
+        set_env_var "$env_file" "APP_URL" "https://${new_domain}"
+        (cd "${TERASKOTA_ROOT}" && php artisan config:cache >/dev/null 2>&1 || true)
         log_ok ".env updated"
     fi
 
@@ -174,42 +196,92 @@ cmd_change_domain() {
         systemctl reload nginx
         log_ok "Nginx reloaded"
     else
-        log_error "Nginx config test gagal — rollback manual diperlukan"
+        log_error "Nginx config test gagal — mengembalikan konfigurasi sebelumnya"
+        if [ -f "${vhost}.bak" ]; then
+            mv "${vhost}.bak" "$vhost"
+            systemctl reload nginx 2>/dev/null || true
+        fi
         return 1
     fi
 
-    # 5. Request new SSL
-    if prompt_yesno "SSL" "Request SSL certificate untuk ${new_domain}?"; then
-        cmd_fix_ssl
+    # 5. Offer SSL setup for new domain
+    if prompt_yesno "SSL" "Konfigurasi sertifikat SSL untuk ${new_domain} sekarang?"; then
+        cmd_ssl_menu
     fi
 
     log_ok "Domain berhasil diubah ke: ${new_domain}"
 }
 
 cmd_fix_ssl() {
-    log_info "Memperbarui SSL certificate untuk ${DOMAIN}..."
+    log_info "Memperbarui SSL Let's Encrypt (Certbot) untuk ${DOMAIN}..."
 
     local email
     email=$(load_config "SSL_EMAIL" "")
 
-    local certbot_cmd=(certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos)
-    if [ -n "$email" ]; then
-        certbot_cmd+=(--email "$email")
-    else
-        certbot_cmd+=(--register-unsafely-without-email)
+    if ! check_command certbot; then
+        install_certbot
     fi
 
-    if "${certbot_cmd[@]}" 2>&1; then
+    # If previous vhost was Cloudflare SSL, restore clean HTTP template first so certbot can configure cleanly
+    local template="${TERASKOTA_ROOT}/vps/config/nginx.conf.template"
+    local vhost="/etc/nginx/sites-available/teraskota"
+    if [ "$(load_config 'SSL_MODE' '')" = "cloudflare" ] && [ -f "$template" ]; then
+        log_substep "Menyiapkan ulang Nginx template untuk Certbot..."
+        sed -e "s/{{DOMAIN}}/${DOMAIN}/g" \
+            -e "s/{{PHP_VERSION}}/${PHP_VER}/g" \
+            "$template" > "$vhost"
+        nginx -t && systemctl reload nginx
+    fi
+
+    if obtain_ssl "$DOMAIN" "$email"; then
         systemctl reload nginx
-        log_ok "SSL certificate berhasil diperbarui"
+        log_ok "SSL Let's Encrypt aktif untuk ${DOMAIN}"
     else
-        log_error "SSL gagal — pastikan DNS ${DOMAIN} sudah pointing ke server ini"
-        echo -e "${C_DIM}Cek: dig +short ${DOMAIN}${C_RESET}"
+        log_error "SSL Let's Encrypt gagal — pastikan DNS ${DOMAIN} sudah pointing ke server ini (atau gunakan Cloudflare Origin SSL)"
+        echo -e "${C_DIM}Cek DNS: dig +short ${DOMAIN}${C_RESET}"
     fi
 }
 
+cmd_ssl_cloudflare() {
+    local cert_file="${1:-}"
+    local key_file="${2:-}"
+    setup_cloudflare_origin_ssl "$DOMAIN" "$cert_file" "$key_file"
+}
+
+cmd_ssl_menu() {
+    echo
+    echo -e "${C_BOLD}${C_CYAN}━━━ Manajemen Sertifikat SSL (${DOMAIN}) ━━━${C_RESET}"
+    echo -e "  ${C_WHITE}1${C_RESET}) Pasang / Perbarui Let's Encrypt (Certbot Otomatis)"
+    echo -e "  ${C_WHITE}2${C_RESET}) Pasang / Ganti Cloudflare Origin Server Certificate (Full Strict)"
+    echo -e "  ${C_WHITE}3${C_RESET}) Lihat Detail Sertifikat SSL Aktif"
+    echo -e "  ${C_WHITE}0${C_RESET}) Kembali"
+    echo
+
+    local choice=""
+    read -rp "$(echo -e "${C_CYAN}Pilihan [0-3]:${C_RESET} ")" choice
+
+    case "$choice" in
+        1) cmd_fix_ssl ;;
+        2) cmd_ssl_cloudflare ;;
+        3)
+            local ssl_mode cf_cert
+            ssl_mode=$(load_config "SSL_MODE" "certbot")
+            cf_cert=$(load_config "CF_CERT_PATH" "${CLOUDFLARE_SSL_DIR}/${DOMAIN}.pem")
+            if [ "$ssl_mode" = "cloudflare" ] && [ -f "$cf_cert" ]; then
+                openssl x509 -in "$cf_cert" -noout -subject -issuer -dates 2>/dev/null || log_error "Gagal membaca sertifikat"
+            elif [ -f "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" ]; then
+                openssl x509 -in "/etc/letsencrypt/live/${DOMAIN}/fullchain.pem" -noout -subject -issuer -dates 2>/dev/null || log_error "Gagal membaca sertifikat"
+            else
+                log_warn "Belum ada sertifikat SSL terpasang untuk ${DOMAIN}."
+            fi
+            ;;
+        0) return 0 ;;
+        *) log_warn "Pilihan tidak valid" ;;
+    esac
+}
+
 cmd_update() {
-    log_info "Updating Teras Kota dari GitHub..."
+    log_info "Updating ${PLATFORM_NAME} dari GitHub..."
 
     git config --global --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
     git config --system --add safe.directory "${TERASKOTA_ROOT}" 2>/dev/null || true
@@ -217,25 +289,22 @@ cmd_update() {
 
     cd "${TERASKOTA_ROOT}"
 
-    # Stash any local changes
     git stash 2>/dev/null || true
 
-    # Pull
     log_substep "git pull origin ${REPO_BRANCH}..."
     if ! git pull origin "$REPO_BRANCH" 2>&1; then
         log_error "git pull gagal"
         return 1
     fi
 
-    # Composer
     log_substep "composer install..."
     composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -5
 
-    # Node build (if package.json changed or build dir missing)
-    if [ ! -d "${TERASKOTA_ROOT}/public/build" ] || git diff HEAD~1 --name-only 2>/dev/null | grep -q "package"; then
-        log_substep "Rebuilding assets..."
+    # Only build Vite assets if pre-built manifest is missing (saves RAM & 15 mins on 1GB VPS)
+    if [ ! -f "${TERASKOTA_ROOT}/public/build/manifest.json" ]; then
+        log_substep "public/build tidak ditemukan — membangun aset Vite..."
         if ! check_command npm; then
-            DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -2
+            DEBIAN_FRONTEND=noninteractive apt-get install -y npm 2>&1 | tail -2 || true
         fi
         if check_command node && check_command npm; then
             npm ci 2>&1 || npm install 2>&1 | tail -3
@@ -243,23 +312,37 @@ cmd_update() {
             rm -rf node_modules
             log_ok "Assets rebuilt"
         else
-            log_warn "Node.js/npm tidak lengkap — skip asset build"
+            log_warn "Node.js/npm tidak tersedia — skip asset build"
         fi
+    else
+        log_ok "Assets pre-built terdeteksi (public/build/manifest.json) — skip npm build"
     fi
 
-    # Migrate
     log_substep "Running migrations..."
     php artisan migrate --force 2>&1
 
-    # Clear & re-cache
+    log_substep "Sinkronisasi akun Super Admin & seeder inti..."
+    php artisan db:seed --class=AdminSeeder --force 2>&1 || true
+
+    mkdir -p "${TERASKOTA_ROOT}/public/uploads/tenants"
+    mkdir -p "${TERASKOTA_ROOT}/storage/fonts"
+
     php artisan config:cache
     php artisan route:cache
     php artisan view:cache
 
-    # Permissions
     chown -R www-data:www-data "${TERASKOTA_ROOT}"
+    chmod -R 775 "${TERASKOTA_ROOT}/storage" "${TERASKOTA_ROOT}/bootstrap/cache" "${TERASKOTA_ROOT}/public/uploads"
 
-    # Restart PHP-FPM (OPcache clear)
+    # Self-update teraskota-ctl binary from latest pulled repository
+    if [ -f "${TERASKOTA_ROOT}/vps/teraskota-ctl" ]; then
+        cp "${TERASKOTA_ROOT}/vps/teraskota-ctl" /usr/local/bin/teraskota-ctl
+        chmod +x /usr/local/bin/teraskota-ctl
+        cp "${TERASKOTA_ROOT}/vps/teraskota-ctl" /usr/bin/teraskota-ctl
+        chmod +x /usr/bin/teraskota-ctl
+        log_ok "Binary teraskota-ctl diperbarui"
+    fi
+
     systemctl restart "$SVC_PHP"
     systemctl reload "$SVC_NGINX"
 
@@ -270,18 +353,21 @@ cmd_backup() {
     log_info "Membuat backup database..."
 
     mkdir -p "${TERASKOTA_BACKUP_DIR}"
-    local timestamp
+    local timestamp backup_file db_pass
     timestamp=$(date +%Y%m%d_%H%M%S)
-    local backup_file="${TERASKOTA_BACKUP_DIR}/db_${timestamp}.sql.gz"
+    backup_file="${TERASKOTA_BACKUP_DIR}/db_${timestamp}.sql.gz"
+    db_pass=$(cat "$DB_PASS_FILE" 2>/dev/null || echo "")
 
-    mysqldump -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" 2>/dev/null | gzip > "$backup_file"
+    MYSQL_PWD="$db_pass" mysqldump -u "$DB_USER" "$DB_NAME" 2>/dev/null | gzip > "$backup_file"
 
-    if [ -f "$backup_file" ]; then
+    if [ -s "$backup_file" ]; then
         local size
         size=$(du -sh "$backup_file" | cut -f1)
         log_ok "Backup: ${backup_file} (${size})"
     else
-        log_error "Backup gagal"
+        rm -f "$backup_file"
+        log_error "Backup gagal atau file kosong"
+        return 1
     fi
 }
 
@@ -292,14 +378,14 @@ cmd_restore() {
     local backups=()
     local i=0
     while IFS= read -r f; do
+        [ -z "$f" ] && continue
         i=$((i + 1))
-        local size
+        local size fname
         size=$(du -sh "$f" | cut -f1)
-        local fname
         fname=$(basename "$f")
         echo -e "  ${C_CYAN}${i}${C_RESET}) ${fname} (${size})"
         backups+=("$f")
-    done < <(ls -t "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null)
+    done < <(ls -t "${TERASKOTA_BACKUP_DIR}"/db_*.sql.gz 2>/dev/null || true)
 
     if [ ${#backups[@]} -eq 0 ]; then
         log_warn "Tidak ada backup tersedia"
@@ -307,12 +393,17 @@ cmd_restore() {
     fi
 
     echo
-    local choice
+    local choice=""
     read -rp "$(echo -e "${C_CYAN}Pilih nomor backup (0 = batal):${C_RESET} ")" choice
 
     if [ "$choice" = "0" ] || [ -z "$choice" ]; then
         log_info "Restore dibatalkan"
         return 0
+    fi
+
+    if ! [[ "$choice" =~ ^[0-9]+$ ]]; then
+        log_error "Pilihan harus berupa angka"
+        return 1
     fi
 
     local idx=$((choice - 1))
@@ -325,7 +416,9 @@ cmd_restore() {
 
     if prompt_yesno "Konfirmasi" "RESTORE database dari $(basename "$selected")? Data saat ini akan ditimpa."; then
         log_info "Restoring..."
-        gunzip -c "$selected" | mysql -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" 2>/dev/null
+        local db_pass
+        db_pass=$(cat "$DB_PASS_FILE" 2>/dev/null || echo "")
+        gunzip -c "$selected" | MYSQL_PWD="$db_pass" mariadb -u "$DB_USER" "$DB_NAME" 2>/dev/null
         log_ok "Database restored dari $(basename "$selected")"
     else
         log_info "Restore dibatalkan"
@@ -342,7 +435,7 @@ cmd_logs() {
     echo -e "  ${C_CYAN}0${C_RESET}) Kembali"
     echo
 
-    local choice
+    local choice=""
     read -rp "$(echo -e "${C_CYAN}Pilihan:${C_RESET} ")" choice
 
     case "$choice" in
@@ -360,17 +453,19 @@ cmd_help() {
     echo -e "${C_BOLD}Usage:${C_RESET} teraskota-ctl [command]"
     echo
     echo -e "${C_BOLD}Commands:${C_RESET}"
-    echo -e "  status          Tampilkan status services, website, dan resources"
-    echo -e "  start           Start semua services"
-    echo -e "  stop            Stop semua services"
-    echo -e "  restart         Restart semua services"
-    echo -e "  domain          Ubah domain website"
-    echo -e "  ssl             Fix/renew SSL certificate"
-    echo -e "  update          Update dari GitHub repository"
-    echo -e "  backup          Backup database"
-    echo -e "  restore         Restore database dari backup"
-    echo -e "  logs            Lihat log files (tail -f)"
-    echo -e "  help            Tampilkan bantuan ini"
+    echo -e "  status                                Tampilkan status services, SSL, dan resources"
+    echo -e "  start                                 Start semua services"
+    echo -e "  stop                                  Stop semua services"
+    echo -e "  restart                               Restart semua services"
+    echo -e "  domain                                Ubah domain website"
+    echo -e "  ssl                                   Menu manajemen SSL (Let's Encrypt / Cloudflare)"
+    echo -e "  ssl-certbot                           Pasang / renew Let's Encrypt via Certbot"
+    echo -e "  ssl-cloudflare [cert.pem] [key.key]   Pasang Cloudflare Origin Server Certificate"
+    echo -e "  update                                Update dari GitHub repository"
+    echo -e "  backup                                Backup database"
+    echo -e "  restore                               Restore database dari backup"
+    echo -e "  logs                                  Lihat log files (tail -f)"
+    echo -e "  help                                  Tampilkan bantuan ini"
     echo
     echo -e "Tanpa argumen, menampilkan menu interaktif."
 }
@@ -382,15 +477,15 @@ interactive_menu() {
     while true; do
         echo
         echo -e "${C_BOLD}${C_CYAN}╔══════════════════════════════════════════════════╗${C_RESET}"
-        echo -e "${C_BOLD}${C_CYAN}║         TERAS KOTA CONTROL PANEL                ║${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}║      KASIRLOKA / TERAS KOTA CONTROL PANEL        ║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}╠══════════════════════════════════════════════════╣${C_RESET}"
-        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}1.${C_RESET} Status              ${C_DIM}(info service)${C_RESET}       ${C_BOLD}${C_CYAN}║${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}1.${C_RESET} Status              ${C_DIM}(info service & SSL)${C_RESET} ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}2.${C_RESET} Start               ${C_DIM}(all services)${C_RESET}       ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}3.${C_RESET} Stop                ${C_DIM}(all services)${C_RESET}       ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}4.${C_RESET} Restart             ${C_DIM}(all services)${C_RESET}       ${C_BOLD}${C_CYAN}║${C_RESET}"
-        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}5.${C_RESET} Change Domain       ${C_DIM}(+ SSL renew)${C_RESET}        ${C_BOLD}${C_CYAN}║${C_RESET}"
-        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}6.${C_RESET} Fix SSL Certificate ${C_DIM}(certbot)${C_RESET}            ${C_BOLD}${C_CYAN}║${C_RESET}"
-        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}7.${C_RESET} Update via GitHub   ${C_DIM}(git pull+build)${C_RESET}     ${C_BOLD}${C_CYAN}║${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}5.${C_RESET} Change Domain       ${C_DIM}(+ SSL setup)${C_RESET}        ${C_BOLD}${C_CYAN}║${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}6.${C_RESET} SSL Certificate     ${C_DIM}(Certbot/Cloudflare)${C_RESET} ${C_BOLD}${C_CYAN}║${C_RESET}"
+        echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}7.${C_RESET} Update via GitHub   ${C_DIM}(git pull+migrate)${C_RESET}   ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}8.${C_RESET} Database Backup     ${C_DIM}(mysqldump)${C_RESET}          ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET}  ${C_WHITE}9.${C_RESET} Database Restore    ${C_DIM}(from backup)${C_RESET}        ${C_BOLD}${C_CYAN}║${C_RESET}"
         echo -e "${C_BOLD}${C_CYAN}║${C_RESET} ${C_WHITE}10.${C_RESET} View Logs           ${C_DIM}(tail -f)${C_RESET}            ${C_BOLD}${C_CYAN}║${C_RESET}"
@@ -398,7 +493,7 @@ interactive_menu() {
         echo -e "${C_BOLD}${C_CYAN}╚══════════════════════════════════════════════════╝${C_RESET}"
         echo
 
-        local choice
+        local choice=""
         read -rp "$(echo -e "${C_CYAN}Pilihan [0-10]:${C_RESET} ")" choice
 
         case "$choice" in
@@ -407,7 +502,7 @@ interactive_menu() {
             3)  cmd_stop ;;
             4)  cmd_restart ;;
             5)  cmd_change_domain ;;
-            6)  cmd_fix_ssl ;;
+            6)  cmd_ssl_menu ;;
             7)  cmd_update ;;
             8)  cmd_backup ;;
             9)  cmd_restore ;;
@@ -425,16 +520,18 @@ if [ $# -eq 0 ]; then
     interactive_menu
 else
     case "$1" in
-        status)   cmd_status ;;
-        start)    cmd_start ;;
-        stop)     cmd_stop ;;
-        restart)  cmd_restart ;;
-        domain)   cmd_change_domain ;;
-        ssl)      cmd_fix_ssl ;;
-        update)   cmd_update ;;
-        backup)   cmd_backup ;;
-        restore)  cmd_restore ;;
-        logs)     cmd_logs ;;
+        status)         cmd_status ;;
+        start)          cmd_start ;;
+        stop)           cmd_stop ;;
+        restart)        cmd_restart ;;
+        domain)         cmd_change_domain ;;
+        ssl)            cmd_ssl_menu ;;
+        ssl-certbot)    cmd_fix_ssl ;;
+        ssl-cloudflare) cmd_ssl_cloudflare "${2:-}" "${3:-}" ;;
+        update)         cmd_update ;;
+        backup)         cmd_backup ;;
+        restore)        cmd_restore ;;
+        logs)           cmd_logs ;;
         help|-h|--help) cmd_help ;;
         *) log_error "Unknown command: $1"; cmd_help; exit 1 ;;
     esac

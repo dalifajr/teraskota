@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # language: bash, file: vps/lib/common.sh, target: Ubuntu 24/26 x86_64/arm64
-# Shared functions for Teras Kota VPS installer and control panel
+# Shared functions for KasirLoka / Teras Kota VPS installer and control panel
 
 # Include guard — prevent double-source (readonly fails on re-declaration)
 [[ -n "${_TERASKOTA_COMMON_LOADED:-}" ]] && return 0
@@ -10,7 +10,6 @@ set -euo pipefail
 
 # Allow composer to run as root without warnings/prompts
 export COMPOSER_ALLOW_SUPERUSER=1
-
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 readonly C_RED='\033[0;31m'
@@ -30,6 +29,7 @@ readonly TERASKOTA_CONFIG="/etc/teraskota"
 readonly TERASKOTA_CONFIG_FILE="${TERASKOTA_CONFIG}/config"
 readonly TERASKOTA_BACKUP_DIR="/var/backups/teraskota"
 readonly TERASKOTA_LOG="/var/log/teraskota-install.log"
+readonly CLOUDFLARE_SSL_DIR="/etc/ssl/cloudflare"
 
 # ── Logging ───────────────────────────────────────────────────────────────────
 log_info()    { echo -e "${C_CYAN}[INFO]${C_RESET}  $*"; echo "[INFO]  $(date '+%Y-%m-%d %H:%M:%S') $*" >> "${TERASKOTA_LOG}" 2>/dev/null || true; }
@@ -148,22 +148,82 @@ check_command() {
     command -v "$1" &>/dev/null
 }
 
+# ── Safe String & .env Helpers ───────────────────────────────────────────────
+# Escape single quotes and backslashes for MariaDB/MySQL single-quoted strings
+sql_escape() {
+    local val="$1"
+    val="${val//\\/\\\\}"
+    val="${val//\'/\'\'}"
+    printf '%s' "$val"
+}
+
+# Safely update or append KEY=VALUE in a .env file without sed delimiter/metacharacter bugs
+set_env_var() {
+    local env_file="$1"
+    local key="$2"
+    local value="$3"
+    local formatted_val="$value"
+
+    # Wrap in double quotes if value contains whitespace, #, $, &, |, or quotes
+    if [[ "$value" =~ [[:space:]\#\$\&\|\'\"\\] ]] && [[ ! "$value" =~ ^\".*\"$ ]]; then
+        local esc="${value//\\/\\\\}"
+        esc="${esc//\"/\\\"}"
+        formatted_val="\"${esc}\""
+    fi
+
+    local tmp_file
+    tmp_file=$(mktemp)
+
+    awk -v k="$key" -v v="$formatted_val" '
+        BEGIN { updated = 0 }
+        {
+            # Match uncommented KEY=... or commented # KEY=...
+            if ($0 ~ "^[[:space:]]*#?[[:space:]]*" k "=") {
+                if (!updated) {
+                    print k "=" v
+                    updated = 1
+                }
+                next
+            }
+            print $0
+        }
+        END {
+            if (!updated) {
+                print k "=" v
+            }
+        }
+    ' "$env_file" > "$tmp_file"
+
+    mv "$tmp_file" "$env_file"
+}
+
 # ── Config Management ────────────────────────────────────────────────────────
 save_config() {
     local key="$1" value="$2"
     mkdir -p "${TERASKOTA_CONFIG}"
-    if grep -q "^${key}=" "${TERASKOTA_CONFIG_FILE}" 2>/dev/null; then
-        sed -i "s|^${key}=.*|${key}=${value}|" "${TERASKOTA_CONFIG_FILE}"
-    else
-        echo "${key}=${value}" >> "${TERASKOTA_CONFIG_FILE}"
-    fi
+    touch "${TERASKOTA_CONFIG_FILE}"
+    local tmp_file
+    tmp_file=$(mktemp)
+    awk -v k="$key" -v v="$value" '
+        BEGIN { updated = 0 }
+        $0 ~ "^" k "=" { print k "=" v; updated = 1; next }
+        { print $0 }
+        END { if (!updated) print k "=" v }
+    ' "${TERASKOTA_CONFIG_FILE}" > "$tmp_file"
+    mv "$tmp_file" "${TERASKOTA_CONFIG_FILE}"
 }
 
 load_config() {
     local key="$1"
     local default="${2:-}"
     if [ -f "${TERASKOTA_CONFIG_FILE}" ]; then
-        grep "^${key}=" "${TERASKOTA_CONFIG_FILE}" 2>/dev/null | cut -d'=' -f2- || echo "$default"
+        local val
+        val=$(grep "^${key}=" "${TERASKOTA_CONFIG_FILE}" 2>/dev/null | tail -1 | cut -d'=' -f2- || true)
+        if [ -n "$val" ]; then
+            echo "$val"
+        else
+            echo "$default"
+        fi
     else
         echo "$default"
     fi
@@ -190,16 +250,16 @@ service_action() {
 }
 
 # ── Interactive Prompt ────────────────────────────────────────────────────────
-# Use whiptail if available, else fallback to read
+# Use whiptail if available and running on a TTY, else fallback to read
 prompt_input() {
     local title="$1" prompt="$2" default="${3:-}"
 
-    if check_command whiptail; then
+    if check_command whiptail && [ -t 0 ] && [ -t 1 ]; then
         local result
-        result=$(whiptail --inputbox "$prompt" 10 60 "$default" --title "$title" 3>&1 1>&2 2>&3) || true
+        result=$(whiptail --inputbox "$prompt" 10 64 "$default" --title "$title" 3>&1 1>&2 2>&3) || true
         echo "$result"
     else
-        local result
+        local result=""
         if [ -n "$default" ]; then
             read -rp "$(echo -e "${C_CYAN}$prompt${C_RESET} [${default}]: ")" result
             echo "${result:-$default}"
@@ -213,14 +273,14 @@ prompt_input() {
 prompt_password() {
     local title="$1" prompt="$2"
 
-    if check_command whiptail; then
+    if check_command whiptail && [ -t 0 ] && [ -t 1 ]; then
         local result
-        result=$(whiptail --passwordbox "$prompt" 10 60 --title "$title" 3>&1 1>&2 2>&3) || true
+        result=$(whiptail --passwordbox "$prompt" 10 64 --title "$title" 3>&1 1>&2 2>&3) || true
         echo "$result"
     else
-        local result
+        local result=""
         read -srp "$(echo -e "${C_CYAN}$prompt${C_RESET}: ")" result
-        echo
+        echo >&2
         echo "$result"
     fi
 }
@@ -228,14 +288,14 @@ prompt_password() {
 prompt_yesno() {
     local title="$1" prompt="$2" default="${3:-y}"
 
-    if check_command whiptail; then
-        if whiptail --yesno "$prompt" 10 60 --title "$title" 3>&1 1>&2 2>&3; then
+    if check_command whiptail && [ -t 0 ] && [ -t 1 ]; then
+        if whiptail --yesno "$prompt" 10 64 --title "$title" 3>&1 1>&2 2>&3; then
             return 0
         else
             return 1
         fi
     else
-        local yn
+        local yn=""
         if [ "$default" = "y" ]; then
             read -rp "$(echo -e "${C_CYAN}$prompt${C_RESET} [Y/n]: ")" yn
             yn="${yn:-y}"
@@ -253,13 +313,13 @@ print_banner() {
     cat << 'EOF'
   ╔════════════════════════════════════════════════════╗
   ║                                                    ║
-  ║   ████████╗███████╗██████╗  █████╗ ███████╗        ║
-  ║   ╚══██╔══╝██╔════╝██╔══██╗██╔══██╗██╔════╝        ║
-  ║      ██║   █████╗  ██████╔╝███████║███████╗        ║
-  ║      ██║   ██╔══╝  ██╔══██╗██╔══██║╚════██║        ║
-  ║      ██║   ███████╗██║  ██║██║  ██║███████║        ║
-  ║      ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝        ║
-  ║           K O T A   B E R L I A N                  ║
+  ║   ██╗  ██╗ █████╗ ███████╗██╗██████╗               ║
+  ║   ██║ ██╔╝██╔══██╗██╔════╝██║██╔══██╗              ║
+  ║   █████╔╝ ███████║███████╗██║██████╔╝              ║
+  ║   ██╔═██╗ ██╔══██║╚════██║██║██╔══██╗              ║
+  ║   ██║  ██╗██║  ██║███████║██║██║  ██║              ║
+  ║   ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝╚═╝╚═╝  ╚═╝              ║
+  ║         L O K A   ·   P O S   S A A S              ║
   ║                                                    ║
   ╚════════════════════════════════════════════════════╝
 EOF

@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # language: bash, file: vps/lib/php-install.sh, target: Ubuntu 24/26 x86_64/arm64
-# PHP installation with full error recovery for all three failure modes
+# PHP installation with full error recovery (no subshell variable loss)
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/common.sh"
+_PHP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${_PHP_LIB_DIR}/common.sh"
 
-# Target PHP version — auto-detected below. Laravel 12 requires ^8.2
+# Global state set directly by select_php_source() (avoid subshell loss)
 TARGET_PHP=""
+PHP_SOURCE=""
 
 # ── Required Extensions ──────────────────────────────────────────────────────
 # php-dom is bundled inside php-xml on Ubuntu
@@ -18,7 +19,6 @@ PHP_EXTENSIONS=(
 # Scans apt-cache for php*-fpm packages, picks the highest version >= 8.2
 detect_available_php() {
     local ver
-    # Search for available php-fpm packages in repo
     for ver in 8.6 8.5 8.4 8.3 8.2; do
         if apt-cache show "php${ver}-fpm" &>/dev/null 2>&1; then
             echo "$ver"
@@ -29,9 +29,7 @@ detect_available_php() {
 }
 
 # ── Strategy Selection ────────────────────────────────────────────────────────
-# Priority:
-#   1. Ubuntu default repo — works on x86 AND arm64
-#   2. Sury APT direct (not PPA) — works on x86 AND arm64
+# Sets globals: TARGET_PHP and PHP_SOURCE directly (do NOT call inside $(...))
 select_php_source() {
     local arch codename
     arch=$(detect_arch)
@@ -39,30 +37,27 @@ select_php_source() {
 
     log_info "Arsitektur: ${arch}, Codename: ${codename}"
 
-    # Auto-detect available PHP version from default repos
     TARGET_PHP=$(detect_available_php)
 
     if [ -n "$TARGET_PHP" ]; then
         log_ok "PHP ${TARGET_PHP} tersedia di repo default Ubuntu"
-        echo "default"
+        PHP_SOURCE="default"
         return 0
     fi
 
-    # Nothing in default repo — try Sury
     log_warn "PHP 8.2+ tidak ada di repo default, mencoba Sury APT..."
-    echo "sury"
+    PHP_SOURCE="sury"
+    return 0
 }
 
 # ── Sury APT Setup (Direct, not PPA) ─────────────────────────────────────────
 setup_sury_repo() {
     log_substep "Menginstall prerequisite untuk Sury repo..."
 
-    # Pre-install dependencies FIRST — this is where most failures happen
     DEBIAN_FRONTEND=noninteractive apt-get install -y \
         software-properties-common gnupg2 ca-certificates \
-        lsb-release apt-transport-https curl 2>&1 | tail -1
+        lsb-release apt-transport-https curl 2>&1 | tail -1 || true
 
-    # Method 1: Import GPG key manually (avoids network-dependent add-apt-repository)
     log_substep "Import Sury GPG key..."
     local gpg_key="/usr/share/keyrings/sury-php.gpg"
     local max_retries=3
@@ -83,11 +78,9 @@ setup_sury_repo() {
         return 1
     fi
 
-    # Add repo directly (not via add-apt-repository which often fails)
     local codename
     codename=$(detect_os_codename)
 
-    # Sury may not support newest Ubuntu codenames yet — fallback to latest known
     local sury_codename="$codename"
     local known_codenames=("focal" "jammy" "noble" "oracular" "plucky" "resolute")
     local found=false
@@ -99,7 +92,6 @@ setup_sury_repo() {
     done
 
     if [ "$found" = false ]; then
-        # Fallback to latest known codename
         sury_codename="noble"
         log_warn "Codename '${codename}' mungkin belum didukung Sury, fallback ke '${sury_codename}'"
     fi
@@ -108,9 +100,8 @@ setup_sury_repo() {
         > /etc/apt/sources.list.d/sury-php.list
 
     log_substep "Updating apt cache..."
-    apt-get update -y 2>&1 | tail -1
+    apt-get update -y 2>&1 | tail -1 || true
 
-    # Re-detect PHP version after adding Sury repo
     TARGET_PHP=$(detect_available_php)
 
     if [ -n "$TARGET_PHP" ]; then
@@ -126,14 +117,11 @@ setup_sury_repo() {
 install_php() {
     log_step "[3/7] Detect & Install PHP"
 
-    local source
-    source=$(select_php_source)
+    select_php_source
 
-    log_info "PHP version target: ${TARGET_PHP}"
-
-    case "$source" in
+    case "$PHP_SOURCE" in
         default)
-            log_info "Menggunakan repo default Ubuntu"
+            log_info "Menggunakan repo default Ubuntu (PHP ${TARGET_PHP})"
             ;;
         sury)
             setup_sury_repo || {
@@ -141,9 +129,19 @@ install_php() {
                 exit 1
             }
             ;;
+        *)
+            log_error "Sumber PHP tidak dikenali: '${PHP_SOURCE}'"
+            exit 1
+            ;;
     esac
 
-    # Build package list with detected version
+    if [ -z "$TARGET_PHP" ]; then
+        log_error "TARGET_PHP kosong — tidak ada versi PHP >= 8.2 yang ditemukan."
+        exit 1
+    fi
+
+    log_info "PHP version target: ${TARGET_PHP}"
+
     local packages=("php${TARGET_PHP}-cli" "php${TARGET_PHP}-common")
     for ext in "${PHP_EXTENSIONS[@]}"; do
         packages+=("php${TARGET_PHP}-${ext}")
@@ -152,7 +150,6 @@ install_php() {
     log_info "Menginstall ${#packages[@]} packages..."
     log_substep "Packages: ${packages[*]}"
 
-    # Install with automatic yes, noninteractive to prevent dpkg prompts
     DEBIAN_FRONTEND=noninteractive apt-get install -y "${packages[@]}" 2>&1 | \
         grep -E "^(Setting up|E:|W:)" || true
 
@@ -167,15 +164,12 @@ install_php() {
 
     log_ok "PHP ${installed_ver} terinstall"
 
-    # ── Fix multiple version conflicts ────────────────────────────────────
-    # Ensure correct version is default
     if [ "$installed_ver" != "$TARGET_PHP" ]; then
         log_warn "PHP terinstall versi ${installed_ver}, bukan ${TARGET_PHP}"
-        log_warn "Menyesuaikan — Laravel 12 butuh ≥8.2, versi ${installed_ver} tetap kompatibel"
+        log_warn "Menyesuaikan — Laravel 12 butuh >= 8.2, versi ${installed_ver} tetap kompatibel"
         TARGET_PHP="$installed_ver"
     fi
 
-    # Set as default via update-alternatives
     if command -v update-alternatives &>/dev/null; then
         update-alternatives --set php "/usr/bin/php${TARGET_PHP}" 2>/dev/null || true
     fi
@@ -196,9 +190,7 @@ install_php() {
         log_substep "Mencoba install ulang yang kurang..."
         for mod in "${missing[@]}"; do
             local pkg_name="php${TARGET_PHP}-${mod}"
-            # pdo_mysql is in php-mysql
             if [ "$mod" = "pdo_mysql" ]; then pkg_name="php${TARGET_PHP}-mysql"; fi
-            # tokenizer/fileinfo are in php-common
             if [ "$mod" = "tokenizer" ] || [ "$mod" = "fileinfo" ]; then
                 pkg_name="php${TARGET_PHP}-common"
             fi
@@ -206,21 +198,18 @@ install_php() {
         done
     fi
 
-    # ── Configure PHP-FPM ─────────────────────────────────────────────────
     configure_php_fpm
 
-    # Final check
     log_ok "PHP ${TARGET_PHP} + extensions: ready"
     php -v | head -1
     echo
 
-    # Export for other scripts
     save_config "PHP_VERSION" "${TARGET_PHP}"
 }
 
 # ── PHP-FPM Pool Configuration (1GB RAM tuning) ──────────────────────────────
 configure_php_fpm() {
-    log_substep "Konfigurasi PHP-FPM pool untuk 1GB RAM..."
+    log_substep "Konfigurasi PHP-FPM pool untuk VPS..."
 
     local pool_conf="/etc/php/${TARGET_PHP}/fpm/pool.d/www.conf"
 
@@ -229,24 +218,20 @@ configure_php_fpm() {
         return
     fi
 
-    # Backup original
     cp "$pool_conf" "${pool_conf}.bak"
 
-    # Apply memory-optimized settings
     sed -i 's/^pm = .*/pm = dynamic/' "$pool_conf"
     sed -i 's/^pm\.max_children = .*/pm.max_children = 5/' "$pool_conf"
     sed -i 's/^pm\.start_servers = .*/pm.start_servers = 2/' "$pool_conf"
     sed -i 's/^pm\.min_spare_servers = .*/pm.min_spare_servers = 1/' "$pool_conf"
     sed -i 's/^pm\.max_spare_servers = .*/pm.max_spare_servers = 3/' "$pool_conf"
 
-    # Add max_requests if not present
     if ! grep -q "^pm.max_requests" "$pool_conf"; then
         echo "pm.max_requests = 500" >> "$pool_conf"
     else
         sed -i 's/^pm\.max_requests = .*/pm.max_requests = 500/' "$pool_conf"
     fi
 
-    # PHP ini tuning
     local php_ini="/etc/php/${TARGET_PHP}/fpm/php.ini"
     if [ -f "$php_ini" ]; then
         sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 10M/' "$php_ini"
@@ -259,8 +244,7 @@ configure_php_fpm() {
     log_ok "PHP-FPM pool dikonfigurasi (max_children=5, memory_limit=128M)"
 }
 
-# Run if called directly
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+if [[ "${BASH_SOURCE[0]:-}" == "${0}" ]]; then
     require_root
     install_php
 fi

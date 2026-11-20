@@ -1,4 +1,4 @@
-# Teras Kota — Nginx Virtual Host Template
+# KasirLoka / Teras Kota — Nginx Virtual Host Template (HTTP / Certbot Ready)
 # Variables replaced by installer: {{DOMAIN}}, {{PHP_VERSION}}
 
 server {
@@ -44,8 +44,8 @@ server {
         add_header Cache-Control "no-store, no-cache, must-revalidate";
     }
 
-    # PWA Manifest
-    location = /manifest.json {
+    # PWA Manifest (supports manifest.webmanifest & manifest.json)
+    location ~* ^/(manifest\.webmanifest|manifest\.json)$ {
         expires 1d;
         add_header Cache-Control "public";
     }
@@ -83,12 +83,12 @@ server {
         deny all;
     }
 
-    # Deny vendor/storage access
-    location ~ ^/(vendor|storage)/ {
+    # Deny sensitive internal directories (allow public/storage symlink & uploads)
+    location ~ ^/(vendor|bootstrap|database|tests|vps)/ {
         deny all;
     }
 
-    # Client body size (for file uploads)
+    # Client body size (for logo/file uploads)
     client_max_body_size 10M;
 
     # Access & error logs
