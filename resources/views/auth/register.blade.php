@@ -44,6 +44,31 @@
             </div>
         @endif
 
+        @if(isset($registrationEnabled) && !$registrationEnabled)
+            @php
+                $regWaClean = preg_replace('/[^0-9]/', '', (string) ($supportWhatsapp ?? ''));
+                if (str_starts_with($regWaClean, '0')) {
+                    $regWaClean = '62' . substr($regWaClean, 1);
+                }
+            @endphp
+            <div class="text-center py-4">
+                <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10 text-warning mb-3" style="width: 64px; height: 64px; font-size: 1.8rem;">
+                    <i class="fa-solid fa-lock"></i>
+                </div>
+                <h5 class="fw-bold text-dark mb-2">Pendaftaran Usaha Baru Ditutup Sementara</h5>
+                <p class="text-muted small mb-4">
+                    Pengelola {{ $platformName ?? 'KasirLoka' }} sedang menutup sementara pendaftaran mandiri. Hubungi tim support kami untuk aktivasi akun baru.
+                </p>
+                <div class="d-flex justify-content-center flex-wrap gap-2">
+                    @if($regWaClean !== '')
+                        <a href="https://wa.me/{{ $regWaClean }}?text={{ urlencode('Halo Admin ' . ($platformName ?? 'KasirLoka') . ', saya ingin mendaftarkan usaha baru.') }}" target="_blank" rel="noopener noreferrer" class="btn btn-success rounded-pill px-4 fw-semibold">
+                            <i class="fa-brands fa-whatsapp me-2"></i>Hubungi Support WA
+                        </a>
+                    @endif
+                    <a href="{{ route('login') }}" class="btn btn-outline-secondary rounded-pill px-4 fw-semibold">Kembali ke Login</a>
+                </div>
+            </div>
+        @else
         <form action="{{ route('register') }}" method="POST">
             @csrf
             <div class="row g-3">
@@ -119,6 +144,7 @@
                 <i class="fa-solid fa-rocket me-2"></i>Buat Usaha &amp; Mulai Trial {{ $trialDays }} Hari
             </button>
         </form>
+        @endif
 
         <div class="text-center mt-3 pt-3 border-top">
             <small class="text-muted">

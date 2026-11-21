@@ -19,7 +19,7 @@ class StoreSettingController extends Controller
 
     public function update(Request $request)
     {
-        $tenant = TenantContext::current();
+        $tenant = TenantContext::current()?->fresh();
         if (!$tenant) {
             return redirect()->route('dashboard')->with('error', 'Profil usaha tidak ditemukan.');
         }
@@ -32,6 +32,7 @@ class StoreSettingController extends Controller
             'receipt_footer' => ['nullable', 'string', 'max:255'],
             'timezone' => ['required', 'in:Asia/Jakarta,Asia/Makassar,Asia/Jayapura'],
             'logo' => ['nullable', 'image', 'mimes:png,jpg,jpeg,webp', 'max:2048'],
+            'remove_logo' => ['nullable', 'boolean'],
         ]);
 
         $updateData = [
@@ -58,6 +59,11 @@ class StoreSettingController extends Controller
             }
 
             $updateData['logo_path'] = 'uploads/tenants/' . $filename;
+        } elseif ($request->boolean('remove_logo')) {
+            if ($tenant->logo_path && str_starts_with($tenant->logo_path, 'uploads/tenants/')) {
+                @unlink(public_path($tenant->logo_path));
+            }
+            $updateData['logo_path'] = null;
         }
 
         $tenant->update($updateData);

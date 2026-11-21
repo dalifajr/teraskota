@@ -138,6 +138,17 @@
                                                 <span>Atur Paket &amp; Masa Aktif</span>
                                             </button>
                                         </li>
+                                        @if(!$tenant->is_lifetime)
+                                            <li>
+                                                <form action="{{ route('superadmin.tenants.quick-extend', $tenant->id) }}" method="POST" class="m-0" data-confirm="Perpanjang cepat masa aktif usaha {{ $tenant->name }} selama +30 hari?">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item text-success fw-semibold">
+                                                        <i class="fa-solid fa-calendar-plus"></i>
+                                                        <span>Perpanjang +30 Hari</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
                                         <li>
                                             <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pwdModal{{ $tenant->id }}">
                                                 <i class="fa-solid fa-key text-warning"></i>

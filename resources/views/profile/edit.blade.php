@@ -56,7 +56,17 @@
                     <hr class="my-4">
 
                     <h6 class="fw-bold text-success mb-3"><i class="fa-solid fa-lock me-1"></i> Ubah Password (Opsional)</h6>
-                    
+
+                    <div class="mb-3">
+                        <label for="current_password" class="form-label fw-semibold text-dark">Password Saat Ini <small class="text-muted fw-normal">(Wajib diisi jika mengganti password)</small></label>
+                        <div class="input-group">
+                            <input type="password" name="current_password" id="current_password" class="form-control" placeholder="Masukkan password lama untuk verifikasi" autocomplete="current-password">
+                            <button type="button" class="btn btn-outline-secondary js-toggle-pwd" data-target="current_password" aria-label="Tampilkan atau sembunyikan password saat ini">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="row mb-4 g-3">
                         <div class="col-md-6">
                             <label for="password" class="form-label fw-semibold text-dark">Password Baru</label>

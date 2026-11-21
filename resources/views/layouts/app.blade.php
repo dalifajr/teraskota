@@ -89,6 +89,15 @@
             </div>
 
             <div class="d-flex align-items-center gap-2 gap-sm-3">
+                @if(!$isKasirOnly)
+                    <!-- Global Quick Search Trigger (Ctrl+K) -->
+                    <button type="button" class="btn btn-sm btn-light border rounded-pill px-3 d-inline-flex align-items-center gap-2 text-muted" data-bs-toggle="modal" data-bs-target="#klQuickSearchModal" title="Pencarian Cepat (Ctrl+K)" aria-label="Pencarian Cepat">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <span class="d-none d-lg-inline small">Cari cepat...</span>
+                        <kbd class="d-none d-xl-inline bg-white text-muted border small" style="font-size: 0.68rem;">Ctrl+K</kbd>
+                    </button>
+                @endif
+
                 <!-- Live Realtime Store Timezone Clock -->
                 <div class="admin-live-clock d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill" title="Zona Waktu Operasional: {{ $activeTzShort }} ({{ $activeTimezone }})">
                     <i class="fa-regular fa-clock text-success"></i>
@@ -450,6 +459,140 @@
             updateAdminClock();
         })();
     </script>
+
+    @if(!$isKasirOnly)
+        @php
+            $quickSearchEndpoint = $isSuperAdminPanel ? route('superadmin.quick-search') : route('admin.quick-search');
+            $quickShortcuts = $isSuperAdminPanel
+                ? [
+                    ['title' => 'Dashboard SaaS', 'subtitle' => 'Analitik MRR, ARPU & Pertumbuhan', 'icon' => 'fa-gauge-high text-primary', 'url' => route('superadmin.dashboard')],
+                    ['title' => 'Daftar Usaha (Tenant)', 'subtitle' => 'Kelola usaha, paket & support', 'icon' => 'fa-store text-success', 'url' => route('superadmin.tenants')],
+                    ['title' => 'Tagihan & Pembayaran', 'subtitle' => 'Verifikasi invoice & ekspor CSV', 'icon' => 'fa-file-invoice-dollar text-warning', 'url' => route('superadmin.invoices')],
+                    ['title' => 'Kode Promo & Kupon', 'subtitle' => 'Buat & kelola diskon langganan', 'icon' => 'fa-ticket text-success', 'url' => route('superadmin.promos')],
+                    ['title' => 'Paket & Harga', 'subtitle' => 'Atur tier langganan & kuota', 'icon' => 'fa-layer-group text-info', 'url' => route('superadmin.plans')],
+                    ['title' => 'Pengaturan Platform', 'subtitle' => 'QRIS billing, broadcast & registrasi', 'icon' => 'fa-sliders text-secondary', 'url' => route('superadmin.settings')],
+                ]
+                : [
+                    ['title' => 'Buka Terminal Kasir POS', 'subtitle' => 'Layani transaksi tunai & QRIS', 'icon' => 'fa-cash-register text-success', 'url' => route('pos.index')],
+                    ['title' => 'Riwayat Transaksi', 'subtitle' => 'Cari nota, cetak struk & sampah', 'icon' => 'fa-clock-rotate-left text-primary', 'url' => route('transactions.index')],
+                    ['title' => 'Pengeluaran Kas', 'subtitle' => 'Catat biaya & lihat distribusi', 'icon' => 'fa-money-bill-transfer text-danger', 'url' => route('expenses.index')],
+                    ['title' => 'Data Menu Produk', 'subtitle' => 'Tambah, import CSV & atur harga', 'icon' => 'fa-mug-hot text-success', 'url' => route('menus.index')],
+                    ['title' => 'Laporan Penjualan', 'subtitle' => 'Laba bersih, jam ramai & PDF', 'icon' => 'fa-file-invoice-dollar text-info', 'url' => route('reports.index')],
+                    ['title' => 'Langganan & Paket', 'subtitle' => 'Perpanjang paket & kode promo', 'icon' => 'fa-crown text-warning', 'url' => route('billing.index')],
+                ];
+        @endphp
+        <!-- Global Quick Search Modal (Ctrl+K) -->
+        <div class="modal fade" id="klQuickSearchModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header py-2 px-3 bg-white">
+                        <div class="input-group border-0">
+                            <span class="input-group-text bg-transparent border-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="search" id="klQuickSearchInput" class="form-control border-0 shadow-none" placeholder="{{ $isSuperAdminPanel ? 'Cari usaha, nomor invoice, kode promo, atau halaman...' : 'Cari menu, no. transaksi, pelanggan, pengeluaran, atau halaman...' }}" autocomplete="off">
+                            <button type="button" class="btn-close my-auto me-1" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body p-2" style="max-height: 400px; overflow-y: auto;" id="klQuickSearchResults"></div>
+                    <div class="modal-footer py-2 px-3 bg-light justify-content-between small text-muted">
+                        <span><kbd class="bg-white text-dark border">Ctrl+K</kbd> untuk membuka · <kbd class="bg-white text-dark border">Esc</kbd> menutup</span>
+                        <span>{{ $isSuperAdminPanel ? 'Platform HQ Search' : 'Pencarian Cepat Usaha' }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script>
+            (function () {
+                const modalEl = document.getElementById('klQuickSearchModal');
+                const inputEl = document.getElementById('klQuickSearchInput');
+                const resultsEl = document.getElementById('klQuickSearchResults');
+                if (!modalEl || !inputEl || !resultsEl) return;
+
+                const searchUrl = @json($quickSearchEndpoint);
+                const shortcuts = @json($quickShortcuts);
+                let debounceTimer = null;
+                let activeController = null;
+
+                function esc(s) {
+                    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+                }
+
+                function renderItems(items, headerLabel) {
+                    if (!items || items.length === 0) {
+                        resultsEl.innerHTML = '<div class="text-center text-muted small py-4">Tidak ada hasil yang cocok.</div>';
+                        return;
+                    }
+                    let html = '';
+                    let lastGroup = '';
+                    items.forEach(item => {
+                        const grp = item.group || headerLabel || 'Pintasan Cepat';
+                        if (grp !== lastGroup) {
+                            html += `<div class="px-3 pt-2 pb-1 text-uppercase text-muted fw-bold" style="font-size:0.68rem;">${esc(grp)}</div>`;
+                            lastGroup = grp;
+                        }
+                        html += `
+                            <a href="${esc(item.url)}" class="d-flex align-items-center gap-3 px-3 py-2 rounded-3 text-decoration-none text-dark kl-qs-item" style="transition: background 0.14s;">
+                                <div class="rounded-3 bg-light border d-flex align-items-center justify-content-center flex-shrink-0" style="width: 34px; height: 34px;">
+                                    <i class="fa-solid ${esc(item.icon || 'fa-arrow-right text-muted')}"></i>
+                                </div>
+                                <div class="min-w-0 flex-grow-1">
+                                    <div class="fw-semibold small text-truncate">${esc(item.title)}</div>
+                                    <div class="text-muted text-truncate" style="font-size:0.75rem;">${esc(item.subtitle || '')}</div>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-muted small opacity-50"></i>
+                            </a>`;
+                    });
+                    resultsEl.innerHTML = html;
+                }
+
+                modalEl.addEventListener('shown.bs.modal', function () {
+                    inputEl.value = '';
+                    renderItems(shortcuts, 'Navigasi Cepat');
+                    inputEl.focus();
+                });
+
+                document.addEventListener('keydown', function (e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+                        e.preventDefault();
+                        const inst = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        inst.toggle();
+                    }
+                });
+
+                inputEl.addEventListener('input', function () {
+                    const q = inputEl.value.trim();
+                    clearTimeout(debounceTimer);
+                    if (activeController) activeController.abort();
+
+                    if (q.length < 2) {
+                        const filtered = q === '' ? shortcuts : shortcuts.filter(s => (s.title + ' ' + s.subtitle).toLowerCase().includes(q.toLowerCase()));
+                        renderItems(filtered, 'Navigasi Cepat');
+                        return;
+                    }
+
+                    debounceTimer = setTimeout(async () => {
+                        resultsEl.innerHTML = '<div class="text-center text-muted small py-4"><span class="spinner-border spinner-border-sm me-2"></span>Mencari...</div>';
+                        activeController = new AbortController();
+                        try {
+                            const res = await fetch(`${searchUrl}?q=${encodeURIComponent(q)}`, {
+                                headers: { 'Accept': 'application/json' },
+                                signal: activeController.signal
+                            });
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
+                            const data = await res.json();
+                            const localHits = shortcuts
+                                .filter(s => (s.title + ' ' + s.subtitle).toLowerCase().includes(q.toLowerCase()))
+                                .map(s => Object.assign({ group: 'Halaman' }, s));
+                            renderItems([...localHits, ...(data.items || [])], 'Hasil Pencarian');
+                        } catch (err) {
+                            if (err.name !== 'AbortError') {
+                                resultsEl.innerHTML = '<div class="text-center text-danger small py-3">Gagal memuat hasil pencarian.</div>';
+                            }
+                        }
+                    }, 220);
+                });
+            })();
+        </script>
+    @endif
 
     @yield('scripts')
 </body>

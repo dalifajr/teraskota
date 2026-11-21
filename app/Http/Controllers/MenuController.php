@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Menu;
 use App\Models\PlatformSetting;
+use App\Models\Setting;
 use App\Http\Requests\StoreMenuRequest;
 use App\Http\Requests\UpdateMenuRequest;
 use App\Services\SubscriptionService;
@@ -270,7 +271,11 @@ class MenuController extends Controller
     public function create()
     {
         $categories = Category::all();
-        return view('menus.create', compact('categories'));
+        $globalProfitPercentage = (float) Setting::getValue('global_profit_percentage', 30);
+        $nextSeq = Menu::withTrashed()->count() + 1;
+        $suggestedCode = 'MNU-' . str_pad((string) $nextSeq, 3, '0', STR_PAD_LEFT);
+
+        return view('menus.create', compact('categories', 'globalProfitPercentage', 'suggestedCode'));
     }
 
     /**
@@ -304,7 +309,9 @@ class MenuController extends Controller
     public function edit(Menu $menu)
     {
         $categories = Category::all();
-        return view('menus.edit', compact('menu', 'categories'));
+        $globalProfitPercentage = (float) Setting::getValue('global_profit_percentage', 30);
+
+        return view('menus.edit', compact('menu', 'categories', 'globalProfitPercentage'));
     }
 
     /**

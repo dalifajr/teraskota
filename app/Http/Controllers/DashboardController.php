@@ -420,4 +420,73 @@ class DashboardController extends Controller
             }),
         ]);
     }
+
+    /**
+     * Global Quick Search (Ctrl+K) for Tenant Admin (strictly tenant-scoped).
+     */
+    public function quickSearch(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['items' => []]);
+        }
+
+        $items = [];
+
+        $menus = \App\Models\Menu::with('category:id,name')
+            ->where(function ($query) use ($q) {
+                $query->where('name', 'like', "%{$q}%")
+                      ->orWhere('code', 'like', "%{$q}%");
+            })
+            ->limit(5)
+            ->get();
+
+        foreach ($menus as $m) {
+            $items[] = [
+                'group' => 'Menu Produk',
+                'icon' => 'fa-mug-hot text-success',
+                'title' => "{$m->code} · {$m->name}",
+                'subtitle' => ($m->category?->name ?? 'Umum') . ' · Rp' . number_format((float) $m->price, 0, ',', '.'),
+                'url' => route('menus.edit', $m->id),
+            ];
+        }
+
+        $txs = Transaction::where(function ($query) use ($q) {
+                $query->where('transaction_number', 'like', "%{$q}%")
+                      ->orWhere('customer_name', 'like', "%{$q}%");
+            })
+            ->latest('id')
+            ->limit(5)
+            ->get();
+
+        foreach ($txs as $tx) {
+            $items[] = [
+                'group' => 'Transaksi',
+                'icon' => 'fa-receipt text-primary',
+                'title' => $tx->transaction_number,
+                'subtitle' => ($tx->customer_name ?: 'Pelanggan') . ' · Rp' . number_format((float) $tx->total_sales, 0, ',', '.') . ' (' . strtoupper($tx->status ?? 'paid') . ')',
+                'url' => route('transactions.show', $tx->id),
+            ];
+        }
+
+        $expenses = Expense::where(function ($query) use ($q) {
+                $query->where('expense_number', 'like', "%{$q}%")
+                      ->orWhere('description', 'like', "%{$q}%");
+            })
+            ->latest('id')
+            ->limit(4)
+            ->get();
+
+        foreach ($expenses as $exp) {
+            $items[] = [
+                'group' => 'Pengeluaran Kas',
+                'icon' => 'fa-money-bill-transfer text-danger',
+                'title' => $exp->description,
+                'subtitle' => "{$exp->expense_number} · {$exp->category} · Rp" . number_format((float) $exp->amount, 0, ',', '.'),
+                'url' => route('expenses.index', ['search' => $exp->expense_number]),
+            ];
+        }
+
+        return response()->json(['items' => $items]);
+    }
 }

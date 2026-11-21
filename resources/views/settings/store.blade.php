@@ -59,7 +59,17 @@
                             <label class="form-label fw-semibold small" for="storeLogoInput">Logo Usaha (Opsional · Maks 2MB PNG/JPG/WebP)</label>
                             <div class="d-flex align-items-center gap-3">
                                 <img id="storeLogoPreview" src="{{ $tenant->logo_path ? $tenant->logoUrl() : asset('assets/images/logo.png') }}" alt="Logo Usaha" class="rounded-circle border shadow-sm" style="width: 60px; height: 60px; object-fit: cover;">
-                                <input type="file" name="logo" id="storeLogoInput" class="form-control" accept="image/png,image/jpeg,image/webp">
+                                <div class="flex-grow-1">
+                                    <input type="file" name="logo" id="storeLogoInput" class="form-control" accept="image/png,image/jpeg,image/webp">
+                                    @if($tenant->logo_path)
+                                        <div class="form-check mt-2">
+                                            <input class="form-check-input" type="checkbox" name="remove_logo" value="1" id="removeStoreLogo">
+                                            <label class="form-check-label small text-danger fw-semibold" for="removeStoreLogo">
+                                                Hapus logo kustom saat ini (kembali ke logo default)
+                                            </label>
+                                        </div>
+                                    @endif
+                                </div>
                             </div>
                         </div>
                     </div>

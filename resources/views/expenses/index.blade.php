@@ -54,6 +54,28 @@
     </div>
 </div>
 
+@if(isset($categoryBreakdown) && $categoryBreakdown->count() > 0)
+<!-- Distribusi Pengeluaran per Kategori -->
+<div class="card premium-card border-0 shadow-sm mb-4" style="font-variant-numeric: tabular-nums;">
+    <div class="card-body py-3 px-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <small class="text-uppercase fw-bold text-muted"><i class="fa-solid fa-chart-pie text-danger me-1"></i>Distribusi Biaya per Kategori</small>
+            <small class="text-muted">{{ $categoryBreakdown->count() }} kategori aktif</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            @foreach($categoryBreakdown as $cb)
+                <a href="{{ route('expenses.index', array_merge(request()->except('page'), ['category' => $cb->category])) }}"
+                   class="text-decoration-none px-3 py-2 rounded-3 border bg-light d-inline-flex align-items-center gap-2 small">
+                    <span class="fw-semibold text-dark">{{ $cb->category }}</span>
+                    <span class="text-danger fw-bold">Rp{{ number_format($cb->total_amount, 0, ',', '.') }}</span>
+                    <span class="badge bg-danger bg-opacity-10 text-danger rounded-pill">{{ $cb->pct }}%</span>
+                </a>
+            @endforeach
+        </div>
+    </div>
+</div>
+@endif
+
 @php
     $expAdvancedCount = 0;
     foreach (['category', 'payment_method', 'start_date', 'end_date'] as $efk) {

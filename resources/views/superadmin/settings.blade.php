@@ -41,6 +41,15 @@
                             <label class="form-label small fw-semibold">Masa Tenggang / Grace Period (Hari)</label>
                             <input type="number" name="grace_days" class="form-control" min="0" max="30" value="{{ old('grace_days', $settings['grace_days']) }}" required>
                         </div>
+                        <div class="col-12">
+                            <div class="form-check form-switch p-2 ps-5 rounded-3 bg-light border">
+                                <input class="form-check-input" type="checkbox" role="switch" id="registrationEnabled" name="registration_enabled" value="1" {{ old('registration_enabled', $settings['registration_enabled'] ?? '1') == '1' ? 'checked' : '' }}>
+                                <label class="form-check-label small fw-semibold text-dark" for="registrationEnabled">
+                                    Buka Pendaftaran Usaha Baru Publik (<code>/register</code>)
+                                </label>
+                                <div class="text-muted" style="font-size: 0.74rem;">Matikan saklar ini jika ingin menutup pendaftaran mandiri sementara (Super Admin tetap bisa menambah usaha manual).</div>
+                            </div>
+                        </div>
 
                         <!-- Platform Broadcast Banner -->
                         <div class="col-12 mt-3">

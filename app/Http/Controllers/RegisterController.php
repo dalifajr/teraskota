@@ -6,6 +6,7 @@ use App\Models\PlatformSetting;
 use App\Services\SubscriptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 
 class RegisterController extends Controller
 {
@@ -29,12 +30,28 @@ class RegisterController extends Controller
         }
 
         $trialDays = (int) PlatformSetting::getValue('trial_days', config('platform.trial_days', 14));
+        $registrationEnabled = PlatformSetting::getValue('registration_enabled', '1') === '1';
+        $supportWhatsapp = (string) PlatformSetting::getValue('support_whatsapp', config('platform.support_whatsapp', ''));
 
-        return view('auth.register', compact('trialDays'));
+        return view('auth.register', compact('trialDays', 'registrationEnabled', 'supportWhatsapp'));
     }
 
     public function register(Request $request)
     {
+        if (PlatformSetting::getValue('registration_enabled', '1') !== '1') {
+            return back()->withErrors([
+                'store_name' => 'Pendaftaran usaha baru sedang ditutup sementara oleh pengelola platform. Silakan hubungi tim support.',
+            ]);
+        }
+
+        $throttleKey = 'register:' . $request->ip();
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return back()->withErrors([
+                'store_name' => "Terlalu banyak percobaan pendaftaran dari alamat IP Anda. Coba lagi dalam {$seconds} detik.",
+            ])->withInput();
+        }
+        RateLimiter::hit($throttleKey, 600);
         $validated = $request->validate([
             'store_name' => ['required', 'string', 'max:120'],
             'business_type' => ['required', 'string', 'max:60'],

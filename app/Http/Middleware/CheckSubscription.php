@@ -42,6 +42,12 @@ class CheckSubscription
             return redirect()->route('login')->with('error', 'Akun tidak memiliki profil usaha aktif.');
         }
 
+        // Sync PHP backend timezone with active tenant store timezone (WIB/WITA/WIT)
+        if (in_array($tenant->timezone, ['Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura'], true)) {
+            date_default_timezone_set($tenant->timezone);
+            config(['app.timezone' => $tenant->timezone]);
+        }
+
         $state = $tenant->subscriptionState();
 
         // 1. Suspended or Expired check
@@ -80,6 +86,7 @@ class CheckSubscription
             if (!$tenant->hasFeature($requirement)) {
                 $featureLabel = match ($requirement) {
                     'qris_dynamic' => 'QRIS Dinamis & Auto-Verify Android Listener',
+                    'offline_sync' => 'Mode Offline POS & Auto-Sync',
                     'pdf_export' => 'Ekspor Laporan PDF',
                     'expenses' => 'Pencatatan Pengeluaran Kas',
                     default => ucfirst(str_replace('_', ' ', $requirement)),

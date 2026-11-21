@@ -29,7 +29,11 @@ class ProfileController extends Controller
             'name' => ['required', 'string', 'max:100'],
             'username' => ['required', 'string', 'max:50', 'unique:users,username,' . $user->id],
             'email' => ['required', 'email', 'max:100', 'unique:users,email,' . $user->id],
+            'current_password' => ['nullable', 'required_with:password', 'current_password'],
             'password' => ['nullable', 'confirmed', Password::min(6)],
+        ], [
+            'current_password.required_with' => 'Masukkan kata sandi saat ini untuk keamanan sebelum mengganti password baru.',
+            'current_password.current_password' => 'Kata sandi saat ini yang Anda masukkan tidak sesuai.',
         ]);
 
         $user->name = $request->name;

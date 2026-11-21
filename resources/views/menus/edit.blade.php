@@ -67,18 +67,36 @@
                         <div class="form-check mb-3">
                             <input type="checkbox" name="use_global_profit" id="use_global_profit" class="form-check-input" value="1" {{ old('use_global_profit', $menu->use_global_profit ? '1' : '0') == '1' ? 'checked' : '' }}>
                             <label class="form-check-label fw-medium text-dark" for="use_global_profit">
-                                Gunakan Persentase Keuntungan Global (Default 30%)
+                                Gunakan Persentase Keuntungan Global (Saat ini: <strong>{{ $globalProfitPercentage ?? 30 }}%</strong>)
                             </label>
-                            <div class="text-muted small">Jika dicentang, menu ini akan mengikuti persentase keuntungan global.</div>
+                            <div class="text-muted small">Jika dicentang, menu ini akan mengikuti persentase keuntungan global toko.</div>
                         </div>
 
-                        <div class="mb-2" id="customProfitContainer">
+                        <div class="mb-3" id="customProfitContainer">
                             <label for="profit_percentage" class="form-label fw-medium text-dark">Persentase Keuntungan Khusus (%)</label>
                             <div class="input-group" style="max-width: 200px;">
                                 <input type="number" name="profit_percentage" id="profit_percentage" min="0" max="100" step="0.1" class="form-control" placeholder="Contoh: 35" value="{{ old('profit_percentage', $menu->profit_percentage) }}" {{ old('use_global_profit', $menu->use_global_profit ? '1' : '0') == '1' ? 'disabled' : '' }}>
                                 <span class="input-group-text">%</span>
                             </div>
                             <small class="text-muted">Masukkan nilai antara 0 - 100.</small>
+                        </div>
+
+                        <!-- Live Margin & HPP Simulator -->
+                        <div class="p-2.5 bg-white rounded-3 border small" style="font-variant-numeric: tabular-nums;">
+                            <div class="row g-2 text-center">
+                                <div class="col-4">
+                                    <div class="text-muted" style="font-size: 0.72rem;">Estimasi Modal (HPP)</div>
+                                    <strong class="text-danger" id="menuSimCost">Rp0</strong>
+                                </div>
+                                <div class="col-4 border-start">
+                                    <div class="text-muted" style="font-size: 0.72rem;">Laba Kotor / Porsi</div>
+                                    <strong class="text-success" id="menuSimProfit">Rp0</strong>
+                                </div>
+                                <div class="col-4 border-start">
+                                    <div class="text-muted" style="font-size: 0.72rem;">Margin Aktif</div>
+                                    <strong class="text-primary" id="menuSimPct">{{ $globalProfitPercentage ?? 30 }}%</strong>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -105,17 +123,41 @@
 @section('scripts')
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const globalPct = {{ (float) ($globalProfitPercentage ?? 30) }};
         const useGlobalCheckbox = document.getElementById('use_global_profit');
         const profitInput = document.getElementById('profit_percentage');
+        const priceInput = document.getElementById('price');
 
-        useGlobalCheckbox.addEventListener('change', function () {
+        function recalcMenuSim() {
+            const price = Math.max(0, parseFloat(priceInput?.value || '0') || 0);
+            const pct = useGlobalCheckbox?.checked
+                ? globalPct
+                : Math.min(100, Math.max(0, parseFloat(profitInput?.value || '0') || 0));
+            const profit = Math.round(price * (pct / 100));
+            const cost = Math.max(0, price - profit);
+            const fmt = (n) => 'Rp' + new Intl.NumberFormat('id-ID').format(n);
+
+            const elCost = document.getElementById('menuSimCost');
+            const elProfit = document.getElementById('menuSimProfit');
+            const elPct = document.getElementById('menuSimPct');
+            if (elCost) elCost.textContent = fmt(cost);
+            if (elProfit) elProfit.textContent = fmt(profit);
+            if (elPct) elPct.textContent = pct + '%';
+        }
+
+        useGlobalCheckbox?.addEventListener('change', function () {
             profitInput.disabled = this.checked;
             if (this.checked) {
                 profitInput.value = '';
             } else {
                 profitInput.focus();
             }
+            recalcMenuSim();
         });
+
+        priceInput?.addEventListener('input', recalcMenuSim);
+        profitInput?.addEventListener('input', recalcMenuSim);
+        recalcMenuSim();
     });
 </script>
 @endsection

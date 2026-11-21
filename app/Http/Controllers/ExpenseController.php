@@ -24,6 +24,21 @@ class ExpenseController extends Controller
         $nonCashExpenses = (float) (clone $query)->where('payment_method', 'non-tunai')->sum('amount');
         $expenseCount = (clone $query)->count();
 
+        $categoryBreakdown = (clone $query)
+            ->select('category', DB::raw('SUM(amount) as total_amount'), DB::raw('COUNT(*) as tx_count'))
+            ->groupBy('category')
+            ->orderByDesc('total_amount')
+            ->get()
+            ->map(function ($row) use ($totalExpenses) {
+                $amt = (float) $row->total_amount;
+                return (object) [
+                    'category' => $row->category,
+                    'total_amount' => $amt,
+                    'tx_count' => (int) $row->tx_count,
+                    'pct' => $totalExpenses > 0 ? round(($amt / $totalExpenses) * 100, 1) : 0.0,
+                ];
+            });
+
         $expenses = $query->orderBy('expense_date', 'desc')
             ->orderBy('id', 'desc')
             ->paginate(15)
@@ -37,7 +52,8 @@ class ExpenseController extends Controller
             'totalExpenses',
             'cashExpenses',
             'nonCashExpenses',
-            'expenseCount'
+            'expenseCount',
+            'categoryBreakdown'
         ));
     }
 

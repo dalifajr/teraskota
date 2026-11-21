@@ -1287,4 +1287,10 @@ body {
     white-space: nowrap;
 }
 
+.kl-qs-item:hover,
+.kl-qs-item:focus {
+    background-color: #f1f5f9;
+    color: var(--primary-green) !important;
+}
+
 

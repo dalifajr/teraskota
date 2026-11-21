@@ -115,12 +115,14 @@ Route::middleware('auth')->group(function () {
         ->middleware('role:super_admin')
         ->group(function () {
             Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
+            Route::get('/quick-search', [SuperAdminController::class, 'quickSearch'])->name('quick-search');
             Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
             Route::get('/tenants/export', [SuperAdminController::class, 'exportTenants'])->name('tenants.export');
             Route::post('/tenants', [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
             Route::put('/tenants/{tenant}', [SuperAdminController::class, 'updateTenant'])->name('tenants.update');
             Route::delete('/tenants/{tenant}', [SuperAdminController::class, 'destroyTenant'])->name('tenants.destroy');
             Route::post('/tenants/{tenant}/subscription', [SuperAdminController::class, 'updateTenantSubscription'])->name('tenants.subscription');
+            Route::post('/tenants/{tenant}/quick-extend', [SuperAdminController::class, 'quickExtendTenant'])->name('tenants.quick-extend');
             Route::post('/tenants/{tenant}/reset-password', [SuperAdminController::class, 'resetOwnerPassword'])->name('tenants.reset-password');
             Route::post('/tenants/{tenant}/toggle', [SuperAdminController::class, 'toggleTenantStatus'])->name('tenants.toggle');
             Route::post('/tenants/{tenant}/impersonate', [SuperAdminController::class, 'impersonateTenant'])->name('tenants.impersonate');
@@ -174,7 +176,9 @@ Route::middleware('auth')->group(function () {
         Route::get('/pos/receipt/{transaction}', [PosController::class, 'receipt'])->name('pos.receipt');
         Route::get('/pos/summary-today', [PosController::class, 'summaryToday'])->name('pos.summary');
         Route::get('/pos/bootstrap', [OfflineSyncController::class, 'bootstrap'])->name('pos.bootstrap');
-        Route::post('/pos/sync', [OfflineSyncController::class, 'sync'])->name('pos.sync');
+        Route::post('/pos/sync', [OfflineSyncController::class, 'sync'])
+            ->middleware('subscription:offline_sync')
+            ->name('pos.sync');
     });
 
     // ---------------------------------------------------------------------
@@ -191,6 +195,7 @@ Route::middleware('auth')->group(function () {
         // Read-only when expired; writes blocked by CheckSubscription
         Route::middleware('subscription')->group(function () {
             Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+            Route::get('/quick-search', [DashboardController::class, 'quickSearch'])->name('admin.quick-search');
             Route::get('/notifications/unread-transactions', [DashboardController::class, 'unreadTransactions'])->name('notifications.unread');
 
             Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');

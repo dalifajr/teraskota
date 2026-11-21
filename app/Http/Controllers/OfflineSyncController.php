@@ -41,6 +41,7 @@ class OfflineSyncController extends Controller
             ->get([
                 'id',
                 'category_id',
+                'code',
                 'name',
                 'price',
                 'use_global_profit',

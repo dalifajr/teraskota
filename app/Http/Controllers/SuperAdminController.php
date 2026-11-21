@@ -486,6 +486,104 @@ class SuperAdminController extends Controller
         return back()->with('success', "Langganan usaha {$tenant->name} berhasil diperbarui ke paket {$plan->name} ({$validated['billing_cycle']}).");
     }
 
+    public function quickExtendTenant(Tenant $tenant)
+    {
+        if ($tenant->is_lifetime) {
+            return back()->with('info', "Usaha {$tenant->name} berstatus VIP Lifetime (tidak perlu perpanjangan).");
+        }
+
+        $plan = $tenant->currentPlan()
+            ?? Plan::where('slug', 'starter')->first()
+            ?? Plan::orderBy('sort_order')->firstOrFail();
+
+        $currentSub = $tenant->activeSubscription;
+        $baseStart = ($currentSub && $currentSub->ends_at && $currentSub->ends_at->isFuture())
+            ? $currentSub->ends_at->copy()
+            : Carbon::now();
+
+        $newEndsAt = $baseStart->copy()->addDays(30);
+        $daysTotal = max(1, (int) Carbon::now()->diffInDays($newEndsAt, false));
+
+        $this->subscriptionService->assignSubscriptionManually(
+            $tenant,
+            $plan,
+            'monthly',
+            $daysTotal,
+            'Perpanjang cepat +30 hari oleh Super Admin'
+        );
+
+        PlatformAuditLog::record(
+            'tenant',
+            'quick_extend_tenant',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Perpanjang cepat +30 hari untuk {$tenant->name} (paket {$plan->name}, aktif hingga {$newEndsAt->format('Y-m-d')})."
+        );
+
+        return back()->with('success', "Masa aktif {$tenant->name} berhasil diperpanjang +30 hari (hingga {$newEndsAt->translatedFormat('d M Y')})!");
+    }
+
+    public function quickSearch(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        if (mb_strlen($q) < 2) {
+            return response()->json(['items' => []]);
+        }
+
+        $items = [];
+
+        $tenants = Tenant::where('name', 'like', "%{$q}%")
+            ->orWhere('slug', 'like', "%{$q}%")
+            ->orWhere('phone', 'like', "%{$q}%")
+            ->limit(5)
+            ->get(['id', 'name', 'slug', 'business_type']);
+
+        foreach ($tenants as $t) {
+            $items[] = [
+                'group' => 'Usaha (Tenant)',
+                'icon' => 'fa-store text-success',
+                'title' => $t->name,
+                'subtitle' => "{$t->slug} · {$t->business_type}",
+                'url' => route('superadmin.tenants', ['search' => $t->slug]),
+            ];
+        }
+
+        $invoices = SubscriptionInvoice::with('tenant:id,name')
+            ->where('invoice_number', 'like', "%{$q}%")
+            ->orWhere('promo_code_snapshot', 'like', "%{$q}%")
+            ->latest('id')
+            ->limit(5)
+            ->get();
+
+        foreach ($invoices as $inv) {
+            $items[] = [
+                'group' => 'Invoice Langganan',
+                'icon' => 'fa-file-invoice-dollar text-primary',
+                'title' => $inv->invoice_number,
+                'subtitle' => ($inv->tenant?->name ?? '-') . ' · Rp' . number_format((float) $inv->final_amount, 0, ',', '.') . ' (' . strtoupper($inv->status) . ')',
+                'url' => route('superadmin.invoices', ['search' => $inv->invoice_number]),
+            ];
+        }
+
+        $promos = PromoCode::where('code', 'like', "%{$q}%")
+            ->orWhere('name', 'like', "%{$q}%")
+            ->limit(4)
+            ->get();
+
+        foreach ($promos as $pr) {
+            $items[] = [
+                'group' => 'Kode Promo',
+                'icon' => 'fa-ticket text-warning',
+                'title' => $pr->code,
+                'subtitle' => $pr->name,
+                'url' => route('superadmin.promos'),
+            ];
+        }
+
+        return response()->json(['items' => $items]);
+    }
+
     public function toggleTenantStatus(Tenant $tenant)
     {
         $tenant->update(['is_active' => !$tenant->is_active]);
@@ -1109,6 +1207,7 @@ class SuperAdminController extends Controller
             'platform_qris_secret' => PlatformSetting::getValue('platform_qris_secret', ''),
             'trial_days' => PlatformSetting::getValue('trial_days', '14'),
             'grace_days' => PlatformSetting::getValue('grace_days', '3'),
+            'registration_enabled' => PlatformSetting::getValue('registration_enabled', '1'),
             'announcement_enabled' => PlatformSetting::getValue('announcement_enabled', '0'),
             'announcement_type' => PlatformSetting::getValue('announcement_type', 'info'),
             'announcement_message' => PlatformSetting::getValue('announcement_message', ''),
@@ -1143,6 +1242,7 @@ class SuperAdminController extends Controller
             'announcement_message' => ['nullable', 'string', 'max:500'],
         ]);
 
+        $validated['registration_enabled'] = $request->has('registration_enabled') ? '1' : '0';
         $validated['announcement_enabled'] = $request->has('announcement_enabled') ? '1' : '0';
         $validated['announcement_type'] = $validated['announcement_type'] ?? 'info';
         $validated['announcement_message'] = trim((string) ($validated['announcement_message'] ?? ''));

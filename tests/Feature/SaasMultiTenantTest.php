@@ -1375,4 +1375,125 @@ class SaasMultiTenantTest extends TestCase
         $auditCsv->assertStatus(200);
         $this->assertStringContainsString('system_clear_log', $auditCsv->streamedContent());
     }
+
+    public function test_round3_profile_password_guard_registration_toggle_quick_extend_ctrl_k_and_tenant_upgrades(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $subService = app(SubscriptionService::class);
+
+        $storeA = $subService->provisionTenant(
+            ['name' => 'Kopi Nusantara R3', 'business_type' => 'Kedai Minuman / Kopi', 'timezone' => 'Asia/Jayapura'],
+            ['name' => 'Owner R3', 'username' => 'r3_owner', 'email' => 'r3@test.id', 'password' => 'secret123'],
+            true
+        );
+        $storeB = $subService->provisionTenant(
+            ['name' => 'Rahasia Toko Lain', 'business_type' => 'Bakery / Kue'],
+            ['name' => 'Owner B3', 'username' => 'b3_owner', 'email' => 'b3@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        // 1. Profile password change requires valid current_password
+        $this->actingAs($storeA['user'])->put('/profile', [
+            'name' => 'Owner R3 Updated',
+            'username' => 'r3_owner',
+            'email' => 'r3@test.id',
+            'password' => 'newpass123',
+            'password_confirmation' => 'newpass123',
+        ])->assertSessionHasErrors('current_password');
+
+        $this->actingAs($storeA['user'])->put('/profile', [
+            'name' => 'Owner R3 Updated',
+            'username' => 'r3_owner',
+            'email' => 'r3@test.id',
+            'current_password' => 'secret123',
+            'password' => 'newpass123',
+            'password_confirmation' => 'newpass123',
+        ])->assertRedirect('/profile')->assertSessionHas('success');
+
+        // 2. Super Admin closes public registration -> /register shows closed notice & blocks POST (as guest)
+        auth()->logout();
+        PlatformSetting::setValue('registration_enabled', '0');
+        $this->get('/register')
+            ->assertStatus(200)
+            ->assertSee('Pendaftaran Usaha Baru Ditutup Sementara');
+
+        $this->post('/register', [
+            'store_name' => 'Usaha Ditolak',
+            'business_type' => 'Kedai Minuman / Kopi',
+            'owner_name' => 'Tester',
+            'username' => 'ditolak_user',
+            'email' => 'ditolak@test.id',
+            'password' => 'secret123',
+            'password_confirmation' => 'secret123',
+        ])->assertSessionHasErrors('store_name');
+        PlatformSetting::setValue('registration_enabled', '1');
+
+        // 3. Super Admin Quick Extend +30 days & Ctrl+K quick-search
+        $oldEnds = $storeA['tenant']->activeSubscription->ends_at->copy();
+        $this->actingAs($superAdmin)->post('/superadmin/tenants/' . $storeA['tenant']->id . '/quick-extend')
+            ->assertRedirect()->assertSessionHas('success');
+        $newEnds = $storeA['tenant']->fresh()->activeSubscription->ends_at;
+        $this->assertTrue($newEnds->gt($oldEnds->copy()->addDays(25)));
+
+        $this->actingAs($superAdmin)->getJson('/superadmin/quick-search?q=Nusantara')
+            ->assertStatus(200)
+            ->assertJsonFragment(['title' => 'Kopi Nusantara R3']);
+
+        // 4. Tenant Admin Ctrl+K quick-search strictly isolated (sees own menus, NEVER sees Store B)
+        $this->actingAs($storeA['user'])->getJson('/quick-search?q=Kopi')
+            ->assertStatus(200)
+            ->assertJsonStructure(['items']);
+        $searchOther = $this->actingAs($storeA['user'])->getJson('/quick-search?q=Croissant');
+        $searchOther->assertStatus(200);
+        $this->assertEmpty($searchOther->json('items'));
+
+        // 5. Menu create shows actual global profit % (42%) instead of hardcoded 30% + live sim
+        Setting::setValue('global_profit_percentage', '42', $storeA['tenant']->id);
+        $this->actingAs($storeA['user'])->get('/menus/create')
+            ->assertStatus(200)
+            ->assertSee('Saat ini: <strong>42%</strong>', false)
+            ->assertSee('menuSimProfit', false);
+
+        // 6. Store settings remove_logo resets logo_path to null
+        $storeA['tenant']->update(['logo_path' => 'uploads/tenants/dummy.png']);
+        $this->actingAs($storeA['user'])->put('/settings/store', [
+            'name' => 'Kopi Nusantara R3',
+            'business_type' => 'Kedai Minuman / Kopi',
+            'timezone' => 'Asia/Jayapura',
+            'remove_logo' => '1',
+        ])->assertRedirect('/settings/store');
+        $this->assertNull($storeA['tenant']->fresh()->logo_path);
+
+        // 7. Expenses category breakdown renders on /expenses
+        $this->actingAs($storeA['user'])->post('/expenses', [
+            'expense_date' => now()->format('Y-m-d'),
+            'category' => 'Bahan Baku',
+            'description' => 'Biji Kopi Arabika',
+            'amount' => 120000,
+            'payment_method' => 'tunai',
+        ])->assertRedirect('/expenses');
+
+        $this->actingAs($storeA['user'])->get('/expenses')
+            ->assertStatus(200)
+            ->assertSee('Distribusi Biaya per Kategori')
+            ->assertSee('100%');
+
+        // 8. Offline bootstrap includes menu code & /pos/sync enforces offline_sync feature gate
+        $boot = $this->actingAs($storeA['user'])->getJson('/pos/bootstrap')->assertStatus(200);
+        $this->assertArrayHasKey('code', $boot->json('menus.0'));
+
+        $noOfflinePlan = Plan::create([
+            'name' => 'Online Only',
+            'slug' => 'online-only-test',
+            'price_monthly' => 15000,
+            'price_yearly' => 150000,
+            'is_active' => true,
+            'sort_order' => 20,
+            'features' => ['offline_sync' => false, 'expenses' => true, 'pdf_export' => true, 'qris_dynamic' => false],
+        ]);
+        $subService->assignSubscriptionManually($storeA['tenant'], $noOfflinePlan, 'monthly');
+        $this->actingAs($storeA['user'])->postJson('/pos/sync', ['sync_id' => 'blocked-1', 'items' => []])
+            ->assertStatus(403)
+            ->assertJson(['feature_locked' => true, 'feature' => 'offline_sync']);
+    }
 }
