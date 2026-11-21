@@ -205,6 +205,6 @@ class Tenant extends Model
             }
         }
 
-        return asset('images/logo.png');
+        return asset('assets/images/logo.png');
     }
 }

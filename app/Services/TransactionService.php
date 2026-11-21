@@ -231,6 +231,12 @@ class TransactionService
             $transaction->transaction_date = $transactionDate;
             $transaction->transaction_time = $transactionTime;
             $transaction->notes = $data['notes'] ?? null;
+            if (array_key_exists('customer_name', $data)) {
+                $transaction->customer_name = $data['customer_name'] ?: null;
+            }
+            if (!empty($data['payment_method']) && in_array($data['payment_method'], ['tunai', 'qris'], true)) {
+                $transaction->payment_method = $data['payment_method'];
+            }
 
             // Pre-fetch all required menus with their categories to prevent N+1 queries
             $menuIds = collect($data['items'])->pluck('menu_id')->unique()->filter()->values();

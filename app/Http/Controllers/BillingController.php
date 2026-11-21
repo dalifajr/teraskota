@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Plan;
 use App\Models\PlatformSetting;
+use App\Models\PromoCode;
 use App\Models\SubscriptionInvoice;
 use App\Services\SubscriptionService;
 use App\Support\TenantContext;
@@ -71,6 +72,55 @@ class BillingController extends Controller
         ));
     }
 
+    public function checkPromo(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:50'],
+            'plan_id' => ['nullable', 'exists:plans,id'],
+            'billing_cycle' => ['nullable', 'in:monthly,yearly'],
+        ]);
+
+        $code = strtoupper(trim($validated['code']));
+        $promo = PromoCode::with('plan')->where('code', $code)->first();
+
+        if (!$promo) {
+            return response()->json([
+                'valid' => false,
+                'message' => "Kode promo \"{$code}\" tidak ditemukan.",
+            ], 404);
+        }
+
+        $plan = !empty($validated['plan_id']) ? Plan::find($validated['plan_id']) : null;
+        $check = $promo->checkValidity($plan);
+        if (!$check['valid']) {
+            return response()->json([
+                'valid' => false,
+                'message' => $check['message'],
+            ], 422);
+        }
+
+        $cycle = $validated['billing_cycle'] ?? 'monthly';
+        $discountPreview = $plan ? $promo->calculateDiscount($plan->priceForCycle($cycle)) : null;
+        $label = $promo->discount_type === 'percent'
+            ? rtrim(rtrim(number_format((float) $promo->discount_value, 2, '.', ''), '0'), '.') . '%'
+                . ($promo->max_discount_amount ? ' (maks. Rp' . number_format((float) $promo->max_discount_amount, 0, ',', '.') . ')' : '')
+            : 'Rp' . number_format((float) $promo->discount_value, 0, ',', '.');
+
+        return response()->json([
+            'valid' => true,
+            'code' => $promo->code,
+            'name' => $promo->name,
+            'discount_label' => $label,
+            'discount_type' => $promo->discount_type,
+            'discount_value' => (float) $promo->discount_value,
+            'max_discount_amount' => $promo->max_discount_amount ? (float) $promo->max_discount_amount : null,
+            'plan_id' => $promo->plan_id,
+            'plan_name' => $promo->plan?->name,
+            'discount_preview' => $discountPreview,
+            'message' => "Kode promo {$promo->code} aktif! Potongan {$label}" . ($promo->plan ? " khusus paket {$promo->plan->name}." : ' untuk semua paket.'),
+        ]);
+    }
+
     public function subscribe(Request $request)
     {
         $tenant = TenantContext::current();
@@ -82,6 +132,7 @@ class BillingController extends Controller
             'plan_id' => ['required', 'exists:plans,id'],
             'billing_cycle' => ['required', 'in:monthly,yearly'],
             'payment_method' => ['required', 'in:qris,transfer'],
+            'promo_code' => ['nullable', 'string', 'max:50'],
         ]);
 
         $plan = Plan::where('is_active', true)->findOrFail($validated['plan_id']);
@@ -89,15 +140,33 @@ class BillingController extends Controller
             return back()->with('error', 'Paket yang dipilih tidak valid untuk langganan berbayar.');
         }
 
+        $promo = null;
+        if (!empty($validated['promo_code'])) {
+            $code = strtoupper(trim($validated['promo_code']));
+            $promo = PromoCode::with('plan')->where('code', $code)->first();
+            if (!$promo) {
+                return back()->with('error', "Kode promo \"{$code}\" tidak ditemukan.");
+            }
+            $check = $promo->checkValidity($plan);
+            if (!$check['valid']) {
+                return back()->with('error', $check['message']);
+            }
+        }
+
         $invoice = $this->subscriptionService->createInvoice(
             $tenant,
             $plan,
             $validated['billing_cycle'],
-            $validated['payment_method']
+            $validated['payment_method'],
+            $promo
         );
 
+        $promoInfo = $invoice->discount_amount > 0
+            ? " (Diskon promo {$invoice->promo_code_snapshot}: -Rp" . number_format((float) $invoice->discount_amount, 0, ',', '.') . ')'
+            : '';
+
         return redirect()->route('billing.index')
-            ->with('success', "Tagihan {$invoice->invoice_number} berhasil dibuat. Silakan selesaikan pembayaran sebesar Rp" . number_format((float) $invoice->final_amount, 0, ',', '.') . ' sesuai kode unik.');
+            ->with('success', "Tagihan {$invoice->invoice_number} berhasil dibuat{$promoInfo}. Silakan selesaikan pembayaran sebesar Rp" . number_format((float) $invoice->final_amount, 0, ',', '.') . ' sesuai kode unik.');
     }
 
     public function checkInvoiceStatus(SubscriptionInvoice $invoice)

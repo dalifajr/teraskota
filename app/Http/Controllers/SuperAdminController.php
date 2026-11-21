@@ -6,6 +6,7 @@ use App\Models\PaymentListenerLog;
 use App\Models\Plan;
 use App\Models\PlatformAuditLog;
 use App\Models\PlatformSetting;
+use App\Models\PromoCode;
 use App\Models\SubscriptionInvoice;
 use App\Models\Tenant;
 use App\Models\Transaction;
@@ -120,6 +121,34 @@ class SuperAdminController extends Controller
             ->take(8)
             ->get();
 
+        // Top 5 Most Active Tenants This Month (by paid POS transaction count & GMV)
+        $monthlyTxByTenant = Transaction::withoutGlobalScope('tenant')
+            ->paid()
+            ->whereYear('transaction_date', Carbon::now()->year)
+            ->whereMonth('transaction_date', Carbon::now()->month)
+            ->select(
+                'tenant_id',
+                DB::raw('COUNT(*) as month_tx_count'),
+                DB::raw('SUM(total_sales) as month_gmv')
+            )
+            ->groupBy('tenant_id')
+            ->orderByDesc('month_gmv')
+            ->take(5)
+            ->get();
+
+        $tenantsKeyed = $tenants->keyBy('id');
+        $topActiveTenants = $monthlyTxByTenant->map(function ($row) use ($tenantsKeyed) {
+            $t = $tenantsKeyed->get($row->tenant_id);
+            if (!$t) {
+                return null;
+            }
+            return (object) [
+                'tenant' => $t,
+                'tx_count' => (int) $row->month_tx_count,
+                'gmv' => (float) $row->month_gmv,
+            ];
+        })->filter()->values();
+
         return view('superadmin.dashboard', compact(
             'totalTenants',
             'activeTenants',
@@ -128,6 +157,7 @@ class SuperAdminController extends Controller
             'graceTenants',
             'expiredTenants',
             'expiringSoonTenants',
+            'topActiveTenants',
             'monthlyTrend',
             'mrr',
             'conversionRatePct',
@@ -144,6 +174,64 @@ class SuperAdminController extends Controller
 
     public function tenants(Request $request)
     {
+        $query = $this->buildTenantQuery($request);
+        $tenants = $query->latest()->paginate(15)->withQueryString();
+        $plans = Plan::orderBy('sort_order')->get();
+
+        return view('superadmin.tenants', compact('tenants', 'plans'));
+    }
+
+    public function exportTenants(Request $request)
+    {
+        $tenants = $this->buildTenantQuery($request)->latest()->get();
+        $platformName = strtoupper(PlatformSetting::platformName());
+        $filename = 'daftar-usaha-tenant-' . Carbon::now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($tenants, $platformName) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, ["DATABASE USAHA (TENANT) {$platformName}"]);
+            fputcsv($file, ['Tanggal Export', Carbon::now()->translatedFormat('d F Y H:i')]);
+            fputcsv($file, ['Total Usaha', $tenants->count()]);
+            fputcsv($file, []);
+            fputcsv($file, ['Nama Usaha', 'Slug', 'Jenis Usaha', 'Pemilik', 'Email', 'WhatsApp', 'Paket', 'Status', 'Berakhir', 'Jml User', 'Jml Menu', 'Jml Transaksi', 'Terdaftar']);
+
+            foreach ($tenants as $t) {
+                $owner = $t->users->firstWhere('role', 'admin') ?? $t->users->first();
+                fputcsv($file, [
+                    $t->name,
+                    $t->slug,
+                    $t->business_type,
+                    $owner?->name ?? '-',
+                    $owner?->email ?? '-',
+                    $t->phone ?? '-',
+                    $t->is_lifetime ? 'VIP Lifetime (Pro)' : ($t->currentPlan()?->name ?? '-'),
+                    strtoupper($t->subscriptionState()),
+                    $t->is_lifetime ? 'Selamanya' : ($t->activeSubscription?->ends_at?->format('Y-m-d') ?? '-'),
+                    (int) $t->users_count,
+                    (int) $t->menus_count,
+                    (int) $t->transactions_count,
+                    $t->created_at?->format('Y-m-d H:i') ?? '-',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function buildTenantQuery(Request $request)
+    {
         // Note: Do NOT use ->limit(5) inside eager-load closure (SQL applies global LIMIT across all parents!).
         // Slice ->take(5) per tenant in the view instead so every tenant accurately sees its own latest 5 invoices.
         $query = Tenant::with([
@@ -158,6 +246,13 @@ class SuperAdminController extends Controller
                 $q->where('name', 'like', "%{$s}%")
                   ->orWhere('slug', 'like', "%{$s}%")
                   ->orWhere('business_type', 'like', "%{$s}%");
+            });
+        }
+
+        if ($request->filled('plan_id')) {
+            $planId = (int) $request->plan_id;
+            $query->whereHas('activeSubscription', function ($sq) use ($planId) {
+                $sq->where('plan_id', $planId);
             });
         }
 
@@ -213,10 +308,7 @@ class SuperAdminController extends Controller
             }
         }
 
-        $tenants = $query->latest()->paginate(15)->withQueryString();
-        $plans = Plan::orderBy('sort_order')->get();
-
-        return view('superadmin.tenants', compact('tenants', 'plans'));
+        return $query;
     }
 
     public function storeTenant(Request $request)
@@ -443,11 +535,19 @@ class SuperAdminController extends Controller
         SubscriptionInvoice::expireOverdue();
 
         $query = $this->buildInvoiceQuery($request);
+        $invoiceSummary = [
+            'total_count' => (clone $query)->count(),
+            'paid_count' => (clone $query)->where('status', 'paid')->count(),
+            'paid_total' => (float) (clone $query)->where('status', 'paid')->sum('base_amount'),
+            'unpaid_count' => (clone $query)->where('status', 'unpaid')->count(),
+            'unpaid_total' => (float) (clone $query)->where('status', 'unpaid')->sum('final_amount'),
+        ];
+
         $invoices = $query->paginate(20)->withQueryString();
         $allTenants = Tenant::orderBy('name')->get(['id', 'name', 'slug']);
         $purchasablePlans = Plan::purchasable()->get();
 
-        return view('superadmin.invoices', compact('invoices', 'allTenants', 'purchasablePlans'));
+        return view('superadmin.invoices', compact('invoices', 'invoiceSummary', 'allTenants', 'purchasablePlans'));
     }
 
     public function storeInvoice(Request $request)
@@ -542,12 +642,21 @@ class SuperAdminController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('start_date')) {
+            $query->whereDate('created_at', '>=', $request->start_date);
+        }
+
+        if ($request->filled('end_date')) {
+            $query->whereDate('created_at', '<=', $request->end_date);
+        }
+
         if ($request->filled('search')) {
             $s = trim((string) $request->search);
             $numeric = preg_replace('/[^0-9]/', '', $s);
             $query->where(function ($q) use ($s, $numeric) {
                 $q->where('invoice_number', 'like', "%{$s}%")
                   ->orWhere('payment_reference', 'like', "%{$s}%")
+                  ->orWhere('promo_code_snapshot', 'like', "%{$s}%")
                   ->orWhereHas('tenant', function ($tq) use ($s) {
                       $tq->where('name', 'like', "%{$s}%")
                          ->orWhere('slug', 'like', "%{$s}%");
@@ -608,7 +717,7 @@ class SuperAdminController extends Controller
 
     public function plans()
     {
-        $plans = Plan::orderBy('sort_order')->get();
+        $plans = Plan::withCount(['subscriptions', 'invoices'])->orderBy('sort_order')->get();
         $tenants = Tenant::with('activeSubscription')->get();
         $planUsageCounts = [];
         foreach ($tenants as $t) {
@@ -718,11 +827,215 @@ class SuperAdminController extends Controller
         return back()->with('success', "Konfigurasi paket {$plan->name} berhasil diperbarui!");
     }
 
+    public function destroyPlan(Plan $plan)
+    {
+        if ($plan->slug === 'trial') {
+            return back()->with('error', 'Paket Trial sistem dilindungi dan tidak dapat dihapus.');
+        }
+
+        if ($plan->subscriptions()->exists() || $plan->invoices()->exists()) {
+            return back()->with('error', "Paket {$plan->name} sudah memiliki riwayat langganan atau invoice. Nonaktifkan paket saja agar data historis tetap aman.");
+        }
+
+        $planId = $plan->id;
+        $planName = $plan->name;
+        $plan->delete();
+
+        PlatformAuditLog::record(
+            'plan',
+            'delete_plan',
+            'Plan',
+            $planId,
+            $planName,
+            "Menghapus paket {$planName} (ID #{$planId}) yang belum memiliki riwayat pemakaian."
+        );
+
+        return back()->with('success', "Paket {$planName} berhasil dihapus.");
+    }
+
+    public function promos()
+    {
+        $promos = PromoCode::with('plan')->latest('id')->paginate(20);
+        $plans = Plan::purchasable()->get();
+
+        return view('superadmin.promos', compact('promos', 'plans'));
+    }
+
+    public function storePromo(Request $request)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'alpha_dash', 'unique:promo_codes,code'],
+            'name' => ['required', 'string', 'max:120'],
+            'discount_type' => ['required', 'in:percent,fixed'],
+            'discount_value' => ['required', 'numeric', 'min:1'],
+            'max_discount_amount' => ['nullable', 'numeric', 'min:1'],
+            'plan_id' => ['nullable', 'exists:plans,id'],
+            'max_uses' => ['nullable', 'integer', 'min:1'],
+            'starts_at' => ['nullable', 'date'],
+            'expires_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+        ]);
+
+        if ($validated['discount_type'] === 'percent' && (float) $validated['discount_value'] > 100) {
+            return back()->with('error', 'Diskon persentase tidak boleh lebih dari 100%.')->withInput();
+        }
+
+        $promo = PromoCode::create([
+            'code' => strtoupper(trim($validated['code'])),
+            'name' => $validated['name'],
+            'discount_type' => $validated['discount_type'],
+            'discount_value' => $validated['discount_value'],
+            'max_discount_amount' => ($validated['max_discount_amount'] ?? null) ?: null,
+            'plan_id' => ($validated['plan_id'] ?? null) ?: null,
+            'max_uses' => ($validated['max_uses'] ?? null) ?: null,
+            'starts_at' => ($validated['starts_at'] ?? null) ?: null,
+            'expires_at' => ($validated['expires_at'] ?? null) ?: null,
+            'is_active' => $request->has('is_active'),
+        ]);
+
+        PlatformAuditLog::record(
+            'promo',
+            'create_promo',
+            'PromoCode',
+            $promo->id,
+            $promo->code,
+            "Membuat kode promo {$promo->code} ({$promo->name})."
+        );
+
+        return back()->with('success', "Kode promo {$promo->code} berhasil ditambahkan!");
+    }
+
+    public function updatePromo(Request $request, PromoCode $promo)
+    {
+        $validated = $request->validate([
+            'code' => ['required', 'string', 'max:50', 'alpha_dash', \Illuminate\Validation\Rule::unique('promo_codes', 'code')->ignore($promo->id)],
+            'name' => ['required', 'string', 'max:120'],
+            'discount_type' => ['required', 'in:percent,fixed'],
+            'discount_value' => ['required', 'numeric', 'min:1'],
+            'max_discount_amount' => ['nullable', 'numeric', 'min:1'],
+            'plan_id' => ['nullable', 'exists:plans,id'],
+            'max_uses' => ['nullable', 'integer', 'min:1'],
+            'starts_at' => ['nullable', 'date'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        if ($validated['discount_type'] === 'percent' && (float) $validated['discount_value'] > 100) {
+            return back()->with('error', 'Diskon persentase tidak boleh lebih dari 100%.');
+        }
+
+        $promo->update([
+            'code' => strtoupper(trim($validated['code'])),
+            'name' => $validated['name'],
+            'discount_type' => $validated['discount_type'],
+            'discount_value' => $validated['discount_value'],
+            'max_discount_amount' => ($validated['max_discount_amount'] ?? null) ?: null,
+            'plan_id' => ($validated['plan_id'] ?? null) ?: null,
+            'max_uses' => ($validated['max_uses'] ?? null) ?: null,
+            'starts_at' => ($validated['starts_at'] ?? null) ?: null,
+            'expires_at' => ($validated['expires_at'] ?? null) ?: null,
+            'is_active' => $request->has('is_active'),
+        ]);
+
+        PlatformAuditLog::record(
+            'promo',
+            'update_promo',
+            'PromoCode',
+            $promo->id,
+            $promo->code,
+            "Memperbarui kode promo {$promo->code} ({$promo->name})."
+        );
+
+        return back()->with('success', "Kode promo {$promo->code} berhasil diperbarui!");
+    }
+
+    public function togglePromo(PromoCode $promo)
+    {
+        $promo->update(['is_active' => !$promo->is_active]);
+        $stateText = $promo->is_active ? 'diaktifkan' : 'dinonaktifkan';
+
+        PlatformAuditLog::record(
+            'promo',
+            'toggle_promo',
+            'PromoCode',
+            $promo->id,
+            $promo->code,
+            "Kode promo {$promo->code} {$stateText}."
+        );
+
+        return back()->with('success', "Kode promo {$promo->code} berhasil {$stateText}.");
+    }
+
+    public function destroyPromo(PromoCode $promo)
+    {
+        $code = $promo->code;
+        $id = $promo->id;
+        $promo->delete();
+
+        PlatformAuditLog::record(
+            'promo',
+            'delete_promo',
+            'PromoCode',
+            $id,
+            $code,
+            "Menghapus kode promo {$code}."
+        );
+
+        return back()->with('success', "Kode promo {$code} berhasil dihapus.");
+    }
+
     public function auditLogs(Request $request)
+    {
+        $logs = $this->buildAuditLogQuery($request)->paginate(25)->withQueryString();
+
+        return view('superadmin.audit-logs', compact('logs'));
+    }
+
+    public function exportAuditLogs(Request $request)
+    {
+        $logs = $this->buildAuditLogQuery($request)->get();
+        $platformName = strtoupper(PlatformSetting::platformName());
+        $filename = 'audit-trail-' . Carbon::now()->format('Ymd-His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($logs, $platformName) {
+            $file = fopen('php://output', 'w');
+            fprintf($file, chr(0xEF) . chr(0xBB) . chr(0xBF));
+
+            fputcsv($file, ["LOG AKTIVITAS AUDIT {$platformName}"]);
+            fputcsv($file, ['Tanggal Export', Carbon::now()->translatedFormat('d F Y H:i')]);
+            fputcsv($file, ['Total Catatan', $logs->count()]);
+            fputcsv($file, []);
+            fputcsv($file, ['Waktu (WIB)', 'Kategori', 'Aksi', 'Pelaku', 'Target', 'Deskripsi', 'IP Address']);
+
+            foreach ($logs as $log) {
+                fputcsv($file, [
+                    $log->created_at?->format('Y-m-d H:i:s') ?? '-',
+                    strtoupper((string) $log->category),
+                    $log->action,
+                    $log->admin?->name ?? 'System',
+                    $log->target_label ?? '-',
+                    $log->description,
+                    $log->ip_address ?? '-',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    protected function buildAuditLogQuery(Request $request)
     {
         $query = PlatformAuditLog::with('admin')->latest('id');
 
-        if ($request->filled('category') && in_array($request->category, ['tenant', 'invoice', 'plan', 'settings', 'impersonate'], true)) {
+        if ($request->filled('category') && in_array($request->category, ['tenant', 'invoice', 'plan', 'promo', 'settings', 'impersonate'], true)) {
             $query->where('category', $request->category);
         }
 
@@ -735,9 +1048,7 @@ class SuperAdminController extends Controller
             });
         }
 
-        $logs = $query->paginate(25)->withQueryString();
-
-        return view('superadmin.audit-logs', compact('logs'));
+        return $query;
     }
 
     public function testPlatformWebhook()

@@ -284,6 +284,55 @@
         </div>
     </div>
 </div>
+
+<!-- Row 4: Top 5 Most Active Tenants This Month -->
+@if(isset($topActiveTenants) && $topActiveTenants->count() > 0)
+<div class="card border-0 shadow-sm rounded-4 mt-4">
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+        <div>
+            <h6 class="fw-bold m-0"><i class="fa-solid fa-trophy text-warning me-2"></i>Top 5 Usaha Paling Aktif Bulan Ini</h6>
+            <small class="text-muted">Peringkat berdasarkan volume GMV POS lunas bulan berjalan (kandidat upsell &amp; retensi)</small>
+        </div>
+        <span class="badge bg-success bg-opacity-10 text-success rounded-pill">{{ now()->translatedFormat('F Y') }}</span>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 small" style="font-variant-numeric: tabular-nums;">
+            <thead class="table-light">
+                <tr>
+                    <th style="width: 48px;">#</th>
+                    <th>Nama Usaha</th>
+                    <th>Paket Aktif</th>
+                    <th class="text-center">Transaksi Bulan Ini</th>
+                    <th class="text-end">GMV POS Bulan Ini</th>
+                    <th class="text-end" style="width: 110px;">Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($topActiveTenants as $rank => $row)
+                    <tr>
+                        <td class="fw-bold text-muted">{{ $rank + 1 }}</td>
+                        <td>
+                            <div class="fw-bold text-dark">{{ $row->tenant->name }}</div>
+                            <small class="text-muted">{{ $row->tenant->business_type }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border">{{ $row->tenant->is_lifetime ? 'VIP Lifetime' : ($row->tenant->currentPlan()?->name ?? '-') }}</span>
+                        </td>
+                        <td class="text-center"><span class="badge bg-primary bg-opacity-10 text-primary">{{ number_format($row->tx_count, 0, ',', '.') }} nota</span></td>
+                        <td class="text-end fw-bold text-success">Rp{{ number_format($row->gmv, 0, ',', '.') }}</td>
+                        <td class="text-end">
+                            <form action="{{ route('superadmin.tenants.impersonate', $row->tenant->id) }}" method="POST" class="d-inline">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2">Support</button>
+                            </form>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
+</div>
+@endif
 @endsection
 
 @section('scripts')

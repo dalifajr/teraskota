@@ -28,9 +28,14 @@
             </a>
         </li>
         <li class="sidebar-item {{ Request::routeIs('expenses.*') ? 'active' : '' }}">
-            <a href="{{ route('expenses.index') }}" class="sidebar-link">
-                <i class="fa-solid fa-money-bill-transfer"></i>
-                <span>Pengeluaran Kas</span>
+            <a href="{{ route('expenses.index') }}" class="sidebar-link d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="fa-solid fa-money-bill-transfer"></i>
+                    <span>Pengeluaran Kas</span>
+                </div>
+                @if($currentTenant && !$currentTenant->hasFeature('expenses'))
+                    <span class="badge bg-warning text-dark" style="font-size: 0.6rem;">PRO</span>
+                @endif
             </a>
         </li>
 

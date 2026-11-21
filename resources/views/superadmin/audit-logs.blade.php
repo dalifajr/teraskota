@@ -14,7 +14,7 @@
             <h6 class="fw-bold m-0 me-1"><i class="fa-solid fa-clipboard-list text-primary me-2"></i>Riwayat Tindakan Super Admin</h6>
             @php $curCat = request('category', ''); @endphp
             <div class="btn-group btn-group-sm" role="group" aria-label="Filter Kategori Audit">
-                @foreach(['' => 'Semua', 'tenant' => 'Tenant', 'invoice' => 'Invoice', 'plan' => 'Paket', 'settings' => 'Pengaturan', 'impersonate' => 'Impersonate'] as $catVal => $catLbl)
+                @foreach(['' => 'Semua', 'tenant' => 'Tenant', 'invoice' => 'Invoice', 'plan' => 'Paket', 'promo' => 'Promo', 'settings' => 'Pengaturan', 'impersonate' => 'Impersonate'] as $catVal => $catLbl)
                     <a href="{{ route('superadmin.audit-logs', array_filter(['category' => $catVal, 'search' => request('search')])) }}"
                        class="btn {{ $curCat === $catVal ? 'btn-dark' : 'btn-outline-secondary' }}">
                         {{ $catLbl }}
@@ -22,13 +22,18 @@
                 @endforeach
             </div>
         </div>
-        <form method="GET" action="{{ route('superadmin.audit-logs') }}" class="d-flex gap-2">
-            @if(request('category'))
-                <input type="hidden" name="category" value="{{ request('category') }}">
-            @endif
-            <input type="text" name="search" class="form-control form-control-sm" style="min-width: 210px;" placeholder="Cari aksi / nama usaha / detail..." value="{{ request('search') }}">
-            <button type="submit" class="btn btn-sm btn-outline-success">Cari</button>
-        </form>
+        <div class="d-flex flex-wrap gap-2">
+            <form method="GET" action="{{ route('superadmin.audit-logs') }}" class="d-flex gap-2">
+                @if(request('category'))
+                    <input type="hidden" name="category" value="{{ request('category') }}">
+                @endif
+                <input type="text" name="search" class="form-control form-control-sm" style="min-width: 200px;" placeholder="Cari aksi / nama usaha / detail..." value="{{ request('search') }}">
+                <button type="submit" class="btn btn-sm btn-outline-success">Cari</button>
+            </form>
+            <a href="{{ route('superadmin.audit-logs.export', request()->query()) }}" class="btn btn-sm btn-outline-dark" title="Unduh Arsip Audit Trail (CSV)">
+                <i class="fa-solid fa-file-csv me-1"></i>Export CSV
+            </a>
+        </div>
     </div>
 
     <div class="table-responsive">
@@ -49,6 +54,7 @@
                             'tenant' => 'bg-success',
                             'invoice' => 'bg-primary',
                             'plan' => 'bg-info text-dark',
+                            'promo' => 'bg-dark text-warning',
                             'impersonate' => 'bg-warning text-dark',
                             default => 'bg-secondary',
                         };

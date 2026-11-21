@@ -6,6 +6,7 @@ use App\Models\Category;
 use App\Models\Menu;
 use App\Models\Plan;
 use App\Models\PlatformSetting;
+use App\Models\PromoCode;
 use App\Models\Setting;
 use App\Models\Subscription;
 use App\Models\SubscriptionInvoice;
@@ -178,13 +179,14 @@ class SubscriptionService
     }
 
     /**
-     * Create a new subscription invoice with unique verification code and optional dynamic QRIS.
+     * Create a new subscription invoice with unique verification code, optional promo discount, and optional dynamic QRIS.
      */
     public function createInvoice(
         Tenant $tenant,
         Plan $plan,
         string $billingCycle = 'monthly',
-        string $paymentMethod = 'qris'
+        string $paymentMethod = 'qris',
+        ?PromoCode $promo = null
     ): SubscriptionInvoice {
         $billingCycle = in_array($billingCycle, ['monthly', 'yearly'], true) ? $billingCycle : 'monthly';
         $paymentMethod = in_array($paymentMethod, ['qris', 'transfer'], true) ? $paymentMethod : 'qris';
@@ -194,7 +196,21 @@ class SubscriptionService
             ->where('status', 'unpaid')
             ->update(['status' => 'cancelled']);
 
-        $baseAmount = $plan->priceForCycle($billingCycle);
+        $grossAmount = $plan->priceForCycle($billingCycle);
+        $discountAmount = 0.0;
+        $appliedPromo = null;
+
+        if ($promo) {
+            $check = $promo->checkValidity($plan);
+            if ($check['valid']) {
+                $discountAmount = $promo->calculateDiscount($grossAmount);
+                if ($discountAmount > 0) {
+                    $appliedPromo = $promo;
+                }
+            }
+        }
+
+        $baseAmount = max(1000.0, $grossAmount - $discountAmount);
         $uniqueCode = $this->generateUniqueInvoiceCode($baseAmount);
         $finalAmount = (int) round($baseAmount) + $uniqueCode;
 
@@ -209,9 +225,12 @@ class SubscriptionService
         return SubscriptionInvoice::create([
             'tenant_id' => $tenant->id,
             'plan_id' => $plan->id,
+            'promo_code_id' => $appliedPromo?->id,
+            'promo_code_snapshot' => $appliedPromo?->code,
             'invoice_number' => $invoiceNumber,
             'billing_cycle' => $billingCycle,
             'base_amount' => $baseAmount,
+            'discount_amount' => $discountAmount,
             'unique_code' => $uniqueCode,
             'final_amount' => $finalAmount,
             'payment_method' => $paymentMethod,
@@ -279,6 +298,10 @@ class SubscriptionService
                 'payment_source_app' => $sourceApp ?: $invoice->payment_source_app,
                 'approved_by' => $approvedBy,
             ]);
+
+            if ($invoice->promo_code_id) {
+                PromoCode::where('id', $invoice->promo_code_id)->increment('used_count');
+            }
 
             if (!$tenant->is_active) {
                 $tenant->update(['is_active' => true]);

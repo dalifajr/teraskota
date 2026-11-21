@@ -19,6 +19,12 @@
             'phone' => $currentTenant?->phone ?? '',
             'footer' => $currentTenant?->receipt_footer ?? 'Terima kasih atas kunjungan Anda!',
         ];
+        $activeTimezone = $isSuperAdminPanel ? 'Asia/Jakarta' : ($currentTenant?->timezone ?? 'Asia/Jakarta');
+        $activeTzShort = match($activeTimezone) {
+            'Asia/Makassar' => 'WITA',
+            'Asia/Jayapura' => 'WIT',
+            default => 'WIB',
+        };
     @endphp
     <title>@yield('title', $brandTitle) - {{ $platformName ?? 'KasirLoka' }}</title>
     <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
@@ -83,11 +89,11 @@
             </div>
 
             <div class="d-flex align-items-center gap-2 gap-sm-3">
-                <!-- Live Realtime WIB Clock -->
-                <div class="admin-live-clock d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill" title="Zona Waktu Operasional: Waktu Indonesia Barat (WIB)">
+                <!-- Live Realtime Store Timezone Clock -->
+                <div class="admin-live-clock d-none d-md-flex align-items-center gap-2 px-3 py-1 rounded-pill" title="Zona Waktu Operasional: {{ $activeTzShort }} ({{ $activeTimezone }})">
                     <i class="fa-regular fa-clock text-success"></i>
                     <span id="adminLiveClock" class="fw-bold text-dark font-monospace">--:--:--</span>
-                    <span class="badge badge-wib rounded-pill">WIB</span>
+                    <span class="badge badge-wib rounded-pill">{{ $activeTzShort }}</span>
                     <span class="text-muted small border-start ps-2 d-none d-xl-inline" id="adminLiveDate">--</span>
                 </div>
 
@@ -421,14 +427,15 @@
     </script>
     @endif
 
-    <!-- Live Realtime WIB Clock Script -->
+    <!-- Live Realtime Store Timezone Clock Script -->
     <script>
         (function() {
+            const storeTimeZone = @json($activeTimezone);
             function updateAdminClock() {
                 try {
                     const now = new Date();
-                    const optionsTime = { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-                    const optionsDate = { timeZone: 'Asia/Jakarta', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+                    const optionsTime = { timeZone: storeTimeZone, hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                    const optionsDate = { timeZone: storeTimeZone, weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
 
                     const timeStr = new Intl.DateTimeFormat('id-ID', optionsTime).format(now);
                     const dateStr = new Intl.DateTimeFormat('id-ID', optionsDate).format(now);

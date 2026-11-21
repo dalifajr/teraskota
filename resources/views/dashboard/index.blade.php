@@ -10,10 +10,18 @@
 @section('content')
     <!-- Admin Hub Header & Quick Actions -->
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+        @php
+            $dashTz = $currentTenant?->timezone ?? 'Asia/Jakarta';
+            $dashTzBadge = match($dashTz) {
+                'Asia/Makassar' => 'WITA (UTC+8)',
+                'Asia/Jayapura' => 'WIT (UTC+9)',
+                default => 'WIB (UTC+7)',
+            };
+        @endphp
         <div>
             <div class="d-flex align-items-center gap-2 mb-1">
                 <h4 class="fw-bold text-dark m-0">Ringkasan Operasional</h4>
-                <span class="badge badge-wib rounded-pill d-none d-sm-inline-block">Zona Waktu: WIB (UTC+7)</span>
+                <span class="badge badge-wib rounded-pill d-none d-sm-inline-block">Zona Waktu: {{ $dashTzBadge }}</span>
             </div>
             <p class="text-muted small m-0">
                 Data performa penjualan, arus kas tunai/QRIS, dan laba bersih {{ $currentTenant?->name ?? ($platformName ?? 'KasirLoka') }}.
@@ -177,6 +185,44 @@
     </div>
 
     <!-- SECTION 1: CORE FINANCIAL OVERVIEW (4 HERO CARDS) -->
+    @if(($monthlySalesTarget ?? 0) > 0)
+        @php
+            $targetRemaining = max(0, (float) $monthlySalesTarget - (float) ($currentMonthSales ?? 0));
+            $dailyNeeded = $targetRemaining > 0 ? round($targetRemaining / max(1, (int) ($daysLeftInMonth ?? 1))) : 0;
+        @endphp
+        <div class="card premium-card border-0 shadow-sm mb-4" style="font-variant-numeric: tabular-nums;">
+            <div class="card-body py-3 px-4">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill px-2 py-1">
+                            <i class="fa-solid fa-bullseye me-1"></i>Target Omzet {{ now()->translatedFormat('F Y') }}
+                        </span>
+                        <span class="fw-bold text-dark small">
+                            Rp{{ number_format($currentMonthSales ?? 0, 0, ',', '.') }}
+                            <span class="text-muted fw-normal">/ Rp{{ number_format($monthlySalesTarget, 0, ',', '.') }}</span>
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2 small">
+                        @if($targetRemaining <= 0)
+                            <span class="badge bg-success rounded-pill"><i class="fa-solid fa-trophy me-1"></i>Target Tercapai! ({{ $monthlyTargetPct }}%)</span>
+                        @else
+                            <span class="text-muted">Sisa <strong class="text-dark">Rp{{ number_format($targetRemaining, 0, ',', '.') }}</strong> (~Rp{{ number_format($dailyNeeded, 0, ',', '.') }}/hari)</span>
+                            <span class="badge bg-primary rounded-pill">{{ $monthlyTargetPct }}%</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="progress" style="height: 10px; border-radius: 999px;">
+                    <div class="progress-bar {{ ($monthlyTargetPct ?? 0) >= 100 ? 'bg-success' : (($monthlyTargetPct ?? 0) >= 60 ? 'bg-primary' : 'bg-warning') }}"
+                         role="progressbar"
+                         style="width: {{ min(100, $monthlyTargetPct ?? 0) }}%"
+                         aria-valuenow="{{ min(100, $monthlyTargetPct ?? 0) }}"
+                         aria-valuemin="0"
+                         aria-valuemax="100"></div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     <div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
         <!-- 1. Total Omzet Penjualan -->
         <div class="col-12 col-sm-6 col-xl-3">

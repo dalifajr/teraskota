@@ -116,6 +116,7 @@ Route::middleware('auth')->group(function () {
         ->group(function () {
             Route::get('/', [SuperAdminController::class, 'dashboard'])->name('dashboard');
             Route::get('/tenants', [SuperAdminController::class, 'tenants'])->name('tenants');
+            Route::get('/tenants/export', [SuperAdminController::class, 'exportTenants'])->name('tenants.export');
             Route::post('/tenants', [SuperAdminController::class, 'storeTenant'])->name('tenants.store');
             Route::put('/tenants/{tenant}', [SuperAdminController::class, 'updateTenant'])->name('tenants.update');
             Route::delete('/tenants/{tenant}', [SuperAdminController::class, 'destroyTenant'])->name('tenants.destroy');
@@ -133,8 +134,16 @@ Route::middleware('auth')->group(function () {
             Route::get('/plans', [SuperAdminController::class, 'plans'])->name('plans');
             Route::post('/plans', [SuperAdminController::class, 'storePlan'])->name('plans.store');
             Route::put('/plans/{plan}', [SuperAdminController::class, 'updatePlan'])->name('plans.update');
+            Route::delete('/plans/{plan}', [SuperAdminController::class, 'destroyPlan'])->name('plans.destroy');
+
+            Route::get('/promos', [SuperAdminController::class, 'promos'])->name('promos');
+            Route::post('/promos', [SuperAdminController::class, 'storePromo'])->name('promos.store');
+            Route::put('/promos/{promo}', [SuperAdminController::class, 'updatePromo'])->name('promos.update');
+            Route::post('/promos/{promo}/toggle', [SuperAdminController::class, 'togglePromo'])->name('promos.toggle');
+            Route::delete('/promos/{promo}', [SuperAdminController::class, 'destroyPromo'])->name('promos.destroy');
 
             Route::get('/audit-logs', [SuperAdminController::class, 'auditLogs'])->name('audit-logs');
+            Route::get('/audit-logs/export', [SuperAdminController::class, 'exportAuditLogs'])->name('audit-logs.export');
 
             Route::get('/settings', [SuperAdminController::class, 'settings'])->name('settings');
             Route::put('/settings', [SuperAdminController::class, 'updateSettings'])->name('settings.update');
@@ -147,6 +156,7 @@ Route::middleware('auth')->group(function () {
             Route::post('/system-update/execute', [SystemUpdateController::class, 'execute'])->name('update.execute');
             Route::post('/system-update/migrate', [SystemUpdateController::class, 'migrateDb'])->name('update.migrate');
             Route::post('/system-update/clear-cache', [SystemUpdateController::class, 'clearCache'])->name('update.clear-cache');
+            Route::post('/system-update/clear-log', [SystemUpdateController::class, 'clearLog'])->name('update.clear-log');
         });
 
     // ---------------------------------------------------------------------
@@ -174,6 +184,7 @@ Route::middleware('auth')->group(function () {
         // Billing & Subscription Management (Always accessible even when expired!)
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+        Route::post('/billing/promo/check', [BillingController::class, 'checkPromo'])->name('billing.promo.check');
         Route::get('/billing/invoice/{invoice}/status', [BillingController::class, 'checkInvoiceStatus'])->name('billing.invoice.status');
         Route::post('/billing/invoice/{invoice}/cancel', [BillingController::class, 'cancelInvoice'])->name('billing.invoice.cancel');
 
@@ -183,17 +194,31 @@ Route::middleware('auth')->group(function () {
             Route::get('/notifications/unread-transactions', [DashboardController::class, 'unreadTransactions'])->name('notifications.unread');
 
             Route::get('/transactions/export', [TransactionController::class, 'export'])->name('transactions.export');
+            Route::post('/transactions/{id}/restore', [TransactionController::class, 'restore'])->name('transactions.restore');
+            Route::post('/transactions/{transaction}/mark-paid', [TransactionController::class, 'markPaid'])->name('transactions.mark-paid');
+            Route::post('/transactions/{transaction}/cancel', [TransactionController::class, 'cancel'])->name('transactions.cancel');
             Route::resource('transactions', TransactionController::class);
-            Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
-            Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
+
+            Route::middleware('subscription:expenses')->group(function () {
+                Route::get('/expenses/export', [ExpenseController::class, 'export'])->name('expenses.export');
+                Route::resource('expenses', ExpenseController::class)->only(['index', 'store', 'update', 'destroy']);
+            });
+
+            Route::get('/menus/export', [MenuController::class, 'export'])->name('menus.export');
+            Route::get('/menus/template', [MenuController::class, 'downloadTemplate'])->name('menus.template');
+            Route::post('/menus/import', [MenuController::class, 'import'])->name('menus.import');
+            Route::post('/menus/{menu}/duplicate', [MenuController::class, 'duplicate'])->name('menus.duplicate');
             Route::patch('/menus/{menu}/toggle-status', [MenuController::class, 'toggleStatus'])->name('menus.toggle-status');
             Route::resource('menus', MenuController::class);
+
             Route::patch('/categories/{category}/toggle-status', [CategoryController::class, 'toggleStatus'])->name('categories.toggle-status');
             Route::resource('categories', CategoryController::class);
             Route::resource('users', UserController::class)->only(['index', 'store', 'update', 'destroy']);
 
             Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-            Route::get('/reports/pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
+            Route::get('/reports/pdf', [ReportController::class, 'pdf'])
+                ->middleware('subscription:pdf_export')
+                ->name('reports.pdf');
             Route::get('/reports/export', [ReportController::class, 'export'])->name('reports.export');
 
             // Store Profile & White-Label Branding
@@ -210,6 +235,8 @@ Route::middleware('auth')->group(function () {
                 Route::put('/settings/qris', [QrisSettingController::class, 'update'])->name('settings.qris.update');
                 Route::post('/settings/qris/regenerate-secret', [QrisSettingController::class, 'regenerateSecret'])->name('settings.qris.regenerate-secret');
                 Route::post('/settings/qris/custom-secret', [QrisSettingController::class, 'updateCustomSecret'])->name('settings.qris.custom-secret');
+                Route::post('/settings/qris/test-webhook', [QrisSettingController::class, 'testWebhook'])->name('settings.qris.test-webhook');
+                Route::post('/settings/qris/prune-logs', [QrisSettingController::class, 'pruneLogs'])->name('settings.qris.prune-logs');
             });
         });
     });

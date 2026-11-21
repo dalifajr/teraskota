@@ -136,4 +136,41 @@ class QrisSettingController extends Controller
         return redirect()->route('settings.qris.index')
             ->with('success', 'Secret Key Webhook berhasil diperbarui: ' . $newSecret);
     }
+
+    public function testWebhook()
+    {
+        $secret = (string) $this->qrisService->getSecret();
+        $hasPayload = !empty(Setting::getValue('qris_payload', ''));
+        $tenant = TenantContext::current();
+        $webhookUrl = $tenant ? url('/listener/' . $tenant->slug . '/payment') : url('/listener/payment');
+
+        if (strlen($secret) < 8) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Shared Secret Key belum valid (minimal 8 karakter).',
+            ], 422);
+        }
+
+        $ts = (string) time();
+        $body = json_encode(['ping' => true, 'tenant' => $tenant?->slug ?? 'default', 'time' => $ts]);
+        $sig = hash_hmac('sha256', $ts . '.' . $body, $secret);
+        $ok = hash_equals(hash_hmac('sha256', $ts . '.' . $body, $secret), $sig);
+
+        return response()->json([
+            'status' => $ok ? 'success' : 'error',
+            'message' => $ok
+                ? 'Konfigurasi HMAC-SHA256 & Endpoint Listener siap digunakan!' . ($hasPayload ? ' (Payload QRIS Aktif)' : ' (Catatan: Payload QRIS statis belum diisi)')
+                : 'Gagal memverifikasi tanda tangan HMAC.',
+            'webhook_url' => $webhookUrl,
+            'has_payload' => $hasPayload,
+        ]);
+    }
+
+    public function pruneLogs()
+    {
+        $deleted = PaymentListenerLog::where('created_at', '<', now()->subDays(30))->delete();
+
+        return redirect()->route('settings.qris.index')
+            ->with('success', "Berhasil membersihkan {$deleted} log notifikasi listener yang berusia lebih dari 30 hari.");
+    }
 }

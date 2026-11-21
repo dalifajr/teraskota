@@ -106,7 +106,14 @@
                                         <i class="fa-regular fa-copy me-1"></i>Salin
                                     </button>
                                 </div>
-                                <small class="text-muted">Harga Rp{{ number_format((float)$activeInvoice->base_amount, 0, ',', '.') }} + Kode Unik <strong>{{ $activeInvoice->unique_code }}</strong></small>
+                                <small class="text-muted">
+                                    Harga Rp{{ number_format((float)$activeInvoice->base_amount, 0, ',', '.') }} + Kode Unik <strong>{{ $activeInvoice->unique_code }}</strong>
+                                    @if((float)($activeInvoice->discount_amount ?? 0) > 0)
+                                        <span class="badge bg-success bg-opacity-10 text-success ms-1">
+                                            <i class="fa-solid fa-ticket me-1"></i>{{ $activeInvoice->promo_code_snapshot }} (-Rp{{ number_format((float)$activeInvoice->discount_amount, 0, ',', '.') }})
+                                        </span>
+                                    @endif
+                                </small>
                             </div>
 
                             @if(!empty($bankInfo['account_number']))
@@ -207,6 +214,30 @@
     </div>
 </div>
 
+<!-- Compact Promo Code Bar -->
+<div class="kl-filter-toolbar p-3 mb-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="rounded-3 bg-success bg-opacity-10 text-success d-inline-flex align-items-center justify-content-center" style="width: 34px; height: 34px;">
+                <i class="fa-solid fa-ticket"></i>
+            </span>
+            <div>
+                <div class="fw-bold small text-dark">Punya Kode Promo / Kupon Diskon?</div>
+                <div class="text-muted" style="font-size: 0.76rem;" id="promoStatusMsg">Masukkan kode promo lalu klik Terapkan sebelum memilih paket.</div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-grow-1 flex-md-grow-0" style="min-width: 260px;">
+            <input type="text" id="billingPromoCode" class="form-control form-control-sm text-uppercase font-monospace" placeholder="cth: HEMAT20" maxlength="50">
+            <button type="button" id="btnCheckPromo" class="btn btn-sm btn-outline-success fw-semibold text-nowrap">
+                <i class="fa-solid fa-check me-1"></i>Terapkan
+            </button>
+            <button type="button" id="btnClearPromo" class="btn btn-sm btn-outline-secondary d-none" title="Hapus kode promo">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
 <div class="row g-3 g-lg-4 mb-5">
     @foreach($plans as $plan)
         @php
@@ -290,6 +321,7 @@
                     <input type="hidden" name="plan_id" value="{{ $plan->id }}">
                     <input type="hidden" name="billing_cycle" value="monthly" class="js-billing-cycle-input">
                     <input type="hidden" name="payment_method" value="{{ $defaultMethod }}" class="js-billing-method-input">
+                    <input type="hidden" name="promo_code" value="" class="js-billing-promo-input">
                     <button type="submit" class="btn {{ $plan->is_featured ? 'btn-primary-green' : 'btn-outline-success' }} w-100 fw-semibold">
                         {{ $isCurrentPlan ? 'Perpanjang Paket ' . $plan->name : 'Pilih Paket ' . $plan->name }}
                     </button>
@@ -376,6 +408,77 @@
                 methodBtns.forEach(b => b.classList.toggle('active', b.dataset.method === method));
                 methodInputs.forEach(inp => { inp.value = method; });
             });
+        });
+
+        // Promo code checker
+        const promoInput = document.getElementById('billingPromoCode');
+        const btnCheckPromo = document.getElementById('btnCheckPromo');
+        const btnClearPromo = document.getElementById('btnClearPromo');
+        const promoStatusMsg = document.getElementById('promoStatusMsg');
+        const hiddenPromoInputs = document.querySelectorAll('.js-billing-promo-input');
+
+        function syncPromoCode(code) {
+            hiddenPromoInputs.forEach(inp => { inp.value = code; });
+        }
+
+        promoInput?.addEventListener('input', () => {
+            syncPromoCode(promoInput.value.trim().toUpperCase());
+        });
+
+        btnClearPromo?.addEventListener('click', () => {
+            if (promoInput) promoInput.value = '';
+            syncPromoCode('');
+            btnClearPromo.classList.add('d-none');
+            if (promoStatusMsg) {
+                promoStatusMsg.className = 'text-muted';
+                promoStatusMsg.textContent = 'Masukkan kode promo lalu klik Terapkan sebelum memilih paket.';
+            }
+        });
+
+        btnCheckPromo?.addEventListener('click', async () => {
+            const code = (promoInput?.value || '').trim().toUpperCase();
+            if (!code) {
+                if (promoStatusMsg) {
+                    promoStatusMsg.className = 'text-danger fw-semibold';
+                    promoStatusMsg.textContent = 'Ketik kode promo terlebih dahulu.';
+                }
+                return;
+            }
+            const origHtml = btnCheckPromo.innerHTML;
+            btnCheckPromo.disabled = true;
+            btnCheckPromo.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+            try {
+                const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+                const res = await fetch("{{ route('billing.promo.check') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify({ code })
+                });
+                const data = await res.json();
+                if (res.ok && data.valid) {
+                    if (promoInput) promoInput.value = data.code;
+                    syncPromoCode(data.code);
+                    btnClearPromo?.classList.remove('d-none');
+                    if (promoStatusMsg) {
+                        promoStatusMsg.className = 'text-success fw-semibold';
+                        promoStatusMsg.textContent = data.message;
+                    }
+                } else {
+                    syncPromoCode('');
+                    if (promoStatusMsg) {
+                        promoStatusMsg.className = 'text-danger fw-semibold';
+                        promoStatusMsg.textContent = data.message || 'Kode promo tidak valid.';
+                    }
+                }
+            } catch (err) {
+                if (promoStatusMsg) {
+                    promoStatusMsg.className = 'text-danger fw-semibold';
+                    promoStatusMsg.textContent = 'Gagal memeriksa kode promo. Coba lagi.';
+                }
+            } finally {
+                btnCheckPromo.disabled = false;
+                btnCheckPromo.innerHTML = origHtml;
+            }
         });
     });
 </script>

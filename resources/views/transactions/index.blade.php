@@ -149,14 +149,30 @@
 <!-- Transactions Table List -->
 <div class="card premium-card">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-list-check text-success me-2"></i> Daftar Log Transaksi</h5>
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <h5 class="m-0 fw-semibold text-dark">
+                <i class="fa-solid {{ !empty($showingTrash) ? 'fa-trash-arrow-up text-danger' : 'fa-list-check text-success' }} me-2"></i>
+                {{ !empty($showingTrash) ? 'Sampah Transaksi Terhapus' : 'Daftar Log Transaksi' }}
+            </h5>
+            <div class="btn-group btn-group-sm" role="group" aria-label="Tampilan Daftar Transaksi">
+                <a href="{{ route('transactions.index', request()->except(['trash', 'page'])) }}" class="btn {{ empty($showingTrash) ? 'btn-dark' : 'btn-outline-secondary' }}">Aktif</a>
+                <a href="{{ route('transactions.index', array_merge(request()->except(['page']), ['trash' => 1])) }}" class="btn {{ !empty($showingTrash) ? 'btn-danger' : 'btn-outline-danger' }}">
+                    <i class="fa-solid fa-trash-can me-1"></i>Sampah
+                    @if(($trashCount ?? 0) > 0)
+                        <span class="badge {{ !empty($showingTrash) ? 'bg-white text-danger' : 'bg-danger text-white' }} ms-1 rounded-pill">{{ $trashCount }}</span>
+                    @endif
+                </a>
+            </div>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{{ route('transactions.export', request()->query()) }}" class="btn btn-outline-dark btn-sm">
-                <i class="fa-solid fa-file-csv me-1"></i> Export CSV
-            </a>
-            <a href="{{ route('transactions.create') }}" class="btn btn-primary-green btn-sm shadow-sm">
-                <i class="fa-solid fa-plus me-1"></i> Transaksi Baru
-            </a>
+            @if(empty($showingTrash))
+                <a href="{{ route('transactions.export', request()->query()) }}" class="btn btn-outline-dark btn-sm">
+                    <i class="fa-solid fa-file-csv me-1"></i> Export CSV
+                </a>
+                <a href="{{ route('transactions.create') }}" class="btn btn-primary-green btn-sm shadow-sm">
+                    <i class="fa-solid fa-plus me-1"></i> Transaksi Baru
+                </a>
+            @endif
         </div>
     </div>
     <div class="card-body p-4">
@@ -213,41 +229,50 @@
                                 </td>
                                 <td><span class="small fw-semibold">{{ $trx->admin->name ?? 'System' }}</span></td>
                                 <td class="text-end">
-                                    <div class="kl-action-group">
-                                        <a href="{{ route('transactions.show', $trx->id) }}" class="btn btn-sm btn-outline-success px-2 py-1 fw-semibold" title="Lihat Detail Transaksi">
-                                            Detail
-                                        </a>
-                                        <div class="dropdown kl-action-dropdown">
-                                            <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $trx->transaction_number }}" title="Aksi Lainnya">
-                                                <i class="fa-solid fa-bars"></i>
+                                    @if(!empty($showingTrash))
+                                        <form action="{{ route('transactions.restore', $trx->id) }}" method="POST" class="d-inline" data-confirm="Pulihkan transaksi {{ $trx->transaction_number }} ke daftar aktif dan hitung kembali ke laporan?">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-success fw-semibold px-2 py-1">
+                                                <i class="fa-solid fa-rotate-left me-1"></i>Pulihkan
                                             </button>
-                                            <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
-                                                <li>
-                                                    <a href="{{ route('pos.receipt', $trx->id) }}" target="_blank" class="dropdown-item">
-                                                        <i class="fa-solid fa-print text-dark"></i>
-                                                        <span>Cetak Struk Thermal</span>
-                                                    </a>
-                                                </li>
-                                                <li>
-                                                    <a href="{{ route('transactions.edit', $trx->id) }}" class="dropdown-item">
-                                                        <i class="fa-solid fa-pen-to-square text-primary"></i>
-                                                        <span>Edit Transaksi</span>
-                                                    </a>
-                                                </li>
-                                                <li><hr class="dropdown-divider"></li>
-                                                <li>
-                                                    <form action="{{ route('transactions.destroy', $trx->id) }}" method="POST" class="m-0" data-confirm="Apakah Anda yakin ingin menghapus transaksi {{ $trx->transaction_number }}? Transaksi ini akan dipindahkan ke folder sampah (soft delete).">
-                                                        @csrf
-                                                        @method('DELETE')
-                                                        <button type="submit" class="dropdown-item text-danger">
-                                                            <i class="fa-solid fa-trash"></i>
-                                                            <span>Hapus Transaksi</span>
-                                                        </button>
-                                                    </form>
-                                                </li>
-                                            </ul>
+                                        </form>
+                                    @else
+                                        <div class="kl-action-group">
+                                            <a href="{{ route('transactions.show', $trx->id) }}" class="btn btn-sm btn-outline-success px-2 py-1 fw-semibold" title="Lihat Detail Transaksi">
+                                                Detail
+                                            </a>
+                                            <div class="dropdown kl-action-dropdown">
+                                                <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $trx->transaction_number }}" title="Aksi Lainnya">
+                                                    <i class="fa-solid fa-bars"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                                    <li>
+                                                        <a href="{{ route('pos.receipt', $trx->id) }}" target="_blank" class="dropdown-item">
+                                                            <i class="fa-solid fa-print text-dark"></i>
+                                                            <span>Cetak Struk Thermal</span>
+                                                        </a>
+                                                    </li>
+                                                    <li>
+                                                        <a href="{{ route('transactions.edit', $trx->id) }}" class="dropdown-item">
+                                                            <i class="fa-solid fa-pen-to-square text-primary"></i>
+                                                            <span>Edit Transaksi</span>
+                                                        </a>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form action="{{ route('transactions.destroy', $trx->id) }}" method="POST" class="m-0" data-confirm="Apakah Anda yakin ingin menghapus transaksi {{ $trx->transaction_number }}? Transaksi ini akan dipindahkan ke folder sampah (soft delete).">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="dropdown-item text-danger">
+                                                                <i class="fa-solid fa-trash"></i>
+                                                                <span>Hapus Transaksi</span>
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
+                                            </div>
                                         </div>
-                                    </div>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

@@ -49,6 +49,15 @@
                         <small class="text-muted d-block mt-1">Masukkan nilai antara 0% sampai 100%.</small>
                     </div>
 
+                    <div class="mb-4">
+                        <label for="monthly_sales_target" class="form-label fw-semibold text-dark">Target Omzet Bulanan (Opsional)</label>
+                        <div class="input-group" style="max-width: 300px;">
+                            <span class="input-group-text fw-bold">Rp</span>
+                            <input type="number" name="monthly_sales_target" id="monthly_sales_target" class="form-control fw-bold" inputmode="numeric" min="0" step="1000" value="{{ old('monthly_sales_target', (int) ($monthlySalesTarget ?? 0)) }}" placeholder="cth: 15000000">
+                        </div>
+                        <small class="text-muted d-block mt-1">Jika diisi &gt; 0, Dashboard akan menampilkan progress bar pencapaian target omzet bulan berjalan.</small>
+                    </div>
+
                     <!-- Live Margin Simulation Box -->
                     <div class="p-3 rounded-3 bg-light border mb-4 small" style="font-variant-numeric: tabular-nums;">
                         <div class="fw-bold text-dark mb-2"><i class="fa-solid fa-calculator text-success me-1"></i>Simulasi Perhitungan (Contoh Harga Jual Rp20.000)</div>

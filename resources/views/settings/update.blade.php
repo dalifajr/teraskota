@@ -282,4 +282,38 @@
         @endif
     </div>
 </div>
+
+<!-- Server Error Log Viewer (Tail 80 Baris Terakhir) -->
+<div class="card premium-card">
+    <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h6 class="m-0 fw-bold text-dark"><i class="fa-solid fa-bug text-danger me-2"></i>Log Error Server (<code>laravel.log</code>)</h6>
+            <small class="text-muted">Menampilkan 80 baris terakhir untuk diagnosa cepat tanpa akses SSH (Ukuran: {{ $health['log_size_mb'] ?? 0 }} MB).</small>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" data-bs-target="#laravelLogTailBox" aria-expanded="false">
+                <i class="fa-solid fa-eye me-1"></i>Lihat / Tutup Log
+            </button>
+            <form action="{{ route('superadmin.update.clear-log') }}" method="POST" class="m-0" data-confirm="Kosongkan seluruh isi storage/logs/laravel.log?">
+                @csrf
+                <button type="submit" class="btn btn-sm btn-outline-danger">
+                    <i class="fa-solid fa-trash-can me-1"></i>Bersihkan Log
+                </button>
+            </form>
+        </div>
+    </div>
+    <div class="collapse" id="laravelLogTailBox">
+        <div class="card-body p-3">
+            @if(!empty($recentLogTail))
+                <div class="p-3 rounded-3 text-light" style="background-color: #0f172a; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem; max-height: 360px; overflow: auto;">
+                    <pre class="m-0 text-white-50" style="white-space: pre-wrap; word-break: break-word;">{{ $recentLogTail }}</pre>
+                </div>
+            @else
+                <div class="text-center text-muted small py-3">
+                    <i class="fa-solid fa-circle-check text-success me-1"></i>File <code>laravel.log</code> bersih (tidak ada error tercatat).
+                </div>
+            @endif
+        </div>
+    </div>
+</div>
 @endsection

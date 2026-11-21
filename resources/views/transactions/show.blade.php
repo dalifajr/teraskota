@@ -89,6 +89,26 @@
                     ];
                 @endphp
                 <div class="d-flex flex-column gap-2 mt-4">
+                    @if($transaction->status === 'pending')
+                        <div class="p-2 bg-warning bg-opacity-10 border border-warning border-opacity-25 rounded-3 mb-1">
+                            <div class="small fw-bold text-dark mb-2"><i class="fa-solid fa-clock text-warning me-1"></i>Tindak Lanjut Transaksi Pending</div>
+                            <div class="d-flex gap-2">
+                                <form action="{{ route('transactions.mark-paid', $transaction->id) }}" method="POST" class="flex-grow-1 m-0" data-confirm="Konfirmasi pembayaran untuk {{ $transaction->transaction_number }} secara manual dan tandai LUNAS?">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-success w-100 fw-semibold">
+                                        <i class="fa-solid fa-check me-1"></i>Tandai Lunas
+                                    </button>
+                                </form>
+                                <form action="{{ route('transactions.cancel', $transaction->id) }}" method="POST" class="m-0" data-confirm="Batalkan transaksi pending {{ $transaction->transaction_number }}?">
+                                    @csrf
+                                    <button type="submit" class="btn btn-sm btn-outline-danger fw-semibold">
+                                        <i class="fa-solid fa-xmark me-1"></i>Batal
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    @endif
+
                     <div class="row g-2">
                         <div class="col-6">
                             <a href="{{ route('pos.receipt', $transaction->id) }}" target="_blank" class="btn btn-dark w-100">

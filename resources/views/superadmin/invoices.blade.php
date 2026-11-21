@@ -8,13 +8,47 @@
 @endsection
 
 @section('content')
+@if(isset($invoiceSummary))
+<div class="kl-metric-strip mb-3">
+    <div class="row g-0">
+        <div class="col-md-4 kl-metric-strip-col">
+            <div class="kl-metric-strip-item justify-content-between w-100">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block" style="font-size: 0.7rem;">Total Invoice (Filter)</small>
+                    <div class="fs-5 fw-bold text-dark">{{ number_format($invoiceSummary['total_count'], 0, ',', '.') }} invoice</div>
+                </div>
+                <i class="fa-solid fa-file-invoice text-secondary fs-5 opacity-50"></i>
+            </div>
+        </div>
+        <div class="col-md-4 kl-metric-strip-col">
+            <div class="kl-metric-strip-item justify-content-between w-100">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block" style="font-size: 0.7rem;">Total Revenue Lunas ({{ $invoiceSummary['paid_count'] }})</small>
+                    <div class="fs-5 fw-bold text-success">Rp{{ number_format($invoiceSummary['paid_total'], 0, ',', '.') }}</div>
+                </div>
+                <i class="fa-solid fa-circle-check text-success fs-5 opacity-50"></i>
+            </div>
+        </div>
+        <div class="col-md-4 kl-metric-strip-col">
+            <div class="kl-metric-strip-item justify-content-between w-100">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block" style="font-size: 0.7rem;">Menunggu Bayar ({{ $invoiceSummary['unpaid_count'] }})</small>
+                    <div class="fs-5 fw-bold text-warning">Rp{{ number_format($invoiceSummary['unpaid_total'], 0, ',', '.') }}</div>
+                </div>
+                <i class="fa-solid fa-clock text-warning fs-5 opacity-50"></i>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="card border-0 shadow-sm rounded-4">
     <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2 border-bottom">
         <div class="d-flex flex-wrap align-items-center gap-2">
             <h6 class="fw-bold m-0 me-1"><i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Daftar Invoice Langganan</h6>
             <div class="btn-group btn-group-sm" role="group" aria-label="Filter Status Invoice">
                 @foreach(['' => 'Semua', 'unpaid' => 'Menunggu', 'paid' => 'Lunas', 'expired' => 'Expired', 'cancelled' => 'Batal'] as $val => $lbl)
-                    <a href="{{ route('superadmin.invoices', array_filter(['status' => $val, 'search' => request('search')])) }}"
+                    <a href="{{ route('superadmin.invoices', array_filter(['status' => $val, 'search' => request('search'), 'start_date' => request('start_date'), 'end_date' => request('end_date')])) }}"
                        class="btn {{ request('status', '') === $val ? 'btn-success' : 'btn-outline-secondary' }}">
                         {{ $lbl }}
                     </a>
@@ -22,18 +56,20 @@
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <form method="GET" action="{{ route('superadmin.invoices') }}" class="d-flex gap-2">
+            <form method="GET" action="{{ route('superadmin.invoices') }}" class="d-flex flex-wrap gap-2">
                 @if(request('status'))
                     <input type="hidden" name="status" value="{{ request('status') }}">
                 @endif
-                <input type="text" name="search" class="form-control form-control-sm" style="min-width: 220px;" placeholder="Cari no. invoice / usaha / kode unik..." value="{{ request('search') }}">
+                <input type="date" name="start_date" class="form-control form-control-sm" style="width: 135px;" value="{{ request('start_date') }}" title="Dari Tanggal">
+                <input type="date" name="end_date" class="form-control form-control-sm" style="width: 135px;" value="{{ request('end_date') }}" title="Sampai Tanggal">
+                <input type="text" name="search" class="form-control form-control-sm" style="min-width: 190px;" placeholder="No. invoice / usaha / kode unik..." value="{{ request('search') }}">
                 <button type="submit" class="btn btn-sm btn-outline-success">Cari</button>
             </form>
-            <a href="{{ route('superadmin.invoices.export', array_filter(['status' => request('status'), 'search' => request('search')])) }}" class="btn btn-sm btn-outline-dark" title="Download CSV Pembukuan Revenue SaaS">
-                <i class="fa-solid fa-file-csv me-1"></i>Export CSV
+            <a href="{{ route('superadmin.invoices.export', request()->query()) }}" class="btn btn-sm btn-outline-dark" title="Download CSV Pembukuan Revenue SaaS">
+                <i class="fa-solid fa-file-csv me-1"></i>CSV
             </a>
             <button type="button" class="btn btn-sm btn-primary-green" data-bs-toggle="modal" data-bs-target="#createInvoiceModal">
-                <i class="fa-solid fa-plus me-1"></i>Buat Invoice Manual
+                <i class="fa-solid fa-plus me-1"></i>Buat Invoice
             </button>
         </div>
     </div>
@@ -71,6 +107,13 @@
                         <td>
                             <div class="fw-bold text-success">Rp{{ number_format((float)$inv->final_amount, 0, ',', '.') }}</div>
                             <small class="text-muted">Kode unik: <strong class="text-dark">{{ $inv->unique_code }}</strong></small>
+                            @if($inv->promo_code_snapshot)
+                                <div class="mt-1">
+                                    <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25">
+                                        <i class="fa-solid fa-ticket me-1"></i>{{ $inv->promo_code_snapshot }} (-Rp{{ number_format((float)$inv->discount_amount, 0, ',', '.') }})
+                                    </span>
+                                </div>
+                            @endif
                         </td>
                         <td>
                             <div class="text-uppercase fw-semibold">{{ $inv->payment_method }}</div>

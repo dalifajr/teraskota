@@ -108,6 +108,8 @@ class ReportController extends Controller
             fputcsv($file, ['Total Produk Terjual', $data['total_quantity']]);
             fputcsv($file, ['Total Diskon Promo (Rp)', number_format($data['total_discount'], 0, ',', '.')]);
             fputcsv($file, ['Total Omzet Bersih (Rp)', number_format($data['total_sales'], 0, ',', '.')]);
+            fputcsv($file, ['  - Omzet Tunai (Rp)', number_format($data['cash_sales'], 0, ',', '.')]);
+            fputcsv($file, ['  - Omzet QRIS (Rp)', number_format($data['qris_sales'], 0, ',', '.')]);
             fputcsv($file, ['Laba Kotor Penjualan (Rp)', number_format($data['total_profit'], 0, ',', '.')]);
             fputcsv($file, ['Estimasi Modal HPP (Rp)', number_format($data['estimated_cost'], 0, ',', '.')]);
             fputcsv($file, ['Total Pengeluaran Operasional (Rp)', number_format($data['total_expenses'], 0, ',', '.')]);
@@ -279,6 +281,29 @@ class ReportController extends Controller
         $qrisSales = (float) (clone $periodTxBase)->where('payment_method', 'qris')->sum('total_sales');
         $qrisCount = (int) (clone $periodTxBase)->where('payment_method', 'qris')->count();
 
+        // Portable Peak Hours (Hourly Distribution 00..23) - safe on MySQL & SQLite
+        $hourlyBuckets = [];
+        for ($h = 0; $h < 24; $h++) {
+            $hourlyBuckets[$h] = ['hour' => sprintf('%02d:00', $h), 'count' => 0, 'sales' => 0.0];
+        }
+        $periodTxsForHours = (clone $periodTxBase)->get(['transaction_time', 'total_sales']);
+        foreach ($periodTxsForHours as $ptx) {
+            $hourInt = (int) substr((string) ($ptx->transaction_time ?? '00:00'), 0, 2);
+            if ($hourInt >= 0 && $hourInt <= 23) {
+                $hourlyBuckets[$hourInt]['count']++;
+                $hourlyBuckets[$hourInt]['sales'] += (float) $ptx->total_sales;
+            }
+        }
+
+        $peakHourLabel = '-';
+        $peakHourCount = 0;
+        foreach ($hourlyBuckets as $hb) {
+            if ($hb['count'] > $peakHourCount) {
+                $peakHourCount = $hb['count'];
+                $peakHourLabel = $hb['hour'] . ' - ' . sprintf('%02d:59', (int) substr($hb['hour'], 0, 2));
+            }
+        }
+
         return [
             'start_date' => $startStr,
             'end_date' => $endStr,
@@ -296,6 +321,9 @@ class ReportController extends Controller
             'cash_count' => $cashCount,
             'qris_sales' => $qrisSales,
             'qris_count' => $qrisCount,
+            'hourly_stats' => array_values($hourlyBuckets),
+            'peak_hour_label' => $peakHourLabel,
+            'peak_hour_count' => $peakHourCount,
             'average_sales_per_day' => $averageSalesPerDay,
             'best_seller' => $bestSeller ? $bestSeller->menu_name_snapshot . ' (' . $bestSeller->qty . ' pcs)' : '-',
             'least_seller' => $leastSeller ? $leastSeller->menu_name_snapshot . ' (' . $leastSeller->qty . ' pcs)' : '-',

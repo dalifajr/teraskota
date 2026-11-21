@@ -42,6 +42,12 @@
                 <span>Paket &amp; Harga</span>
             </a>
         </li>
+        <li class="sidebar-item {{ Request::routeIs('superadmin.promos*') ? 'active' : '' }}">
+            <a href="{{ route('superadmin.promos') }}" class="sidebar-link">
+                <i class="fa-solid fa-ticket"></i>
+                <span>Kode Promo &amp; Kupon</span>
+            </a>
+        </li>
         <li class="sidebar-item {{ Request::routeIs('superadmin.settings*') ? 'active' : '' }}">
             <a href="{{ route('superadmin.settings') }}" class="sidebar-link">
                 <i class="fa-solid fa-sliders"></i>
@@ -113,6 +119,9 @@
             <li class="sidebar-section-label">Monetisasi &amp; Sistem</li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.plans*') ? 'active' : '' }}">
                 <a href="{{ route('superadmin.plans') }}" class="sidebar-link"><i class="fa-solid fa-layer-group"></i><span>Paket &amp; Harga</span></a>
+            </li>
+            <li class="sidebar-item {{ Request::routeIs('superadmin.promos*') ? 'active' : '' }}">
+                <a href="{{ route('superadmin.promos') }}" class="sidebar-link"><i class="fa-solid fa-ticket"></i><span>Kode Promo &amp; Kupon</span></a>
             </li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.settings*') ? 'active' : '' }}">
                 <a href="{{ route('superadmin.settings') }}" class="sidebar-link"><i class="fa-solid fa-sliders"></i><span>Pengaturan Platform</span></a>

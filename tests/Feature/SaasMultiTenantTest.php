@@ -1072,4 +1072,307 @@ class SaasMultiTenantTest extends TestCase
             ->assertSee('kl-segmented', false)
             ->assertSee('kl-plan-card', false);
     }
+
+    public function test_superadmin_promos_plan_delete_tenant_export_and_invoice_date_filters(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $subService = app(SubscriptionService::class);
+        $proPlan = Plan::where('slug', 'pro')->firstOrFail();
+
+        $store = $subService->provisionTenant(
+            ['name' => 'Kedai Promo Uji', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Owner Promo', 'username' => 'promo_owner', 'email' => 'promo@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        // 1. Super Admin creates a 20% promo code (max discount Rp 15.000)
+        $this->actingAs($superAdmin)->post('/superadmin/promos', [
+            'code' => 'HEMAT20',
+            'name' => 'Diskon 20% Launch',
+            'discount_type' => 'percent',
+            'discount_value' => 20,
+            'max_discount_amount' => 15000,
+            'max_uses' => 5,
+            'is_active' => '1',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $promo = \App\Models\PromoCode::where('code', 'HEMAT20')->firstOrFail();
+
+        // 2. Tenant checks promo via AJAX and subscribes with promo code
+        $this->actingAs($store['user'])->postJson('/billing/promo/check', [
+            'code' => 'hemat20',
+            'plan_id' => $proPlan->id,
+            'billing_cycle' => 'monthly',
+        ])->assertStatus(200)->assertJson(['valid' => true, 'code' => 'HEMAT20']);
+
+        $this->actingAs($store['user'])->post('/billing/subscribe', [
+            'plan_id' => $proPlan->id,
+            'billing_cycle' => 'monthly',
+            'payment_method' => 'transfer',
+            'promo_code' => 'HEMAT20',
+        ])->assertRedirect('/billing')->assertSessionHas('success');
+
+        $invoice = SubscriptionInvoice::where('tenant_id', $store['tenant']->id)->latest('id')->firstOrFail();
+        $this->assertEquals($promo->id, $invoice->promo_code_id);
+        $this->assertEquals('HEMAT20', $invoice->promo_code_snapshot);
+        $this->assertEquals(15000.0, (float) $invoice->discount_amount); // 20% of 79.000 = 15.800 capped at 15.000
+        $this->assertEquals(64000.0, (float) $invoice->base_amount);
+        $this->assertEquals(0, $promo->fresh()->used_count);
+
+        // 3. Super Admin approves invoice -> used_count increments atomically
+        $this->actingAs($superAdmin)->post('/superadmin/invoices/' . $invoice->id . '/approve')
+            ->assertRedirect()->assertSessionHas('success');
+        $this->assertEquals(1, $promo->fresh()->used_count);
+
+        // 4. Super Admin filters invoices by date & sees promo badge + KPI strip
+        $today = now()->format('Y-m-d');
+        $this->actingAs($superAdmin)->get("/superadmin/invoices?start_date={$today}&end_date={$today}")
+            ->assertStatus(200)
+            ->assertSee('HEMAT20')
+            ->assertSee('Total Revenue Lunas');
+
+        // 5. Super Admin filters tenants by plan_id & exports CSV
+        $this->actingAs($superAdmin)->get('/superadmin/tenants?plan_id=' . $proPlan->id)
+            ->assertStatus(200)
+            ->assertSee('Kedai Promo Uji');
+
+        $csvResp = $this->actingAs($superAdmin)->get('/superadmin/tenants/export?plan_id=' . $proPlan->id);
+        $csvResp->assertStatus(200);
+        $this->assertStringContainsString('Kedai Promo Uji', $csvResp->streamedContent());
+
+        // 6. Safe Plan Deletion: blocks Pro plan (in use), allows deleting brand-new unused plan
+        $this->actingAs($superAdmin)->delete('/superadmin/plans/' . $proPlan->id)
+            ->assertRedirect()->assertSessionHas('error');
+        $this->assertDatabaseHas('plans', ['id' => $proPlan->id]);
+
+        $unusedPlan = Plan::create([
+            'name' => 'Sementara',
+            'slug' => 'sementara-test',
+            'price_monthly' => 25000,
+            'price_yearly' => 250000,
+            'is_active' => false,
+            'sort_order' => 99,
+            'features' => ['expenses' => false, 'pdf_export' => false],
+        ]);
+        $this->actingAs($superAdmin)->delete('/superadmin/plans/' . $unusedPlan->id)
+            ->assertRedirect()->assertSessionHas('success');
+        $this->assertDatabaseMissing('plans', ['id' => $unusedPlan->id]);
+    }
+
+    public function test_tenant_admin_feature_gating_timezone_trash_restore_menu_csv_peak_hours_and_qris_ping(): void
+    {
+        $subService = app(SubscriptionService::class);
+        $store = $subService->provisionTenant(
+            ['name' => 'Warung Makassar', 'business_type' => 'Warung Makan / Resto', 'timezone' => 'Asia/Makassar'],
+            ['name' => 'Owner Makassar', 'username' => 'mks_owner', 'email' => 'mks@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        // 1. Dynamic WITA timezone appears in navbar & dashboard
+        $this->actingAs($store['user'])->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('WITA (UTC+8)')
+            ->assertSee('Asia/Makassar');
+
+        // 2. Soft-delete transaction -> appears in Trash tab -> Restore brings it back
+        $menu = Menu::withoutGlobalScope('tenant')->where('tenant_id', $store['tenant']->id)->firstOrFail();
+        $checkout = $this->actingAs($store['user'])->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 50000,
+            'customer_name' => 'Andi Trash',
+        ])->assertStatus(200);
+        $txId = $checkout->json('transaction.id');
+
+        $this->actingAs($store['user'])->delete('/transactions/' . $txId)
+            ->assertRedirect('/transactions');
+        $this->assertSoftDeleted('transactions', ['id' => $txId]);
+
+        $this->actingAs($store['user'])->get('/transactions?trash=1')
+            ->assertStatus(200)
+            ->assertSee('Sampah Transaksi Terhapus')
+            ->assertSee('Andi Trash');
+
+        $this->actingAs($store['user'])->post('/transactions/' . $txId . '/restore')
+            ->assertRedirect('/transactions?trash=1')
+            ->assertSessionHas('success');
+        $this->assertNotSoftDeleted('transactions', ['id' => $txId]);
+
+        // 3. Menu 1-click duplicate, CSV export, CSV template, and bulk CSV import
+        $this->actingAs($store['user'])->post('/menus/' . $menu->id . '/duplicate')
+            ->assertRedirect();
+        $this->assertDatabaseHas('menus', [
+            'tenant_id' => $store['tenant']->id,
+            'name' => $menu->name . ' (Salinan)',
+        ]);
+
+        $tplResp = $this->actingAs($store['user'])->get('/menus/template');
+        $tplResp->assertStatus(200);
+        $this->assertStringContainsString('MNM-101', $tplResp->streamedContent());
+
+        $csvContent = "Kode,Nama Menu,Kategori,Harga Jual,Margin Khusus (%),Status\nIMP-001,Coto Makassar,Masakan Khas,35000,40,aktif\nIMP-002,Es Pisang Ijo,Dessert Khas,18000,,aktif\n";
+        $csvFile = \Illuminate\Http\UploadedFile::fake()->createWithContent('menus.csv', $csvContent);
+        $this->actingAs($store['user'])->post('/menus/import', ['csv_file' => $csvFile])
+            ->assertRedirect('/menus')
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('menus', ['tenant_id' => $store['tenant']->id, 'code' => 'IMP-001', 'name' => 'Coto Makassar']);
+        $this->assertDatabaseHas('categories', ['tenant_id' => $store['tenant']->id, 'name' => 'Masakan Khas']);
+
+        $menuCsvResp = $this->actingAs($store['user'])->get('/menus/export');
+        $menuCsvResp->assertStatus(200);
+        $this->assertStringContainsString('Coto Makassar', $menuCsvResp->streamedContent());
+
+        // 4. Reports Peak Hours chart & CSV includes Tunai/QRIS breakdown
+        $this->actingAs($store['user'])->get('/reports')
+            ->assertStatus(200)
+            ->assertSee('Analisa Jam Ramai (Peak Hours)')
+            ->assertSee('peakHoursChart', false);
+
+        $reportCsv = $this->actingAs($store['user'])->get('/reports/export');
+        $reportCsv->assertStatus(200);
+        $this->assertStringContainsString('Omzet Tunai (Rp)', $reportCsv->streamedContent());
+
+        // 5. Tenant QRIS Webhook Test Ping & Prune Logs
+        $this->actingAs($store['user'])->postJson('/settings/qris/test-webhook')
+            ->assertStatus(200)
+            ->assertJson(['status' => 'success']);
+
+        $this->actingAs($store['user'])->post('/settings/qris/prune-logs')
+            ->assertRedirect('/settings/qris')
+            ->assertSessionHas('success');
+
+        // 6. Feature Gating Enforcement: Lite plan with expenses=false & pdf_export=false blocks /expenses & /reports/pdf
+        $litePlan = Plan::create([
+            'name' => 'Lite Hemat',
+            'slug' => 'lite-hemat-test',
+            'price_monthly' => 19000,
+            'price_yearly' => 190000,
+            'is_active' => true,
+            'sort_order' => 10,
+            'features' => ['offline_sync' => true, 'expenses' => false, 'pdf_export' => false, 'qris_dynamic' => false],
+        ]);
+        $subService->assignSubscriptionManually($store['tenant'], $litePlan, 'monthly');
+
+        $this->actingAs($store['user'])->get('/expenses')
+            ->assertRedirect('/billing')
+            ->assertSessionHas('error');
+        $this->actingAs($store['user'])->get('/reports/pdf')
+            ->assertRedirect('/billing')
+            ->assertSessionHas('error');
+    }
+
+    public function test_round2_webhook_auth_hardening_logo_fallback_audit_csv_log_clear_target_and_tx_resolve(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $subService = app(SubscriptionService::class);
+
+        $store = $subService->provisionTenant(
+            ['name' => 'Kedai Aman Sejati', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Owner Aman', 'username' => 'aman_owner', 'email' => 'aman@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        // 1. Tenant::logoUrl() fallback points to assets/images/logo.png (never broken images/logo.png)
+        $this->assertStringContainsString('assets/images/logo.png', $store['tenant']->logoUrl());
+
+        // 2. Webhook test-connection endpoints MUST reject unauthenticated probes with 401 when secret is configured
+        PlatformSetting::setValue('platform_qris_secret', 'supersecretplatform123');
+        $this->postJson('/listener/platform/test-connection', [])->assertStatus(401);
+        $this->postJson('/listener/platform/test-connection', ['secret' => 'supersecretplatform123'])->assertStatus(200);
+
+        $tenantSecret = Setting::withoutGlobalScope('tenant')
+            ->where('tenant_id', $store['tenant']->id)
+            ->where('key', 'qris_secret')
+            ->value('value');
+        $this->postJson('/listener/' . $store['tenant']->slug . '/test-connection', [])->assertStatus(401);
+        $this->postJson('/listener/' . $store['tenant']->slug . '/test-connection', ['secret' => $tenantSecret])->assertStatus(200);
+
+        // 3. Manual backoffice transaction supports customer_name, payment_method, and discount
+        $menu = Menu::withoutGlobalScope('tenant')->where('tenant_id', $store['tenant']->id)->firstOrFail();
+        $this->actingAs($store['user'])->post('/transactions', [
+            'transaction_date' => now()->format('Y-m-d'),
+            'transaction_time' => '11:30',
+            'customer_name' => 'Pelanggan Backoffice',
+            'payment_method' => 'qris',
+            'discount_type' => 'nominal',
+            'discount_value' => 2000,
+            'notes' => 'Order manual WA',
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+        ])->assertRedirect();
+
+        $manualTx = Transaction::withoutGlobalScope('tenant')
+            ->where('tenant_id', $store['tenant']->id)
+            ->where('customer_name', 'Pelanggan Backoffice')
+            ->firstOrFail();
+        $this->assertEquals('qris', $manualTx->payment_method);
+        $this->assertEquals(2000.0, (float) $manualTx->discount_amount);
+
+        // 4. Backoffice quick mark-paid & cancel on pending transactions
+        $pendingTx = Transaction::withoutGlobalScope('tenant')->create([
+            'tenant_id' => $store['tenant']->id,
+            'transaction_number' => 'TRX-PEND-R2-1',
+            'transaction_date' => now()->toDateString(),
+            'transaction_time' => '12:00:00',
+            'total_quantity' => 1,
+            'total_sales' => 15000,
+            'final_amount' => 15234,
+            'total_profit' => 5000,
+            'estimated_cost' => 10000,
+            'payment_method' => 'qris',
+            'status' => 'pending',
+            'created_by' => $store['user']->id,
+        ]);
+        $this->actingAs($store['user'])->get('/transactions/' . $pendingTx->id)
+            ->assertStatus(200)
+            ->assertSee('Tandai Lunas');
+        $this->actingAs($store['user'])->post('/transactions/' . $pendingTx->id . '/mark-paid')
+            ->assertRedirect('/transactions/' . $pendingTx->id)
+            ->assertSessionHas('success');
+        $this->assertEquals('paid', $pendingTx->fresh()->status);
+
+        $pendingTx2 = Transaction::withoutGlobalScope('tenant')->create([
+            'tenant_id' => $store['tenant']->id,
+            'transaction_number' => 'TRX-PEND-R2-2',
+            'transaction_date' => now()->toDateString(),
+            'transaction_time' => '12:05:00',
+            'total_quantity' => 1,
+            'total_sales' => 15000,
+            'final_amount' => 15235,
+            'total_profit' => 5000,
+            'estimated_cost' => 10000,
+            'payment_method' => 'qris',
+            'status' => 'pending',
+            'created_by' => $store['user']->id,
+        ]);
+        $this->actingAs($store['user'])->post('/transactions/' . $pendingTx2->id . '/cancel')
+            ->assertRedirect('/transactions/' . $pendingTx2->id)
+            ->assertSessionHas('success');
+        $this->assertEquals('cancelled', $pendingTx2->fresh()->status);
+
+        // 5. Monthly Sales Target setting & Dashboard progress bar
+        $this->actingAs($store['user'])->put('/settings/profit', [
+            'global_profit_percentage' => 35,
+            'monthly_sales_target' => 1000000,
+        ])->assertRedirect('/settings/profit')->assertSessionHas('success');
+
+        $this->actingAs($store['user'])->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('Target Omzet')
+            ->assertSee('1.000.000');
+
+        // 6. Super Admin: Top 5 Active Tenants on Dashboard, Clear Log + Audit Trail record, and Audit Trail CSV export
+        $this->actingAs($superAdmin)->get('/superadmin')
+            ->assertStatus(200)
+            ->assertSee('Top 5 Usaha Paling Aktif Bulan Ini')
+            ->assertSee('Kedai Aman Sejati');
+
+        $this->actingAs($superAdmin)->post('/superadmin/system-update/clear-log')
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $auditCsv = $this->actingAs($superAdmin)->get('/superadmin/audit-logs/export');
+        $auditCsv->assertStatus(200);
+        $this->assertStringContainsString('system_clear_log', $auditCsv->streamedContent());
+    }
 }

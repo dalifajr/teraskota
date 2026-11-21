@@ -9,10 +9,13 @@ class SubscriptionInvoice extends Model
     protected $fillable = [
         'tenant_id',
         'plan_id',
+        'promo_code_id',
+        'promo_code_snapshot',
         'subscription_id',
         'invoice_number',
         'billing_cycle',
         'base_amount',
+        'discount_amount',
         'unique_code',
         'final_amount',
         'payment_method',
@@ -28,6 +31,7 @@ class SubscriptionInvoice extends Model
 
     protected $casts = [
         'base_amount' => 'decimal:2',
+        'discount_amount' => 'decimal:2',
         'unique_code' => 'integer',
         'final_amount' => 'decimal:2',
         'qris_expired_at' => 'datetime',
@@ -42,6 +46,11 @@ class SubscriptionInvoice extends Model
     public function plan()
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function promoCode()
+    {
+        return $this->belongsTo(PromoCode::class);
     }
 
     public function subscription()

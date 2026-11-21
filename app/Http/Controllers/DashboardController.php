@@ -330,6 +330,19 @@ class DashboardController extends Controller
         $totalActiveMenus = \App\Models\Menu::where('status', true)->count();
         $totalCategories = Category::count();
 
+        // Monthly Sales Target Progress (always reflects current month regardless of active filter)
+        $monthlySalesTarget = (float) \App\Models\Setting::getValue('monthly_sales_target', 0);
+        $currentMonthSales = $monthlySalesTarget > 0
+            ? (float) Transaction::paid()
+                ->whereYear('transaction_date', Carbon::now()->year)
+                ->whereMonth('transaction_date', Carbon::now()->month)
+                ->sum('total_sales')
+            : 0.0;
+        $monthlyTargetPct = $monthlySalesTarget > 0
+            ? min(100, round(($currentMonthSales / $monthlySalesTarget) * 100, 1))
+            : 0.0;
+        $daysLeftInMonth = max(1, (int) Carbon::now()->diffInDays(Carbon::now()->endOfMonth()) + 1);
+
         return view('dashboard.index', compact(
             'period',
             'startDate',
@@ -363,6 +376,10 @@ class DashboardController extends Controller
             'recentTransactions',
             'totalActiveMenus',
             'totalCategories',
+            'monthlySalesTarget',
+            'currentMonthSales',
+            'monthlyTargetPct',
+            'daysLeftInMonth',
             'trendData',
             'topMenus',
             'bottomMenus',

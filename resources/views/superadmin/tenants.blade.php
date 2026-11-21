@@ -22,15 +22,24 @@
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2">
-            <form method="GET" class="d-flex gap-2">
+            <form method="GET" class="d-flex flex-wrap gap-2">
                 @if(request('status'))
                     <input type="hidden" name="status" value="{{ request('status') }}">
                 @endif
-                <input type="text" name="search" class="form-control form-control-sm" placeholder="Cari nama usaha / slug..." value="{{ request('search') }}">
+                <select name="plan_id" class="form-select form-select-sm" style="width: auto;" aria-label="Filter Paket" onchange="this.form.submit()">
+                    <option value="">Semua Paket</option>
+                    @foreach($plans as $pl)
+                        <option value="{{ $pl->id }}" {{ (string) request('plan_id') === (string) $pl->id ? 'selected' : '' }}>{{ $pl->name }}</option>
+                    @endforeach
+                </select>
+                <input type="text" name="search" class="form-control form-control-sm" style="width: 185px;" placeholder="Cari nama usaha / slug..." value="{{ request('search') }}">
                 <button class="btn btn-sm btn-outline-success" type="submit">Cari</button>
             </form>
+            <a href="{{ route('superadmin.tenants.export', request()->query()) }}" class="btn btn-sm btn-outline-dark" title="Unduh Database Usaha (CSV)">
+                <i class="fa-solid fa-file-csv me-1"></i>CSV
+            </a>
             <button type="button" class="btn btn-sm btn-primary-green" data-bs-toggle="modal" data-bs-target="#createTenantModal">
-                <i class="fa-solid fa-plus me-1"></i>Tambah Usaha Baru
+                <i class="fa-solid fa-plus me-1"></i>Tambah Usaha
             </button>
         </div>
     </div>

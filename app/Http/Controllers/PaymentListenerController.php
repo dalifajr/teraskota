@@ -50,6 +50,13 @@ class PaymentListenerController extends Controller
             ], 404);
         }
 
+        if (!$tenant->canOperate()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Langganan usaha tidak aktif atau sedang disuspend.',
+            ], 403);
+        }
+
         return TenantContext::runForTenant($tenant, function () use ($request, $tenant) {
             $secret = $this->qrisService->getSecret();
             $timestamp = $request->header('X-Timestamp', '');
@@ -58,15 +65,16 @@ class PaymentListenerController extends Controller
 
             if (!empty($secret)) {
                 $expectedSignature = hash_hmac('sha256', $timestamp . '.' . $rawContent, $secret);
-                $bodySecret = $request->input('secret');
+                $bodySecret = (string) $request->input('secret', '');
 
-                if (!empty($signature) && !hash_equals($expectedSignature, $signature)) {
-                    if ($bodySecret !== $secret) {
-                        return response()->json([
-                            'status' => 'error',
-                            'message' => 'Signature mismatch (Invalid Secret)',
-                        ], 401);
-                    }
+                $isValidSig = (!empty($signature) && hash_equals($expectedSignature, $signature))
+                           || ($bodySecret !== '' && hash_equals($secret, $bodySecret));
+
+                if (!$isValidSig) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Signature mismatch (Invalid Secret)',
+                    ], 401);
                 }
             }
 
@@ -92,6 +100,13 @@ class PaymentListenerController extends Controller
                 'status' => 'error',
                 'message' => 'Usaha/Tenant tidak ditemukan.',
             ], 404);
+        }
+
+        if (!$tenant->canOperate()) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Langganan usaha tidak aktif atau sedang disuspend.',
+            ], 403);
         }
 
         return TenantContext::runForTenant($tenant, function () use ($request, $tenant) {
@@ -225,9 +240,12 @@ class PaymentListenerController extends Controller
 
         if (!empty($secret)) {
             $expectedSignature = hash_hmac('sha256', $timestamp . '.' . $rawContent, $secret);
-            $bodySecret = $request->input('secret');
+            $bodySecret = (string) $request->input('secret', '');
 
-            if (!empty($signature) && !hash_equals($expectedSignature, $signature) && $bodySecret !== $secret) {
+            $isValid = (!empty($signature) && hash_equals($expectedSignature, $signature))
+                    || ($bodySecret !== '' && hash_equals($secret, $bodySecret));
+
+            if (!$isValid) {
                 return response()->json([
                     'status' => 'error',
                     'message' => 'Signature mismatch (Invalid Platform Secret)',

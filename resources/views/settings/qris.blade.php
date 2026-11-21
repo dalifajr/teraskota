@@ -1,6 +1,12 @@
 @extends('layouts.app')
 
 @section('title', 'Pengaturan QRIS & Webhook Listener')
+@section('page_title', 'Pengaturan QRIS & Webhook Listener')
+
+@section('breadcrumbs')
+    <li class="breadcrumb-item text-muted">Pengaturan</li>
+    <li class="breadcrumb-item active" aria-current="page">QRIS &amp; Listener</li>
+@endsection
 
 @section('styles')
 <style>
@@ -50,37 +56,22 @@
 @endsection
 
 @section('content')
-<div class="container-fluid px-0 px-md-3">
+<div class="container-fluid px-0">
     <!-- Header -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-3 gap-2">
         <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-1">
-                    <li class="breadcrumb-item"><a href="{{ route('dashboard') }}" class="text-decoration-none text-muted">Dashboard</a></li>
-                    <li class="breadcrumb-item text-muted">Pengaturan</li>
-                    <li class="breadcrumb-item active text-success fw-bold" aria-current="page">QRIS & Listener</li>
-                </ol>
-            </nav>
-            <h1 class="h3 fw-bold text-dark mb-0">Pengaturan QRIS & Webhook Listener</h1>
-            <p class="text-muted small mb-0">Konfigurasi payload QRIS statis, konversi kode unik dinamis, dan integrasi Android Listener.</p>
+            <p class="text-muted small mb-0">Konfigurasi payload QRIS statis, konversi kode unik dinamis, dan diagnostik Android Listener.</p>
         </div>
-        <div>
-            <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-outline-success fw-bold">
+        <div class="d-flex flex-wrap gap-2">
+            <button type="button" id="btnTenantTestWebhook" class="btn btn-sm btn-outline-primary fw-semibold">
+                <i class="fa-solid fa-plug-circle-check me-1"></i>Tes Konfigurasi Webhook
+            </button>
+            <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-sm btn-outline-success fw-semibold">
                 <i class="fa-solid fa-cash-register me-1"></i> Buka Kasir POS
             </a>
         </div>
     </div>
-
-    <!-- Alert Success -->
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show shadow-sm border-0 rounded-3 mb-4" role="alert">
-            <div class="d-flex align-items-center">
-                <i class="fa-solid fa-circle-check fs-4 me-3 text-success"></i>
-                <div>{{ session('success') }}</div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-        </div>
-    @endif
+    <div id="tenantWebhookTestResult" class="alert d-none small py-2 mb-3"></div>
 
     <!-- Main Card with Tabs -->
     <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4">
@@ -381,13 +372,21 @@
 
                 <!-- TAB 3: LOG NOTIFIKASI MASUK -->
                 <div class="tab-pane fade" id="tab-logs" role="tabpanel">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                         <h6 class="fw-bold text-dark mb-0">
                             <i class="fa-solid fa-history me-1 text-muted"></i> 15 Log Transaksi Listener Terakhir
                         </h6>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload();">
-                            <i class="fa-solid fa-rotate me-1"></i> Refresh
-                        </button>
+                        <div class="d-flex gap-2">
+                            <form action="{{ route('settings.qris.prune-logs') }}" method="POST" class="m-0" data-confirm="Bersihkan seluruh log notifikasi QRIS yang berusia lebih dari 30 hari?">
+                                @csrf
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    <i class="fa-solid fa-broom me-1"></i>Bersihkan Log &gt;30 Hari
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.location.reload();">
+                                <i class="fa-solid fa-rotate me-1"></i> Refresh
+                            </button>
+                        </div>
                     </div>
 
                     <div class="table-responsive rounded-3 border">
@@ -575,11 +574,43 @@
         }
     }
 
-    function confirmRegenerateSecret() {
-        if (confirm('PERINGATAN: Mengubah Secret Key akan membuat aplikasi Android Listener tidak bisa mengirim webhook sampai Secret Key baru diperbarui di aplikasi HP. Lanjutkan?')) {
-            document.getElementById('formRegenerateSecret').submit();
+    async function confirmRegenerateSecret() {
+        const msg = 'PERINGATAN: Mengubah Secret Key akan membuat aplikasi Android Listener tidak bisa mengirim webhook sampai Secret Key baru diperbarui di aplikasi HP. Lanjutkan?';
+        const ok = window.KLConfirm
+            ? await window.KLConfirm({ title: 'Acak Ulang Secret Key?', text: msg, isDanger: true, confirmText: 'Ya, Acak Ulang' })
+            : window.confirm(msg);
+        if (ok) {
+            document.getElementById('formRegenerateSecret')?.submit();
         }
     }
+
+    document.getElementById('btnTenantTestWebhook')?.addEventListener('click', async function () {
+        const btn = this;
+        const box = document.getElementById('tenantWebhookTestResult');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menguji...';
+        try {
+            const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+            const res = await fetch("{{ route('settings.qris.test-webhook') }}", {
+                method: 'POST',
+                headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf }
+            });
+            const data = await res.json();
+            if (box) {
+                box.className = 'alert small py-2 mb-3 ' + (res.ok && data.status === 'success' ? 'alert-success' : 'alert-danger');
+                box.innerHTML = `<i class="fa-solid ${res.ok && data.status === 'success' ? 'fa-circle-check' : 'fa-triangle-exclamation'} me-2"></i>${data.message || 'Gagal menguji webhook.'}`;
+            }
+        } catch (err) {
+            if (box) {
+                box.className = 'alert alert-danger small py-2 mb-3';
+                box.textContent = 'Terjadi kesalahan jaringan saat menguji konfigurasi webhook.';
+            }
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    });
 
     // Handle AJAX submission of Custom Secret Modal
     document.getElementById('formCustomSecret')?.addEventListener('submit', async function(e) {

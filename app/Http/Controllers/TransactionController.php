@@ -31,7 +31,10 @@ class TransactionController extends Controller
     {
         Transaction::expireOverdueQris();
 
-        $query = $this->buildFilteredQuery($request);
+        $showingTrash = $request->boolean('trash');
+        $trashCount = Transaction::onlyTrashed()->count();
+
+        $query = $this->buildFilteredQuery($request, $showingTrash);
 
         $summaryStats = [
             'count' => (clone $query)->count(),
@@ -47,7 +50,16 @@ class TransactionController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'role']);
 
-        return view('transactions.index', compact('transactions', 'summaryStats', 'cashiers'));
+        return view('transactions.index', compact('transactions', 'summaryStats', 'cashiers', 'showingTrash', 'trashCount'));
+    }
+
+    public function restore(int $id)
+    {
+        $transaction = Transaction::onlyTrashed()->findOrFail($id);
+        $transaction->restore();
+
+        return redirect()->route('transactions.index', ['trash' => 1])
+            ->with('success', "Transaksi {$transaction->transaction_number} berhasil dipulihkan ke daftar aktif!");
     }
 
     public function export(Request $request)
@@ -97,9 +109,11 @@ class TransactionController extends Controller
         return response()->stream($callback, 200, $headers);
     }
 
-    protected function buildFilteredQuery(Request $request)
+    protected function buildFilteredQuery(Request $request, bool $onlyTrashed = false)
     {
-        $query = Transaction::with(['admin'])->withCount('details');
+        $query = $onlyTrashed
+            ? Transaction::onlyTrashed()->with(['admin'])->withCount('details')
+            : Transaction::with(['admin'])->withCount('details');
 
         // Search by Transaction Number or Customer Name
         if ($request->filled('search')) {
@@ -172,6 +186,10 @@ class TransactionController extends Controller
         $request->validate([
             'transaction_date' => ['required', 'date'],
             'transaction_time' => ['required', 'string'],
+            'customer_name' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', 'in:tunai,qris'],
+            'discount_type' => ['nullable', 'in:none,nominal,percentage'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_id' => [
@@ -225,6 +243,10 @@ class TransactionController extends Controller
         $request->validate([
             'transaction_date' => ['required', 'date'],
             'transaction_time' => ['required', 'string'],
+            'customer_name' => ['nullable', 'string', 'max:100'],
+            'payment_method' => ['nullable', 'in:tunai,qris'],
+            'discount_type' => ['nullable', 'in:none,nominal,percentage'],
+            'discount_value' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:500'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.menu_id' => [
@@ -241,6 +263,41 @@ class TransactionController extends Controller
         } catch (\Exception $e) {
             return back()->with('error', 'Gagal memperbarui transaksi: ' . $e->getMessage())->withInput();
         }
+    }
+
+    /**
+     * Manually confirm a pending transaction as paid from Backoffice.
+     */
+    public function markPaid(Transaction $transaction)
+    {
+        if ($transaction->status === 'paid') {
+            return back()->with('info', "Transaksi {$transaction->transaction_number} sudah berstatus lunas.");
+        }
+
+        $transaction->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'payment_reference' => $transaction->payment_reference ?: ('MANUAL-ADMIN-' . strtoupper(uniqid())),
+            'payment_source_app' => $transaction->payment_source_app ?: 'Konfirmasi Manual Admin',
+        ]);
+
+        return redirect()->route('transactions.show', $transaction->id)
+            ->with('success', "Transaksi {$transaction->transaction_number} berhasil ditandai LUNAS!");
+    }
+
+    /**
+     * Cancel a pending transaction from Backoffice.
+     */
+    public function cancel(Transaction $transaction)
+    {
+        if ($transaction->status !== 'pending') {
+            return back()->with('error', 'Hanya transaksi berstatus Menunggu (Pending) yang dapat dibatalkan.');
+        }
+
+        $transaction->update(['status' => 'cancelled']);
+
+        return redirect()->route('transactions.show', $transaction->id)
+            ->with('success', "Transaksi {$transaction->transaction_number} berhasil dibatalkan.");
     }
 
     /**

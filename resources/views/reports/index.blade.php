@@ -184,6 +184,28 @@
         . "Terlaris    : {$best_seller}";
 @endphp
 
+<!-- Analisa Jam Ramai (Peak Hours) -->
+@if(!empty($hourly_stats))
+<div class="card premium-card mb-4">
+    <div class="premium-header py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h6 class="m-0 fw-bold text-dark"><i class="fa-solid fa-clock text-success me-2"></i>Analisa Jam Ramai (Peak Hours)</h6>
+            <small class="text-muted">Distribusi jumlah transaksi per jam operasional untuk membantu atur shift kasir &amp; stok.</small>
+        </div>
+        @if(($peak_hour_count ?? 0) > 0)
+            <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2">
+                <i class="fa-solid fa-fire text-warning me-1"></i>Puncak Ramai: <strong>{{ $peak_hour_label }}</strong> ({{ $peak_hour_count }} nota)
+            </span>
+        @endif
+    </div>
+    <div class="card-body p-3 p-md-4">
+        <div style="height: 210px; position: relative;">
+            <canvas id="peakHoursChart"></canvas>
+        </div>
+    </div>
+</div>
+@endif
+
 <!-- Laporan detail table -->
 <div class="card premium-card">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -273,6 +295,46 @@
 
         periodSelect.addEventListener('change', toggleCustomDateFields);
         toggleCustomDateFields(); // Run on mount
+
+        // Peak Hours Bar Chart
+        const peakCanvas = document.getElementById('peakHoursChart');
+        if (peakCanvas && typeof Chart !== 'undefined') {
+            @php $peakStatsPayload = $hourly_stats ?? []; @endphp
+            const hourlyData = @json($peakStatsPayload);
+            new Chart(peakCanvas, {
+                type: 'bar',
+                data: {
+                    labels: hourlyData.map(h => h.hour),
+                    datasets: [{
+                        label: 'Jumlah Transaksi',
+                        data: hourlyData.map(h => h.count),
+                        backgroundColor: 'rgba(22, 163, 74, 0.78)',
+                        borderColor: '#15803d',
+                        borderWidth: 1,
+                        borderRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                afterLabel: function(ctx) {
+                                    const item = hourlyData[ctx.dataIndex];
+                                    return item ? 'Omzet: Rp' + new Intl.NumberFormat('id-ID').format(Math.round(item.sales || 0)) : '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 }, grid: { color: 'rgba(148,163,184,0.14)' } },
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+                    }
+                }
+            });
+        }
     });
 </script>
 @endsection

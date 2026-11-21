@@ -1,10 +1,7 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN;
 
-Perbaiki elemen yang kurang efisien. seperti, tombol aksi yang ditampilkan semua, seharusnya bisa dibuat style hamburger.
+lakukan evaluasi terhadap fitur yang ada pada role superadmin, dan admin. lakukan brainstorming untuk mendapatkan hasil evaluasi yang maksimal. hasil evaluasi bisa berupa perbaikan ataupun penambahan fitur baru.
 
-elemen card paket, dll.
-
-intinya, lekukan evaluasi elemen dan tampilan untuk lebih efisien dan lebih baik lagi.
 
 
 BACA!!! CATATAN UNTUK KAMU:

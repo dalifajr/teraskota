@@ -78,8 +78,37 @@
 <!-- Menus Table List -->
 <div class="card premium-card">
     <div class="premium-header d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-coffee text-success me-2"></i> Daftar Menu Aktif & Nonaktif</h5>
-        <a href="{{ route('menus.create') }}" class="btn btn-primary-green btn-sm shadow-sm"><i class="fa-solid fa-plus me-1"></i> Tambah Menu Baru</a>
+        <h5 class="m-0 fw-semibold text-dark"><i class="fa-solid fa-coffee text-success me-2"></i> Daftar Menu Aktif &amp; Nonaktif</h5>
+        <div class="kl-action-group">
+            <div class="dropdown kl-action-dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold d-inline-flex align-items-center gap-1" data-bs-toggle="dropdown" aria-expanded="false">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>Import / Export</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                    <li>
+                        <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#importMenuModal">
+                            <i class="fa-solid fa-upload text-success"></i>
+                            <span>Import Menu (CSV)</span>
+                        </button>
+                    </li>
+                    <li>
+                        <a href="{{ route('menus.template') }}" class="dropdown-item">
+                            <i class="fa-solid fa-file-arrow-down text-primary"></i>
+                            <span>Unduh Template CSV</span>
+                        </a>
+                    </li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li>
+                        <a href="{{ route('menus.export') }}" class="dropdown-item">
+                            <i class="fa-solid fa-file-csv text-dark"></i>
+                            <span>Export Katalog CSV</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+            <a href="{{ route('menus.create') }}" class="btn btn-primary-green btn-sm shadow-sm"><i class="fa-solid fa-plus me-1"></i> Tambah Menu</a>
+        </div>
     </div>
     <div class="card-body p-4">
         @if($menus->count() > 0)
@@ -146,6 +175,15 @@
                                                 </a>
                                             </li>
                                             <li>
+                                                <form action="{{ route('menus.duplicate', $menu->id) }}" method="POST" class="m-0">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="fa-regular fa-copy text-info"></i>
+                                                        <span>Duplikat Menu</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li>
                                                 <form action="{{ route('menus.toggle-status', $menu->id) }}" method="POST" class="m-0">
                                                     @csrf
                                                     @method('PATCH')
@@ -188,6 +226,37 @@
                 <p class="m-0">Tidak ada menu yang ditemukan</p>
             </div>
         @endif
+    </div>
+</div>
+
+<!-- Modal Import Menu Massal CSV -->
+<div class="modal fade" id="importMenuModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="{{ route('menus.import') }}" method="POST" enctype="multipart/form-data" class="modal-content">
+            @csrf
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-file-import text-success me-2"></i>Import Massal Katalog Menu (CSV)</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-light border small mb-3">
+                    <div class="fw-semibold text-dark mb-1">Format Kolom CSV:</div>
+                    <code class="d-block mb-2">Kode, Nama Menu, Kategori, Harga Jual, Margin Khusus (%), Status</code>
+                    <div class="text-muted">Kategori yang belum ada akan dibuat otomatis. Kosongkan kolom Margin Khusus untuk memakai margin global.</div>
+                    <a href="{{ route('menus.template') }}" class="btn btn-sm btn-outline-primary mt-2">
+                        <i class="fa-solid fa-download me-1"></i>Unduh Contoh Template CSV
+                    </a>
+                </div>
+                <div class="mb-0">
+                    <label for="menuCsvFile" class="form-label small fw-semibold">Pilih File CSV <span class="text-danger">*</span></label>
+                    <input type="file" name="csv_file" id="menuCsvFile" class="form-control" accept=".csv,.txt" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary-green"><i class="fa-solid fa-upload me-1"></i>Mulai Import</button>
+            </div>
+        </form>
     </div>
 </div>
 @endsection

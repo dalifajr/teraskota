@@ -212,13 +212,33 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
-                    <button type="submit" class="btn btn-primary-green">Simpan Perubahan</button>
+                <div class="modal-footer justify-content-between">
+                    @php
+                        $canDeletePlan = $plan->slug !== 'trial'
+                            && (($plan->subscriptions_count ?? 0) === 0)
+                            && (($plan->invoices_count ?? 0) === 0);
+                    @endphp
+                    @if($canDeletePlan)
+                        <button type="submit" form="deletePlanForm{{ $plan->id }}" class="btn btn-outline-danger btn-sm">
+                            <i class="fa-solid fa-trash me-1"></i>Hapus Paket
+                        </button>
+                    @else
+                        <span class="text-muted" style="font-size: 0.74rem;"><i class="fa-solid fa-shield-halved me-1"></i>Dilindungi riwayat</span>
+                    @endif
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary-green">Simpan Perubahan</button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
+    @if($canDeletePlan)
+        <form id="deletePlanForm{{ $plan->id }}" action="{{ route('superadmin.plans.destroy', $plan->id) }}" method="POST" class="d-none" data-confirm="Hapus permanen paket {{ $plan->name }}? Paket ini belum pernah dipakai oleh tenant mana pun.">
+            @csrf
+            @method('DELETE')
+        </form>
+    @endif
 @endforeach
 
 <!-- Modal Tambah Paket Langganan Baru -->

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlatformAuditLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Carbon\Carbon;
@@ -178,6 +179,8 @@ class SystemUpdateController extends Controller
             'log_size_mb' => file_exists($logFile) ? round(filesize($logFile) / (1024 ** 2), 2) : 0,
         ];
 
+        $recentLogTail = $this->readLogTail($logFile, 80);
+
         return view('settings.update', compact(
             'isGitAvailable',
             'isShellAllowed',
@@ -191,8 +194,40 @@ class SystemUpdateController extends Controller
             'lastCommitAuthor',
             'phpVersion',
             'laravelVersion',
-            'health'
+            'health',
+            'recentLogTail'
         ));
+    }
+
+    protected function readLogTail(string $path, int $lines = 80): string
+    {
+        if (!file_exists($path) || !is_readable($path)) {
+            return '';
+        }
+
+        $size = filesize($path);
+        if (!$size || $size <= 0) {
+            return '';
+        }
+
+        $maxBytes = 65536; // Read at most last 64KB to prevent OOM
+        $handle = @fopen($path, 'rb');
+        if (!$handle) {
+            return '';
+        }
+
+        if ($size > $maxBytes) {
+            fseek($handle, -$maxBytes, SEEK_END);
+        }
+        $chunk = (string) fread($handle, $maxBytes);
+        fclose($handle);
+
+        $allLines = preg_split('/\r\n|\r|\n/', trim($chunk));
+        if (!$allLines) {
+            return '';
+        }
+
+        return implode("\n", array_slice($allLines, -$lines));
     }
 
     /**
@@ -276,6 +311,15 @@ class SystemUpdateController extends Controller
 
             $log[] = "\n=== PEMBARUAN SISTEM BERHASIL DILAKUKAN ===";
 
+            PlatformAuditLog::record(
+                'settings',
+                'system_update_execute',
+                'System',
+                null,
+                'GitHub Sync',
+                'Menjalankan pembaruan sistem (git pull + migrate + cache clear).'
+            );
+
             return back()->with('update_log', implode("\n", $log))
                          ->with('success', 'Pembaruan sistem berhasil diselesaikan!');
         } catch (\Exception $e) {
@@ -297,6 +341,16 @@ class SystemUpdateController extends Controller
         try {
             Artisan::call('migrate', ['--force' => true]);
             $output = Artisan::output();
+
+            PlatformAuditLog::record(
+                'settings',
+                'system_migrate_db',
+                'System',
+                null,
+                'Database Migration',
+                'Menjalankan migrasi basis data secara manual dari panel Super Admin.'
+            );
+
             return back()->with('update_log', "=== EKSEKUSI MIGRASI BASIS DATA (ARTISAN) ===\nWaktu: " . Carbon::now()->toDateTimeString() . "\n\n" . ($output ?: 'Semua tabel sudah dalam status termigrasi (Nothing to migrate).'))
                          ->with('success', 'Migrasi basis data berhasil dijalankan!');
         } catch (\Exception $e) {
@@ -310,6 +364,38 @@ class SystemUpdateController extends Controller
     public function clearCache()
     {
         Artisan::call('optimize:clear');
+
+        PlatformAuditLog::record(
+            'settings',
+            'system_clear_cache',
+            'System',
+            null,
+            'Application Cache',
+            'Membersihkan cache aplikasi (config, route, view).'
+        );
+
         return back()->with('success', 'Semua cache (konfigurasi, rute, view terkompilasi) berhasil dibersihkan!');
+    }
+
+    /**
+     * Truncate storage/logs/laravel.log safely.
+     */
+    public function clearLog()
+    {
+        $logFile = storage_path('logs/laravel.log');
+        if (file_exists($logFile) && is_writable($logFile)) {
+            @file_put_contents($logFile, '');
+        }
+
+        PlatformAuditLog::record(
+            'settings',
+            'system_clear_log',
+            'System',
+            null,
+            'laravel.log',
+            'Membersihkan file log error server (storage/logs/laravel.log).'
+        );
+
+        return back()->with('success', 'Log error server (laravel.log) berhasil dikosongkan!');
     }
 }

@@ -169,7 +169,7 @@
             <tr>
                 <td>
                     <div class="summary-label">Jumlah Transaksi</div>
-                    <div class="summary-value" style="color: #2c3e50;">{{ number_format($total_transactions, 0, ',', '.') }}</div>
+                    <div class="summary-value" style="color: #2c3e50;">{{ number_format($total_transactions, 0, ',', '.') }} nota</div>
                 </td>
                 <td>
                     <div class="summary-label">Total Pengeluaran Kas</div>
@@ -178,6 +178,25 @@
                 <td>
                     <div class="summary-label">Laba Bersih Aktual (Net Profit)</div>
                     <div class="summary-value" style="color: {{ ($net_profit ?? 0) >= 0 ? '#11361b' : '#c0392b' }};">Rp{{ number_format($net_profit ?? 0, 0, ',', '.') }}</div>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <div class="summary-label">Omzet Tunai ({{ $cash_count ?? 0 }} nota)</div>
+                    <div class="summary-value" style="font-size: 11.5pt; color: #166534;">Rp{{ number_format($cash_sales ?? 0, 0, ',', '.') }}</div>
+                </td>
+                <td>
+                    <div class="summary-label">Omzet QRIS ({{ $qris_count ?? 0 }} nota)</div>
+                    <div class="summary-value" style="font-size: 11.5pt; color: #0369a1;">Rp{{ number_format($qris_sales ?? 0, 0, ',', '.') }}</div>
+                </td>
+                <td>
+                    <div class="summary-label">Diskon Promo · Jam Puncak</div>
+                    <div class="summary-value" style="font-size: 10.5pt; color: #b45309;">
+                        Rp{{ number_format($total_discount ?? 0, 0, ',', '.') }}
+                        @if(!empty($peak_hour_label) && ($peak_hour_count ?? 0) > 0)
+                            · {{ $peak_hour_label }}
+                        @endif
+                    </div>
                 </td>
             </tr>
         </table>
@@ -214,6 +233,36 @@
             @endforeach
         </tbody>
     </table>
+
+    @if(!empty($expenses_list) && count($expenses_list) > 0)
+        <div style="font-weight: bold; font-size: 11pt; color: #991b1b; margin-top: 25px; margin-bottom: 5px; text-transform: uppercase;">
+            Rincian Pengeluaran Kas Operasional
+        </div>
+        <table class="report-table">
+            <thead>
+                <tr>
+                    <th style="width: 35px; background-color: #991b1b;" class="text-center">No</th>
+                    <th style="width: 85px; background-color: #991b1b;">Tanggal</th>
+                    <th style="width: 110px; background-color: #991b1b;">Kategori</th>
+                    <th style="background-color: #991b1b;">Keterangan</th>
+                    <th style="width: 75px; background-color: #991b1b;" class="text-center">Sumber</th>
+                    <th style="width: 105px; background-color: #991b1b;" class="text-end">Nominal</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($expenses_list as $eIdx => $exp)
+                    <tr>
+                        <td class="text-center">{{ $eIdx + 1 }}</td>
+                        <td>{{ $exp->expense_date?->format('d/m/Y') ?? '-' }}</td>
+                        <td>{{ $exp->category }}</td>
+                        <td>{{ $exp->description }}</td>
+                        <td class="text-center">{{ strtoupper($exp->payment_method ?? 'TUNAI') }}</td>
+                        <td class="text-end fw-bold" style="color: #c0392b;">Rp{{ number_format((float)$exp->amount, 0, ',', '.') }}</td>
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    @endif
 
 </body>
 </html>
