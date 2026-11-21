@@ -32,6 +32,9 @@
             <a href="{{ route('superadmin.invoices.export', array_filter(['status' => request('status'), 'search' => request('search')])) }}" class="btn btn-sm btn-outline-dark" title="Download CSV Pembukuan Revenue SaaS">
                 <i class="fa-solid fa-file-csv me-1"></i>Export CSV
             </a>
+            <button type="button" class="btn btn-sm btn-primary-green" data-bs-toggle="modal" data-bs-target="#createInvoiceModal">
+                <i class="fa-solid fa-plus me-1"></i>Buat Invoice Manual
+            </button>
         </div>
     </div>
     <div class="table-responsive">
@@ -119,5 +122,60 @@
     @if($invoices->hasPages())
         <div class="card-footer bg-white">{{ $invoices->links() }}</div>
     @endif
+</div>
+
+<!-- Modal Buat Invoice Manual -->
+<div class="modal fade" id="createInvoiceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <form action="{{ route('superadmin.invoices.store') }}" method="POST" class="modal-content">
+            @csrf
+            <div class="modal-header">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-file-invoice-dollar text-success me-2"></i>Buat Invoice Langganan Manual</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Pilih Usaha (Tenant) <span class="text-danger">*</span></label>
+                    <select name="tenant_id" class="form-select" required>
+                        <option value="">-- Pilih Usaha --</option>
+                        @foreach($allTenants ?? [] as $t)
+                            <option value="{{ $t->id }}">{{ $t->name }} ({{ $t->slug }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-semibold">Pilih Paket Berbayar <span class="text-danger">*</span></label>
+                    <select name="plan_id" class="form-select" required>
+                        @foreach($purchasablePlans ?? [] as $p)
+                            <option value="{{ $p->id }}">{{ $p->name }} — Rp{{ number_format((float)$p->price_monthly, 0, ',', '.') }}/bln · Rp{{ number_format((float)$p->price_yearly, 0, ',', '.') }}/thn</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="row g-3">
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Siklus Tagihan</label>
+                        <select name="billing_cycle" class="form-select" required>
+                            <option value="monthly">Bulanan (1 Bulan)</option>
+                            <option value="yearly">Tahunan (1 Tahun)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small fw-semibold">Metode Bayar</label>
+                        <select name="payment_method" class="form-select" required>
+                            <option value="qris">QRIS Dinamis</option>
+                            <option value="transfer">Transfer Bank</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="alert alert-info small mt-3 mb-0 py-2">
+                    <i class="fa-solid fa-circle-info me-1"></i>Kode unik 3 digit akan dibuat otomatis. Tagihan langsung muncul di akun usaha dan siap dikirim lewat tombol <strong>WA</strong>.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                <button type="submit" class="btn btn-primary-green">Terbitkan Invoice</button>
+            </div>
+        </form>
+    </div>
 </div>
 @endsection

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentListenerLog;
 use App\Models\Plan;
+use App\Models\PlatformAuditLog;
 use App\Models\PlatformSetting;
 use App\Models\SubscriptionInvoice;
 use App\Models\Tenant;
@@ -16,6 +17,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SuperAdminController extends Controller
 {
@@ -30,6 +32,8 @@ class SuperAdminController extends Controller
 
     public function dashboard()
     {
+        SubscriptionInvoice::expireOverdue();
+
         // Always ensure we are in global platform context on superadmin routes
         $tenants = Tenant::with(['activeSubscription.plan'])
             ->withCount(['users', 'menus', 'transactions'])
@@ -38,6 +42,8 @@ class SuperAdminController extends Controller
 
         $totalTenants = $tenants->count();
         $activeTenants = $tenants->filter(fn($t) => in_array($t->subscriptionState(), ['active', 'lifetime'], true))->count();
+        $paidActiveTenants = $tenants->filter(fn($t) => !$t->is_lifetime && $t->subscriptionState() === 'active')->count();
+        $nonLifetimeTenants = $tenants->filter(fn($t) => !$t->is_lifetime)->count();
         $trialTenants = $tenants->filter(fn($t) => $t->subscriptionState() === 'trial')->count();
         $graceTenants = $tenants->filter(fn($t) => $t->subscriptionState() === 'grace')->count();
         $expiredTenants = $tenants->filter(fn($t) => in_array($t->subscriptionState(), ['expired', 'suspended'], true))->count();
@@ -68,6 +74,17 @@ class SuperAdminController extends Controller
                     : (float) $sub->plan->price_monthly;
             }
         }
+
+        // Advanced SaaS Health Metrics
+        $conversionRatePct = $nonLifetimeTenants > 0
+            ? round(($paidActiveTenants / $nonLifetimeTenants) * 100, 1)
+            : 0.0;
+        $arpu = $paidActiveTenants > 0 ? round($mrr / $paidActiveTenants, 0) : 0.0;
+        $platformGmvThisMonth = (float) Transaction::withoutGlobalScope('tenant')
+            ->paid()
+            ->whereYear('transaction_date', Carbon::now()->year)
+            ->whereMonth('transaction_date', Carbon::now()->month)
+            ->sum('total_sales');
 
         $revenueThisMonth = (float) SubscriptionInvoice::where('status', 'paid')
             ->whereYear('paid_at', Carbon::now()->year)
@@ -106,12 +123,16 @@ class SuperAdminController extends Controller
         return view('superadmin.dashboard', compact(
             'totalTenants',
             'activeTenants',
+            'paidActiveTenants',
             'trialTenants',
             'graceTenants',
             'expiredTenants',
             'expiringSoonTenants',
             'monthlyTrend',
             'mrr',
+            'conversionRatePct',
+            'arpu',
+            'platformGmvThisMonth',
             'revenueThisMonth',
             'revenueAllTime',
             'pendingInvoicesCount',
@@ -123,10 +144,12 @@ class SuperAdminController extends Controller
 
     public function tenants(Request $request)
     {
+        // Note: Do NOT use ->limit(5) inside eager-load closure (SQL applies global LIMIT across all parents!).
+        // Slice ->take(5) per tenant in the view instead so every tenant accurately sees its own latest 5 invoices.
         $query = Tenant::with([
             'activeSubscription.plan',
             'users' => fn($q) => $q->orderByRaw("CASE WHEN role = 'admin' THEN 0 ELSE 1 END")->orderBy('id'),
-            'invoices' => fn($q) => $q->with('plan')->latest('id')->limit(5),
+            'invoices' => fn($q) => $q->with('plan')->latest('id'),
         ])->withCount(['users', 'menus', 'transactions']);
 
         if ($request->filled('search')) {
@@ -160,6 +183,15 @@ class SuperAdminController extends Controller
                                  $eq->whereNull('ends_at')->orWhere('ends_at', '>=', $now);
                              });
                       });
+            } elseif ($status === 'grace') {
+                $query->where('is_active', true)
+                      ->where('is_lifetime', false)
+                      ->whereHas('activeSubscription', function ($sq) use ($now) {
+                          $sq->whereNotNull('ends_at')
+                             ->where('ends_at', '<', $now)
+                             ->whereNotNull('grace_ends_at')
+                             ->where('grace_ends_at', '>=', $now);
+                      });
             } elseif ($status === 'expired') {
                 $query->where(function ($q) use ($now) {
                     $q->where('is_active', false)
@@ -168,7 +200,12 @@ class SuperAdminController extends Controller
                              ->where(function ($subQ) use ($now) {
                                  $subQ->whereDoesntHave('activeSubscription')
                                       ->orWhereHas('activeSubscription', function ($sq) use ($now) {
-                                          $sq->whereNotNull('ends_at')->where('ends_at', '<', $now);
+                                          $sq->whereNotNull('ends_at')
+                                             ->where('ends_at', '<', $now)
+                                             ->where(function ($gq) use ($now) {
+                                                 $gq->whereNull('grace_ends_at')
+                                                    ->orWhere('grace_ends_at', '<', $now);
+                                             });
                                       });
                              });
                       });
@@ -225,6 +262,15 @@ class SuperAdminController extends Controller
             );
         }
 
+        PlatformAuditLog::record(
+            'tenant',
+            'create_tenant',
+            'Tenant',
+            $provisioned['tenant']->id,
+            $provisioned['tenant']->name,
+            "Membuat usaha baru {$provisioned['tenant']->name} (owner: {$provisioned['user']->username}, paket: {$plan->name} / {$validated['billing_cycle']})."
+        );
+
         return back()->with('success', "Usaha {$provisioned['tenant']->name} (Owner: {$provisioned['user']->username}) berhasil ditambahkan!");
     }
 
@@ -238,6 +284,15 @@ class SuperAdminController extends Controller
         ]);
 
         $tenant->update($validated);
+
+        PlatformAuditLog::record(
+            'tenant',
+            'update_tenant',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Memperbarui profil usaha {$tenant->name} ({$tenant->business_type})."
+        );
 
         return back()->with('success', "Informasi usaha {$tenant->name} berhasil diperbarui!");
     }
@@ -257,12 +312,22 @@ class SuperAdminController extends Controller
             return back()->with('error', 'Usaha ini terhubung dengan akun Super Admin dan tidak dapat dihapus.');
         }
 
+        $tenantId = $tenant->id;
         $tenantName = $tenant->name;
 
         DB::transaction(function () use ($tenant) {
             User::where('tenant_id', $tenant->id)->delete();
             $tenant->forceDelete();
         });
+
+        PlatformAuditLog::record(
+            'tenant',
+            'delete_tenant',
+            'Tenant',
+            $tenantId,
+            $tenantName,
+            "Menghapus permanen usaha {$tenantName} (ID #{$tenantId}) beserta seluruh data terkait."
+        );
 
         return back()->with('success', "Usaha {$tenantName} beserta seluruh datanya berhasil dihapus secara permanen.");
     }
@@ -286,6 +351,15 @@ class SuperAdminController extends Controller
             'password' => \Illuminate\Support\Facades\Hash::make($validated['new_password']),
         ]);
 
+        PlatformAuditLog::record(
+            'tenant',
+            'reset_owner_password',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Mereset password pemilik usaha {$tenant->name} (username: {$owner->username})."
+        );
+
         return back()->with('success', "Password pemilik {$tenant->name} ({$owner->username}) berhasil direset!");
     }
 
@@ -308,6 +382,15 @@ class SuperAdminController extends Controller
             $validated['notes'] ?? null
         );
 
+        PlatformAuditLog::record(
+            'tenant',
+            'update_subscription',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Mengatur langganan manual {$tenant->name} ke paket {$plan->name} ({$validated['billing_cycle']}" . (!empty($validated['custom_days']) ? ", {$validated['custom_days']} hari" : '') . ').'
+        );
+
         return back()->with('success', "Langganan usaha {$tenant->name} berhasil diperbarui ke paket {$plan->name} ({$validated['billing_cycle']}).");
     }
 
@@ -316,6 +399,15 @@ class SuperAdminController extends Controller
         $tenant->update(['is_active' => !$tenant->is_active]);
         $statusText = $tenant->is_active ? 'diaktifkan kembali' : 'dinonaktifkan (suspend)';
 
+        PlatformAuditLog::record(
+            'tenant',
+            $tenant->is_active ? 'activate_tenant' : 'suspend_tenant',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Status usaha {$tenant->name} {$statusText}."
+        );
+
         return back()->with('success', "Status usaha {$tenant->name} berhasil {$statusText}.");
     }
 
@@ -323,6 +415,15 @@ class SuperAdminController extends Controller
     {
         session(['impersonating_tenant_id' => $tenant->id]);
         TenantContext::set($tenant);
+
+        PlatformAuditLog::record(
+            'impersonate',
+            'impersonate_tenant',
+            'Tenant',
+            $tenant->id,
+            $tenant->name,
+            "Masuk Mode Support (impersonate) ke panel usaha {$tenant->name}."
+        );
 
         return redirect()->route('dashboard')
             ->with('success', "Mode Support aktif: Anda sekarang melihat dashboard sebagai admin {$tenant->name}.");
@@ -339,10 +440,49 @@ class SuperAdminController extends Controller
 
     public function invoices(Request $request)
     {
+        SubscriptionInvoice::expireOverdue();
+
         $query = $this->buildInvoiceQuery($request);
         $invoices = $query->paginate(20)->withQueryString();
+        $allTenants = Tenant::orderBy('name')->get(['id', 'name', 'slug']);
+        $purchasablePlans = Plan::purchasable()->get();
 
-        return view('superadmin.invoices', compact('invoices'));
+        return view('superadmin.invoices', compact('invoices', 'allTenants', 'purchasablePlans'));
+    }
+
+    public function storeInvoice(Request $request)
+    {
+        $validated = $request->validate([
+            'tenant_id' => ['required', 'exists:tenants,id'],
+            'plan_id' => ['required', 'exists:plans,id'],
+            'billing_cycle' => ['required', 'in:monthly,yearly'],
+            'payment_method' => ['required', 'in:qris,transfer'],
+        ]);
+
+        $tenant = Tenant::findOrFail($validated['tenant_id']);
+        $plan = Plan::findOrFail($validated['plan_id']);
+
+        if ($plan->priceForCycle($validated['billing_cycle']) <= 0) {
+            return back()->with('error', 'Pilih paket berbayar yang valid untuk menerbitkan invoice.');
+        }
+
+        $invoice = $this->subscriptionService->createInvoice(
+            $tenant,
+            $plan,
+            $validated['billing_cycle'],
+            $validated['payment_method']
+        );
+
+        PlatformAuditLog::record(
+            'invoice',
+            'create_invoice',
+            'SubscriptionInvoice',
+            $invoice->id,
+            $invoice->invoice_number,
+            "Menerbitkan invoice manual {$invoice->invoice_number} untuk {$tenant->name} ({$plan->name} {$validated['billing_cycle']}, Rp" . number_format((float) $invoice->final_amount, 0, ',', '.') . ').'
+        );
+
+        return back()->with('success', "Invoice {$invoice->invoice_number} untuk {$tenant->name} (Rp" . number_format((float) $invoice->final_amount, 0, ',', '.') . ') berhasil diterbitkan!');
     }
 
     public function exportInvoices(Request $request)
@@ -436,6 +576,15 @@ class SuperAdminController extends Controller
             Auth::id()
         );
 
+        PlatformAuditLog::record(
+            'invoice',
+            'approve_invoice',
+            'SubscriptionInvoice',
+            $invoice->id,
+            $invoice->invoice_number,
+            "Menyetujui lunas invoice {$invoice->invoice_number} ({$invoice->tenant?->name}, Rp" . number_format((float) $invoice->final_amount, 0, ',', '.') . ').'
+        );
+
         return back()->with('success', "Invoice {$invoice->invoice_number} dikonfirmasi LUNAS! Langganan {$invoice->tenant->name} langsung aktif.");
     }
 
@@ -443,6 +592,15 @@ class SuperAdminController extends Controller
     {
         if ($invoice->status === 'unpaid') {
             $invoice->update(['status' => 'cancelled']);
+
+            PlatformAuditLog::record(
+                'invoice',
+                'cancel_invoice',
+                'SubscriptionInvoice',
+                $invoice->id,
+                $invoice->invoice_number,
+                "Membatalkan invoice {$invoice->invoice_number} milik {$invoice->tenant?->name}."
+            );
         }
 
         return back()->with('success', "Invoice {$invoice->invoice_number} dibatalkan.");
@@ -461,6 +619,56 @@ class SuperAdminController extends Controller
         }
 
         return view('superadmin.plans', compact('plans', 'planUsageCounts'));
+    }
+
+    public function storePlan(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'description' => ['nullable', 'string', 'max:255'],
+            'price_monthly' => ['required', 'numeric', 'min:0'],
+            'price_yearly' => ['required', 'numeric', 'min:0'],
+            'max_users' => ['nullable', 'integer', 'min:1'],
+            'max_menus' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $baseSlug = Str::slug($validated['name']) ?: 'paket';
+        $slug = $baseSlug;
+        $idx = 1;
+        while (Plan::where('slug', $slug)->exists()) {
+            $slug = $baseSlug . '-' . $idx++;
+        }
+
+        $plan = Plan::create([
+            'name' => $validated['name'],
+            'slug' => $slug,
+            'description' => $validated['description'] ?? null,
+            'price_monthly' => $validated['price_monthly'],
+            'price_yearly' => $validated['price_yearly'],
+            'max_users' => ($validated['max_users'] ?? null) ?: null,
+            'max_menus' => ($validated['max_menus'] ?? null) ?: null,
+            'is_active' => $request->has('is_active'),
+            'is_featured' => $request->has('is_featured'),
+            'sort_order' => ((int) Plan::max('sort_order')) + 1,
+            'features' => [
+                'offline_sync' => $request->has('feature_offline_sync'),
+                'expenses' => $request->has('feature_expenses'),
+                'pdf_export' => $request->has('feature_pdf_export'),
+                'qris_dynamic' => $request->has('feature_qris_dynamic'),
+                'custom_branding' => true,
+            ],
+        ]);
+
+        PlatformAuditLog::record(
+            'plan',
+            'create_plan',
+            'Plan',
+            $plan->id,
+            $plan->name,
+            "Menambahkan paket baru {$plan->name} (Rp" . number_format((float) $plan->price_monthly, 0, ',', '.') . '/bln).'
+        );
+
+        return back()->with('success', "Paket baru {$plan->name} berhasil ditambahkan!");
     }
 
     public function updatePlan(Request $request, Plan $plan)
@@ -485,8 +693,8 @@ class SuperAdminController extends Controller
             'description' => $validated['description'] ?? null,
             'price_monthly' => $validated['price_monthly'],
             'price_yearly' => $validated['price_yearly'],
-            'max_users' => $validated['max_users'] ?: null,
-            'max_menus' => $validated['max_menus'] ?: null,
+            'max_users' => ($validated['max_users'] ?? null) ?: null,
+            'max_menus' => ($validated['max_menus'] ?? null) ?: null,
             'is_active' => $request->has('is_active'),
             'is_featured' => $request->has('is_featured'),
             'features' => [
@@ -498,7 +706,83 @@ class SuperAdminController extends Controller
             ],
         ]);
 
+        PlatformAuditLog::record(
+            'plan',
+            'update_plan',
+            'Plan',
+            $plan->id,
+            $plan->name,
+            "Memperbarui paket {$plan->name} (Rp" . number_format((float) $plan->price_monthly, 0, ',', '.') . '/bln, Rp' . number_format((float) $plan->price_yearly, 0, ',', '.') . '/thn).'
+        );
+
         return back()->with('success', "Konfigurasi paket {$plan->name} berhasil diperbarui!");
+    }
+
+    public function auditLogs(Request $request)
+    {
+        $query = PlatformAuditLog::with('admin')->latest('id');
+
+        if ($request->filled('category') && in_array($request->category, ['tenant', 'invoice', 'plan', 'settings', 'impersonate'], true)) {
+            $query->where('category', $request->category);
+        }
+
+        if ($request->filled('search')) {
+            $s = trim((string) $request->search);
+            $query->where(function ($q) use ($s) {
+                $q->where('description', 'like', "%{$s}%")
+                  ->orWhere('target_label', 'like', "%{$s}%")
+                  ->orWhere('action', 'like', "%{$s}%");
+            });
+        }
+
+        $logs = $query->paginate(25)->withQueryString();
+
+        return view('superadmin.audit-logs', compact('logs'));
+    }
+
+    public function testPlatformWebhook()
+    {
+        $secret = (string) PlatformSetting::getValue('platform_qris_secret', '');
+        $hasQris = !empty(PlatformSetting::getValue('platform_qris_payload', ''));
+        if (strlen($secret) < 8) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Platform Webhook Secret Key belum valid (minimal 8 karakter).',
+            ], 422);
+        }
+
+        $ts = (string) time();
+        $payload = json_encode(['ping' => true, 'time' => $ts]);
+        $sig = hash_hmac('sha256', $ts . '.' . $payload, $secret);
+        $verified = hash_equals(hash_hmac('sha256', $ts . '.' . $payload, $secret), $sig);
+
+        return response()->json([
+            'status' => $verified ? 'success' : 'error',
+            'message' => $verified
+                ? 'Signature HMAC-SHA256 & konfigurasi endpoint billing siap digunakan!' . ($hasQris ? ' (QRIS Statis Aktif)' : ' (Catatan: Payload QRIS Statis belum diisi)')
+                : 'Gagal memverifikasi signature HMAC.',
+            'webhook_url' => url('/listener/platform/payment'),
+            'has_qris' => $hasQris,
+        ]);
+    }
+
+    public function pruneWebhookLogs()
+    {
+        $deleted = PaymentListenerLog::withoutGlobalScope('tenant')
+            ->where('is_platform_billing', true)
+            ->where('created_at', '<', Carbon::now()->subDays(30))
+            ->delete();
+
+        PlatformAuditLog::record(
+            'settings',
+            'prune_webhook_logs',
+            'PaymentListenerLog',
+            null,
+            'Platform Webhook Logs',
+            "Membersihkan {$deleted} log webhook billing yang berusia lebih dari 30 hari."
+        );
+
+        return back()->with('success', "Berhasil membersihkan {$deleted} log webhook billing yang lebih dari 30 hari.");
     }
 
     public function settings()
@@ -563,6 +847,15 @@ class SuperAdminController extends Controller
         foreach ($validated as $key => $val) {
             PlatformSetting::setValue($key, $val);
         }
+
+        PlatformAuditLog::record(
+            'settings',
+            'update_platform_settings',
+            'PlatformSetting',
+            null,
+            $validated['platform_name'],
+            "Memperbarui pengaturan platform {$validated['platform_name']} (trial: {$validated['trial_days']}h, broadcast: " . ($validated['announcement_enabled'] === '1' ? 'AKTIF' : 'OFF') . ').'
+        );
 
         return back()->with('success', 'Pengaturan Platform & Pembayaran Langganan berhasil disimpan!');
     }

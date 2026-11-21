@@ -48,6 +48,12 @@
                 <span>Pengaturan Platform</span>
             </a>
         </li>
+        <li class="sidebar-item {{ Request::routeIs('superadmin.audit-logs*') ? 'active' : '' }}">
+            <a href="{{ route('superadmin.audit-logs') }}" class="sidebar-link">
+                <i class="fa-solid fa-clipboard-list"></i>
+                <span>Log Aktivitas Audit</span>
+            </a>
+        </li>
         <li class="sidebar-item {{ Request::routeIs('superadmin.update.*') ? 'active' : '' }}">
             <a href="{{ route('superadmin.update.index') }}" class="sidebar-link">
                 <i class="fa-brands fa-github"></i>
@@ -110,6 +116,9 @@
             </li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.settings*') ? 'active' : '' }}">
                 <a href="{{ route('superadmin.settings') }}" class="sidebar-link"><i class="fa-solid fa-sliders"></i><span>Pengaturan Platform</span></a>
+            </li>
+            <li class="sidebar-item {{ Request::routeIs('superadmin.audit-logs*') ? 'active' : '' }}">
+                <a href="{{ route('superadmin.audit-logs') }}" class="sidebar-link"><i class="fa-solid fa-clipboard-list"></i><span>Log Aktivitas Audit</span></a>
             </li>
             <li class="sidebar-item {{ Request::routeIs('superadmin.update.*') ? 'active' : '' }}">
                 <a href="{{ route('superadmin.update.index') }}" class="sidebar-link"><i class="fa-brands fa-github"></i><span>Update Sistem</span></a>

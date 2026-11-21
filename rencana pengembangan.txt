@@ -1,7 +1,10 @@
 RENCANA PENGEMBANGAN FITUR DAN PERBAIKAN;
 
-lakukan analisa, fitur, menu, serta perubahan terakhir yang dilakukan. lakukan brainstorming untuk mendapatkan kritik dan saran. serta berikan ide dan fitur baru atau perbaikan fitur yang sudah ada. lakukan mulai dari role user superadmin (pemilik platform) terlebih dahulu.
+Perbaiki elemen yang kurang efisien. seperti, tombol aksi yang ditampilkan semua, seharusnya bisa dibuat style hamburger.
 
+elemen card paket, dll.
+
+intinya, lekukan evaluasi elemen dan tampilan untuk lebih efisien dan lebih baik lagi.
 
 
 BACA!!! CATATAN UNTUK KAMU:

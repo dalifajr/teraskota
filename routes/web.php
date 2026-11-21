@@ -125,15 +125,21 @@ Route::middleware('auth')->group(function () {
             Route::post('/tenants/{tenant}/impersonate', [SuperAdminController::class, 'impersonateTenant'])->name('tenants.impersonate');
 
             Route::get('/invoices', [SuperAdminController::class, 'invoices'])->name('invoices');
+            Route::post('/invoices', [SuperAdminController::class, 'storeInvoice'])->name('invoices.store');
             Route::get('/invoices/export', [SuperAdminController::class, 'exportInvoices'])->name('invoices.export');
             Route::post('/invoices/{invoice}/approve', [SuperAdminController::class, 'approveInvoice'])->name('invoices.approve');
             Route::post('/invoices/{invoice}/cancel', [SuperAdminController::class, 'cancelInvoice'])->name('invoices.cancel');
 
             Route::get('/plans', [SuperAdminController::class, 'plans'])->name('plans');
+            Route::post('/plans', [SuperAdminController::class, 'storePlan'])->name('plans.store');
             Route::put('/plans/{plan}', [SuperAdminController::class, 'updatePlan'])->name('plans.update');
+
+            Route::get('/audit-logs', [SuperAdminController::class, 'auditLogs'])->name('audit-logs');
 
             Route::get('/settings', [SuperAdminController::class, 'settings'])->name('settings');
             Route::put('/settings', [SuperAdminController::class, 'updateSettings'])->name('settings.update');
+            Route::post('/settings/test-webhook', [SuperAdminController::class, 'testPlatformWebhook'])->name('settings.test-webhook');
+            Route::post('/settings/prune-webhook-logs', [SuperAdminController::class, 'pruneWebhookLogs'])->name('settings.prune-logs');
 
             // System Update via GitHub (Super Admin Only)
             Route::get('/system-update', [SystemUpdateController::class, 'index'])->name('update.index');

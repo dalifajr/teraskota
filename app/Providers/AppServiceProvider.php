@@ -73,6 +73,7 @@ class AppServiceProvider extends ServiceProvider
                 $pendingInvoicesBadgeCount = 0;
                 if ($user && $user->isSuperAdmin() && !$isImpersonating) {
                     try {
+                        SubscriptionInvoice::expireOverdue();
                         $pendingInvoicesBadgeCount = SubscriptionInvoice::where('status', 'unpaid')->count();
                     } catch (\Throwable $e) {
                         $pendingInvoicesBadgeCount = 0;

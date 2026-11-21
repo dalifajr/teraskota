@@ -66,6 +66,46 @@
     </div>
 </div>
 
+<!-- Advanced SaaS Business Metrics Strip -->
+<div class="row g-3 mb-4" style="font-variant-numeric: tabular-nums;">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block">Trial Conversion Rate</small>
+                    <h4 class="fw-bold text-success mt-1 mb-0">{{ number_format($conversionRatePct ?? 0, 1) }}%</h4>
+                    <small class="text-muted">{{ $paidActiveTenants ?? 0 }} usaha berbayar aktif</small>
+                </div>
+                <div class="rounded-3 bg-success bg-opacity-10 text-success p-2 fs-5"><i class="fa-solid fa-bullseye"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block">ARPU (Avg. Revenue / Tenant)</small>
+                    <h4 class="fw-bold text-primary mt-1 mb-0">Rp{{ number_format($arpu ?? 0, 0, ',', '.') }}</h4>
+                    <small class="text-muted">Rata-rata nilai langganan / bulan</small>
+                </div>
+                <div class="rounded-3 bg-primary bg-opacity-10 text-primary p-2 fs-5"><i class="fa-solid fa-coins"></i></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-4 p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="text-uppercase text-muted fw-bold d-block">GMV POS Global (Bulan Ini)</small>
+                    <h4 class="fw-bold text-dark mt-1 mb-0">Rp{{ number_format($platformGmvThisMonth ?? 0, 0, ',', '.') }}</h4>
+                    <small class="text-muted">Total volume penjualan seluruh tenant</small>
+                </div>
+                <div class="rounded-3 bg-warning bg-opacity-10 text-warning p-2 fs-5"><i class="fa-solid fa-cash-register"></i></div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Row 2: 6-Month SaaS Growth Chart + Expiring Soon Watchlist -->
 <div class="row g-4 mb-4">
     <div class="col-lg-7">

@@ -894,4 +894,88 @@ class SaasMultiTenantTest extends TestCase
         $this->assertStringContainsString('kasirloka-pos-v3', $swJs);
         $this->assertStringContainsString("url.pathname === '/pos'", $swJs);
     }
+
+    public function test_super_admin_round2_bugfixes_audit_trail_manual_invoice_new_plan_and_webhook_ping(): void
+    {
+        $subService = app(SubscriptionService::class);
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $tenantAdmin = User::where('username', 'admin')->firstOrFail();
+        $proPlan = Plan::where('slug', 'pro')->firstOrFail();
+
+        // Provision 2 tenants & create invoices for both (verifying eager-load fix without SQL global limit(5))
+        $t1 = $subService->provisionTenant(
+            ['name' => 'Tenant Audit Satu', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Owner T1', 'username' => 't1_owner', 'email' => 't1@test.id', 'password' => 'secret123'],
+            false
+        );
+        $t2 = $subService->provisionTenant(
+            ['name' => 'Tenant Audit Dua', 'business_type' => 'Warung Makan / Resto'],
+            ['name' => 'Owner T2', 'username' => 't2_owner', 'email' => 't2@test.id', 'password' => 'secret123'],
+            false
+        );
+
+        // 1. Super Admin creates manual invoices for both tenants via POST /superadmin/invoices
+        $this->actingAs($superAdmin)->post('/superadmin/invoices', [
+            'tenant_id' => $t1['tenant']->id,
+            'plan_id' => $proPlan->id,
+            'billing_cycle' => 'monthly',
+            'payment_method' => 'transfer',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->actingAs($superAdmin)->post('/superadmin/invoices', [
+            'tenant_id' => $t2['tenant']->id,
+            'plan_id' => $proPlan->id,
+            'billing_cycle' => 'yearly',
+            'payment_method' => 'qris',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $inv1 = SubscriptionInvoice::where('tenant_id', $t1['tenant']->id)->latest('id')->firstOrFail();
+        $inv2 = SubscriptionInvoice::where('tenant_id', $t2['tenant']->id)->latest('id')->firstOrFail();
+
+        // Verify both tenants' invoices render in /superadmin/tenants (eager load bug fixed)
+        $this->actingAs($superAdmin)->get('/superadmin/tenants')
+            ->assertStatus(200)
+            ->assertSee($inv1->invoice_number)
+            ->assertSee($inv2->invoice_number);
+
+        // 2. Overdue unpaid invoice automatically transitions to 'expired' when Super Admin opens /superadmin/invoices
+        $inv1->update(['qris_expired_at' => Carbon::now()->subHours(2)]);
+        $this->actingAs($superAdmin)->get('/superadmin/invoices')->assertStatus(200);
+        $this->assertEquals('expired', $inv1->fresh()->status);
+
+        // 3. Super Admin creates a brand new tier plan via POST /superadmin/plans
+        $this->actingAs($superAdmin)->post('/superadmin/plans', [
+            'name' => 'Enterprise Multi',
+            'description' => 'Untuk jaringan outlet besar',
+            'price_monthly' => 149000,
+            'price_yearly' => 1490000,
+            'max_users' => 50,
+            'feature_qris_dynamic' => '1',
+            'feature_offline_sync' => '1',
+            'feature_expenses' => '1',
+            'feature_pdf_export' => '1',
+            'is_active' => '1',
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseHas('plans', ['name' => 'Enterprise Multi', 'slug' => 'enterprise-multi']);
+
+        // 4. Dashboard displays SaaS business metrics (Conversion Rate, ARPU, GMV)
+        $this->actingAs($superAdmin)->get('/superadmin')
+            ->assertStatus(200)
+            ->assertSee('Trial Conversion Rate')
+            ->assertSee('ARPU')
+            ->assertSee('GMV POS Global');
+
+        // 5. Live Webhook Test Ping endpoint returns success JSON
+        $this->actingAs($superAdmin)->postJson('/superadmin/settings/test-webhook')
+            ->assertStatus(200)
+            ->assertJson(['status' => 'success']);
+
+        // 6. Audit Trail records actions & restricts access to Super Admin only
+        $this->actingAs($tenantAdmin)->get('/superadmin/audit-logs')->assertRedirect('/dashboard');
+        $this->actingAs($superAdmin)->get('/superadmin/audit-logs')
+            ->assertStatus(200)
+            ->assertSee($inv1->invoice_number)
+            ->assertSee('Enterprise Multi');
+    }
 }

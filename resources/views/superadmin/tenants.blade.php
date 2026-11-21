@@ -17,6 +17,7 @@
                 <a href="{{ route('superadmin.tenants', array_filter(['search' => request('search')])) }}" class="btn {{ $currentStatusFilter === '' ? 'btn-dark' : 'btn-outline-secondary' }}">Semua</a>
                 <a href="{{ route('superadmin.tenants', array_filter(['status' => 'active', 'search' => request('search')])) }}" class="btn {{ $currentStatusFilter === 'active' ? 'btn-success' : 'btn-outline-success' }}">Aktif</a>
                 <a href="{{ route('superadmin.tenants', array_filter(['status' => 'trial', 'search' => request('search')])) }}" class="btn {{ $currentStatusFilter === 'trial' ? 'btn-info text-dark fw-semibold' : 'btn-outline-info text-dark' }}">Trial</a>
+                <a href="{{ route('superadmin.tenants', array_filter(['status' => 'grace', 'search' => request('search')])) }}" class="btn {{ $currentStatusFilter === 'grace' ? 'btn-warning text-dark fw-semibold' : 'btn-outline-warning text-dark' }}">Grace</a>
                 <a href="{{ route('superadmin.tenants', array_filter(['status' => 'expired', 'search' => request('search')])) }}" class="btn {{ $currentStatusFilter === 'expired' ? 'btn-danger' : 'btn-outline-danger' }}">Expired</a>
             </div>
         </div>
@@ -226,7 +227,7 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse($tenant->invoices as $tInv)
+                                @forelse($tenant->invoices->take(5) as $tInv)
                                     <tr>
                                         <td class="font-monospace">{{ $tInv->invoice_number }}</td>
                                         <td>{{ $tInv->plan?->name ?? '-' }} ({{ $tInv->billing_cycle }})</td>

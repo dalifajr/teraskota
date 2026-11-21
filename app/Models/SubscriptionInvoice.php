@@ -63,4 +63,15 @@ class SubscriptionInvoice extends Model
     {
         return $this->status === 'unpaid';
     }
+
+    /**
+     * Automatically mark overdue unpaid invoices as expired.
+     */
+    public static function expireOverdue(): int
+    {
+        return static::where('status', 'unpaid')
+            ->whereNotNull('qris_expired_at')
+            ->where('qris_expired_at', '<', now())
+            ->update(['status' => 'expired']);
+    }
 }

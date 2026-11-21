@@ -147,7 +147,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="mb-0">
+                <div class="mb-3">
                     <label class="fw-bold d-block mb-1">Secret Key Aktif:</label>
                     <div class="input-group input-group-sm">
                         <input type="text" id="copySecretKey" class="form-control font-monospace bg-light" value="{{ $settings['platform_qris_secret'] }}" readonly>
@@ -156,14 +156,25 @@
                         </button>
                     </div>
                 </div>
+                <button type="button" class="btn btn-sm btn-outline-success w-100 fw-semibold" id="btnTestPlatformWebhook">
+                    <i class="fa-solid fa-plug-circle-check me-1"></i>Uji Koneksi &amp; Signature Webhook (Live)
+                </button>
             </div>
         </div>
 
         <!-- Platform Billing Webhook Audit Logs -->
         <div class="card border-0 shadow-sm rounded-4">
-            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center gap-2">
                 <h6 class="fw-bold m-0"><i class="fa-solid fa-satellite-dish text-primary me-2"></i>Log Webhook Billing Terbaru</h6>
-                <span class="badge bg-light text-dark border">{{ $platformWebhookLogs->count() }} log</span>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-light text-dark border">{{ $platformWebhookLogs->count() }} log</span>
+                    <form action="{{ route('superadmin.settings.prune-logs') }}" method="POST" class="d-inline" data-confirm="Hapus log webhook billing yang berusia lebih dari 30 hari?">
+                        @csrf
+                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2" title="Bersihkan log lama (>30 hari)">
+                            <i class="fa-solid fa-broom"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
             <div class="table-responsive" style="max-height: 360px; overflow-y: auto;">
                 <table class="table table-hover align-middle mb-0 small" style="font-variant-numeric: tabular-nums;">
@@ -235,6 +246,35 @@
                 btn.innerHTML = '<i class="fa-solid fa-check text-success"></i>';
                 setTimeout(() => { btn.innerHTML = prev; }, 1400);
             });
+        });
+
+        // Test Platform Webhook Live Ping
+        document.getElementById('btnTestPlatformWebhook')?.addEventListener('click', async function () {
+            const btn = this;
+            const prev = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Menguji...';
+            try {
+                const res = await fetch("{{ route('superadmin.settings.test-webhook') }}", {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                    }
+                });
+                const data = await res.json();
+                Swal.fire({
+                    icon: res.ok && data.status === 'success' ? 'success' : 'error',
+                    title: res.ok ? 'Webhook Billing Siap!' : 'Verifikasi Gagal',
+                    text: data.message || 'Tidak dapat menghubungi server.',
+                    confirmButtonColor: '#14532d'
+                });
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'Gagal Menguji', text: 'Terjadi kesalahan jaringan.' });
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = prev;
+            }
         });
 
         // Generate 32-char cryptographic random hex secret
