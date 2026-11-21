@@ -1,7 +1,11 @@
 @extends('layouts.app')
 
 @php
-    $roleTitle = $user->isSuperAdmin() ? 'Profil Super Admin' : ($user->isKasir() ? 'Profil Kasir' : 'Profil Akun Usaha');
+    $isSuperAdminOnly = $user->isSuperAdmin() && !($isImpersonatingTenant ?? false);
+    $roleTitle = $isSuperAdminOnly ? 'Profil Super Admin' : ($user->isKasir() ? 'Profil Kasir' : 'Profil Akun Usaha');
+    $cancelUrl = $isSuperAdminOnly
+        ? route('superadmin.dashboard')
+        : ($user->isKasir() ? route('pos.index') : route('dashboard'));
 @endphp
 @section('title', $roleTitle)
 @section('page_title', $roleTitle)
@@ -33,7 +37,7 @@
                     @csrf
                     @method('PUT')
 
-                    <div class="row mb-3">
+                    <div class="row mb-3 g-3">
                         <div class="col-md-6">
                             <label for="name" class="form-label fw-semibold text-dark">Nama Lengkap <span class="text-danger">*</span></label>
                             <input type="text" name="name" id="name" class="form-control" value="{{ old('name', $user->name) }}" required autocomplete="name">
@@ -53,20 +57,30 @@
 
                     <h6 class="fw-bold text-success mb-3"><i class="fa-solid fa-lock me-1"></i> Ubah Password (Opsional)</h6>
                     
-                    <div class="row mb-4">
+                    <div class="row mb-4 g-3">
                         <div class="col-md-6">
                             <label for="password" class="form-label fw-semibold text-dark">Password Baru</label>
-                            <input type="password" name="password" id="password" class="form-control" placeholder="Kosongkan jika tidak ingin diubah">
+                            <div class="input-group">
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Kosongkan jika tidak ingin diubah" autocomplete="new-password">
+                                <button type="button" class="btn btn-outline-secondary js-toggle-pwd" data-target="password" aria-label="Tampilkan atau sembunyikan password baru">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
                             <small class="text-muted">Minimal 6 karakter.</small>
                         </div>
                         <div class="col-md-6">
                             <label for="password_confirmation" class="form-label fw-semibold text-dark">Konfirmasi Password Baru</label>
-                            <input type="password" name="password_confirmation" id="password_confirmation" class="form-control" placeholder="Ulangi password baru">
+                            <div class="input-group">
+                                <input type="password" name="password_confirmation" id="password_confirmation" class="form-control" placeholder="Ulangi password baru" autocomplete="new-password">
+                                <button type="button" class="btn btn-outline-secondary js-toggle-pwd" data-target="password_confirmation" aria-label="Tampilkan atau sembunyikan konfirmasi password">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <div class="d-flex gap-2">
-                        <a href="{{ route('dashboard') }}" class="btn btn-outline-secondary px-4"><i class="fa-solid fa-xmark me-1"></i> Batal</a>
+                        <a href="{{ $cancelUrl }}" class="btn btn-outline-secondary px-4"><i class="fa-solid fa-xmark me-1"></i> Batal</a>
                         <button type="submit" class="btn btn-primary-green px-4"><i class="fa-solid fa-save me-1"></i> Simpan Profil</button>
                     </div>
                 </form>
@@ -75,4 +89,20 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.querySelectorAll('.js-toggle-pwd').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const input = document.getElementById(btn.getAttribute('data-target'));
+            const icon = btn.querySelector('i');
+            if (!input || !icon) return;
+            const isPwd = input.type === 'password';
+            input.type = isPwd ? 'text' : 'password';
+            icon.classList.toggle('fa-eye', !isPwd);
+            icon.classList.toggle('fa-eye-slash', isPwd);
+        });
+    });
+</script>
 @endsection

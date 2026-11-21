@@ -832,4 +832,66 @@ class SaasMultiTenantTest extends TestCase
         $starterPos->assertStatus(200)
             ->assertSee('PRO');
     }
+
+    public function test_public_auth_profile_and_pwa_security_upgrades(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+        $tenantAdmin = User::where('username', 'admin')->firstOrFail();
+        $cashier = User::where('username', 'kasir')->firstOrFail();
+
+        // 1. Dynamic trialDays & Support WhatsApp rendered on Landing Page & Login
+        PlatformSetting::setValue('trial_days', '21');
+        PlatformSetting::setValue('support_whatsapp', '081277778888');
+
+        $this->get('/')
+            ->assertStatus(200)
+            ->assertSee('Gratis Uji Coba 21 Hari')
+            ->assertSee('https://wa.me/6281277778888');
+
+        $this->get('/login')
+            ->assertStatus(200)
+            ->assertSee('Daftar Gratis 21 Hari')
+            ->assertSee('https://wa.me/6281277778888');
+
+        // 2. Login brute-force rate limiting (5 failed attempts -> 6th blocked)
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/login', [
+                'username' => 'brute_target_user',
+                'password' => 'wrongpass',
+            ])->assertSessionHasErrors('username');
+        }
+
+        $throttled = $this->post('/login', [
+            'username' => 'brute_target_user',
+            'password' => 'wrongpass',
+        ]);
+        $throttled->assertSessionHasErrors('username');
+        $this->assertStringContainsString('Terlalu banyak percobaan masuk gagal', session('errors')->first('username'));
+        \Illuminate\Support\Facades\RateLimiter::clear('login:brute_target_user|127.0.0.1');
+
+        // 3. Profile Cancel URL is role-aware (no broken redirect for Super Admin or Kasir)
+        $this->actingAs($superAdmin)->get('/profile')
+            ->assertStatus(200)
+            ->assertSee('href="' . route('superadmin.dashboard') . '"', false);
+
+        $this->actingAs($cashier)->get('/profile')
+            ->assertStatus(200)
+            ->assertSee('href="' . route('pos.index') . '"', false);
+
+        $this->actingAs($tenantAdmin)->get('/profile')
+            ->assertStatus(200)
+            ->assertSee('href="' . route('dashboard') . '"', false);
+
+        // 4. White-label PWA assets clean of Teras Kota & SW caches only /pos HTML
+        $manifest = file_get_contents(public_path('manifest.webmanifest'));
+        $offlineHtml = file_get_contents(public_path('offline.html'));
+        $swJs = file_get_contents(public_path('service-worker.js'));
+
+        $this->assertStringContainsString('KasirLoka POS', $manifest);
+        $this->assertStringNotContainsString('Teras Kota', $manifest);
+        $this->assertStringContainsString('KasirLoka POS', $offlineHtml);
+        $this->assertStringNotContainsString('Teras Kota', $offlineHtml);
+        $this->assertStringContainsString('kasirloka-pos-v3', $swJs);
+        $this->assertStringContainsString("url.pathname === '/pos'", $swJs);
+    }
 }

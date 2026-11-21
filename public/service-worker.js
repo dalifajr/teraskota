@@ -1,4 +1,4 @@
-const CACHE_NAME = 'teraskota-pos-v2';
+const CACHE_NAME = 'kasirloka-pos-v3';
 
 const STATIC_ASSETS = [
     '/manifest.webmanifest',
@@ -6,6 +6,8 @@ const STATIC_ASSETS = [
     '/icons/icon-192.png',
     '/icons/icon-512.png',
     '/assets/css/custom.css',
+    '/assets/js/ui-transitions.js',
+    '/assets/js/qrcode.min.js',
     '/assets/js/offline-db.js',
     '/assets/js/sync-manager.js',
     '/assets/js/receipt.js',
@@ -15,11 +17,10 @@ const STATIC_ASSETS = [
     'https://cdn.jsdelivr.net/npm/sweetalert2@11'
 ];
 
-// Install: Cache critical assets
+// Install: Cache critical static assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            // Use allSettled approach so one failing optional CDN asset doesn't fail SW installation
             return Promise.allSettled(
                 STATIC_ASSETS.map((url) => {
                     return fetch(url, { mode: 'cors' })
@@ -28,10 +29,7 @@ self.addEventListener('install', (event) => {
                                 return cache.put(url, res);
                             }
                         })
-                        .catch(() => {
-                            // Fallback for relative paths
-                            return cache.add(url).catch(() => {});
-                        });
+                        .catch(() => cache.add(url).catch(() => {}));
                 })
             );
         })
@@ -39,7 +37,7 @@ self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// Activate: Clean up old caches
+// Activate: Clean up old caches (e.g., teraskota-pos-v2)
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => {
@@ -50,11 +48,10 @@ self.addEventListener('activate', (event) => {
     );
 });
 
-// Fetch handling
+// Fetch handling (Multi-Tenant Safe: ONLY /pos HTML is cached for offline cashier usage)
 self.addEventListener('fetch', (event) => {
     const request = event.request;
 
-    // Do not intercept non-GET requests (e.g., checkout/sync POSTs)
     if (request.method !== 'GET') {
         return;
     }
@@ -63,29 +60,25 @@ self.addEventListener('fetch', (event) => {
 
     // Navigation requests (HTML pages)
     if (request.mode === 'navigate') {
+        const isOfflinePosRoute = url.origin === location.origin && url.pathname === '/pos';
+
         event.respondWith(
             fetch(request)
                 .then((networkResponse) => {
-                    if (networkResponse && networkResponse.status === 200) {
+                    // Multi-tenant privacy guard: NEVER cache /superadmin, /dashboard, /billing, /transactions, /login, etc.
+                    if (isOfflinePosRoute && networkResponse && networkResponse.status === 200) {
                         const responseClone = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
-                            cache.put(request, responseClone);
+                            cache.put('/pos', responseClone);
                         });
                     }
                     return networkResponse;
                 })
                 .catch(async () => {
-                    // Try to match cached page (especially /pos)
-                    const cachedResponse = await caches.match(request);
-                    if (cachedResponse) {
-                        return cachedResponse;
-                    }
-                    // Also try matching '/pos' explicitly if navigated to root or pos
-                    if (url.pathname === '/pos' || url.pathname === '/') {
+                    if (isOfflinePosRoute) {
                         const posCached = await caches.match('/pos');
                         if (posCached) return posCached;
                     }
-                    // Fallback to offline page
                     return caches.match('/offline.html');
                 })
         );
@@ -95,7 +88,7 @@ self.addEventListener('fetch', (event) => {
     // Static assets & CDN (CSS, JS, Fonts, Images)
     if (
         STATIC_ASSETS.includes(request.url) ||
-        url.origin === location.origin && (
+        (url.origin === location.origin && (
             url.pathname.startsWith('/assets/') ||
             url.pathname.startsWith('/icons/') ||
             url.pathname.endsWith('.css') ||
@@ -104,7 +97,7 @@ self.addEventListener('fetch', (event) => {
             url.pathname.endsWith('.jpg') ||
             url.pathname.endsWith('.svg') ||
             url.pathname.endsWith('.woff2')
-        ) ||
+        )) ||
         url.hostname.includes('cdn.jsdelivr.net') ||
         url.hostname.includes('cdnjs.cloudflare.com') ||
         url.hostname.includes('fonts.googleapis.com') ||
@@ -113,7 +106,6 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             caches.match(request).then((cachedResponse) => {
                 if (cachedResponse) {
-                    // Return cached asset, revalidate in background if online
                     fetch(request).then((networkResponse) => {
                         if (networkResponse && networkResponse.status === 200) {
                             caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse));
@@ -128,16 +120,9 @@ self.addEventListener('fetch', (event) => {
                         caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
                     }
                     return networkResponse;
-                }).catch(() => {
-                    // Asset unavailable offline and not in cache
-                });
+                }).catch(() => {});
             })
         );
         return;
     }
-
-    // Default: network with cache fallback
-    event.respondWith(
-        fetch(request).catch(() => caches.match(request))
-    );
 });

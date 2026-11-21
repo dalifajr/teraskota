@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="{{ $platformName ?? 'KasirLoka' }} — {{ $platformTagline ?? 'Aplikasi Kasir POS & Keuangan UMKM Anti-Offline' }}. Struk thermal & WhatsApp, QRIS Dinamis Auto-Verify, dan laporan laba bersih otomatis.">
+    <link rel="manifest" href="{{ asset('manifest.webmanifest') }}">
+    <meta name="theme-color" content="#14532d">
+    <link rel="apple-touch-icon" href="{{ asset('icons/icon-192.png') }}">
     <title>{{ $platformName ?? 'KasirLoka' }} — {{ $platformTagline ?? 'Aplikasi Kasir POS & Keuangan UMKM' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -149,6 +153,13 @@
                     <p class="lead text-white-50 mb-4" style="max-width: 600px;">
                         {{ $platformTagline }}. Dirancang khusus untuk kedai minuman, kopi, warung makan, dan UMKM agar tetap melayani pembeli meski sinyal hilang—lengkap dengan QRIS Dinamis verifikasi otomatis.
                     </p>
+                    @php
+                        $landingWaClean = preg_replace('/[^0-9]/', '', (string) ($supportWhatsapp ?? ''));
+                        if (str_starts_with($landingWaClean, '0')) {
+                            $landingWaClean = '62' . substr($landingWaClean, 1);
+                        }
+                        $landingWaMsg = 'Halo Admin ' . ($platformName ?? 'KasirLoka') . ', saya ingin bertanya mengenai paket dan fitur kasir POS untuk usaha saya.';
+                    @endphp
                     <div class="d-flex flex-wrap gap-3 mb-4">
                         <a href="{{ route('register') }}" class="btn btn-kl-lime btn-lg px-4 rounded-pill shadow">
                             <i class="fa-solid fa-rocket me-2"></i>Daftar Usaha Sekarang
@@ -156,11 +167,16 @@
                         <a href="#harga" class="btn btn-outline-light btn-lg px-4 rounded-pill">
                             Lihat Harga Paket
                         </a>
+                        @if($landingWaClean !== '')
+                            <a href="https://wa.me/{{ $landingWaClean }}?text={{ urlencode($landingWaMsg) }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-lg px-4 rounded-pill shadow-sm">
+                                <i class="fa-brands fa-whatsapp me-2"></i>Tanya via WA
+                            </a>
+                        @endif
                     </div>
                     <div class="d-flex flex-wrap gap-4 small text-white-50">
                         <span><i class="fa-solid fa-circle-check text-warning me-1"></i>Jalan di HP, Tablet &amp; Laptop</span>
-                        <span><i class="fa-solid fa-circle-check text-warning me-1"></i>Struk Thermal 58mm/80mm</span>
-                        <span><i class="fa-solid fa-circle-check text-warning me-1"></i>Siap Pakai 2 Menit</span>
+                        <span><i class="fa-solid fa-circle-check text-warning me-1"></i>Struk Thermal &amp; Kirim WA Rp0</span>
+                        <span><i class="fa-solid fa-circle-check text-warning me-1"></i>Hold Pesanan &amp; Siap Pakai 2 Menit</span>
                     </div>
                 </div>
                 <div class="col-lg-5">
@@ -239,10 +255,10 @@
                 </div>
                 <div class="col-md-6 col-lg-4">
                     <div class="feature-card">
-                        <div class="feature-icon"><i class="fa-solid fa-store"></i></div>
-                        <h5 class="fw-bold">Struk &amp; PDF Nama Toko Anda</h5>
+                        <div class="feature-icon"><i class="fa-brands fa-whatsapp"></i></div>
+                        <h5 class="fw-bold">Struk Thermal &amp; Digital WhatsApp</h5>
                         <p class="text-muted small mb-0">
-                            Atur sendiri nama usaha, logo, alamat, telepon, dan pesan penutup pada struk thermal 58mm/80mm serta laporan PDF bulanan Anda.
+                            Atur sendiri nama usaha, logo, alamat, dan footer struk Anda. Cetak lewat printer thermal 58mm/80mm atau kirim struk digital langsung ke WhatsApp pelanggan tanpa biaya API.
                         </p>
                     </div>
                 </div>
@@ -292,7 +308,7 @@
                             <h4 class="fw-bold mb-1">{{ $plan->name }}</h4>
                             <p class="text-muted small mb-4">{{ $plan->description }}</p>
 
-                            <div class="mb-4">
+                            <div class="mb-4" style="font-variant-numeric: tabular-nums;">
                                 <span class="display-6 fw-bold text-dark price-display"
                                       data-monthly="Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}"
                                       data-yearly="Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}">
@@ -304,9 +320,9 @@
                             <ul class="list-unstyled d-grid gap-2 mb-4 small">
                                 <li><i class="fa-solid fa-check text-success me-2"></i>{{ $plan->max_users ? "Hingga {$plan->max_users} akun pengguna (Admin & Kasir)" : 'Akun pengguna tanpa batas' }}</li>
                                 <li><i class="fa-solid fa-check text-success me-2"></i>{{ $plan->max_menus ? "Hingga {$plan->max_menus} menu produk" : 'Jumlah menu produk tanpa batas' }}</li>
-                                <li><i class="fa-solid fa-check text-success me-2"></i>Kasir POS Offline-First + Auto Sync</li>
-                                <li><i class="fa-solid fa-check text-success me-2"></i>Struk Thermal &amp; Laporan PDF nama toko sendiri</li>
-                                <li><i class="fa-solid fa-check text-success me-2"></i>Pencatatan Pengeluaran Kas &amp; Laba Bersih</li>
+                                <li><i class="fa-solid fa-check text-success me-2"></i>Kasir POS Offline-First, Hold Order &amp; Auto Sync</li>
+                                <li><i class="fa-solid fa-check text-success me-2"></i>Struk Thermal, Kirim Struk WA &amp; PDF nama toko sendiri</li>
+                                <li><i class="fa-solid fa-check text-success me-2"></i>Pengeluaran Kas, Estimasi Kas Laci &amp; Laba Bersih</li>
                                 @if($plan->hasFeature('qris_dynamic'))
                                     <li class="fw-semibold text-success"><i class="fa-solid fa-star text-warning me-2"></i>QRIS Dinamis + Auto-Verify Android Listener</li>
                                 @else
@@ -375,6 +391,13 @@
     <footer class="py-4 bg-dark text-white-50 text-center">
         <div class="container">
             <div class="fw-bold text-white mb-1">{{ $platformName ?? 'KasirLoka' }}</div>
+            @if(!empty($landingWaClean))
+                <div class="mb-2">
+                    <a href="https://wa.me/{{ $landingWaClean }}?text={{ urlencode($landingWaMsg) }}" target="_blank" rel="noopener noreferrer" class="text-success text-decoration-none small fw-semibold">
+                        <i class="fa-brands fa-whatsapp me-1"></i>Hubungi Tim Support WhatsApp
+                    </a>
+                </div>
+            @endif
             <small>&copy; {{ date('Y') }} {{ $platformName ?? 'KasirLoka' }}. Seluruh hak cipta dilindungi.</small>
         </div>
     </footer>

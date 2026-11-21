@@ -162,8 +162,15 @@
                 @enderror
             </div>
 
-            <!-- Remember Me -->
-            <div class="d-flex justify-content-between align-items-center mb-4">
+            <!-- Remember Me & Support Help -->
+            @php
+                $supportWaClean = preg_replace('/[^0-9]/', '', (string) ($supportWhatsapp ?? ''));
+                if (str_starts_with($supportWaClean, '0')) {
+                    $supportWaClean = '62' . substr($supportWaClean, 1);
+                }
+                $forgotWaMsg = 'Halo Admin ' . ($platformName ?? 'KasirLoka') . ', saya lupa kata sandi akun saya dan butuh bantuan reset password.';
+            @endphp
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
                 <div class="form-check">
                     <input
                         class="form-check-input"
@@ -176,6 +183,11 @@
                         Ingat saya di perangkat ini
                     </label>
                 </div>
+                @if($supportWaClean !== '')
+                    <a href="https://wa.me/{{ $supportWaClean }}?text={{ urlencode($forgotWaMsg) }}" target="_blank" rel="noopener noreferrer" class="small text-success text-decoration-none fw-semibold">
+                        <i class="fa-brands fa-whatsapp me-1"></i>Lupa Sandi?
+                    </a>
+                @endif
             </div>
 
             <!-- Submit Button -->
@@ -188,7 +200,7 @@
         <div class="text-center mt-4 pt-3 border-top">
             <p class="small text-muted mb-2">
                 Belum punya akun usaha?
-                <a href="{{ route('register') }}" class="fw-bold text-success text-decoration-none">Daftar Gratis 14 Hari</a>
+                <a href="{{ route('register') }}" class="fw-bold text-success text-decoration-none">Daftar Gratis {{ $trialDays ?? 14 }} Hari</a>
             </p>
             <small class="text-muted d-block">
                 <a href="{{ route('landing') }}" class="text-muted text-decoration-none me-2"><i class="fa-solid fa-arrow-left me-1"></i>Beranda</a>

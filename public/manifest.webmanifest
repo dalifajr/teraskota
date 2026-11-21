@@ -1,8 +1,8 @@
 {
     "id": "/pos",
-    "name": "POS Kasir Teras Kota",
-    "short_name": "Teras Kota POS",
-    "description": "Terminal Kasir Offline-First Teras Kota Berlian Makmur",
+    "name": "KasirLoka POS — Kasir & Keuangan UMKM",
+    "short_name": "KasirLoka POS",
+    "description": "Aplikasi Kasir POS Offline-First, QRIS Dinamis Auto-Verify & Laporan Laba Bersih UMKM",
     "start_url": "/pos",
     "scope": "/",
     "display": "standalone",
