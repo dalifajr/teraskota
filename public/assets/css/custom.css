@@ -1042,3 +1042,249 @@ body {
     border-radius: inherit;
 }
 
+/* ==========================================================================
+   7. EFFICIENT UI COMPONENTS: ACTION HAMBURGER MENU, PLAN CARDS & METRIC STRIP
+   ========================================================================== */
+.kl-action-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.35rem;
+}
+
+.kl-action-btn {
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background-color: #ffffff;
+    color: #334155;
+    transition: background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.kl-action-btn:hover,
+.kl-action-btn[aria-expanded="true"] {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+    color: var(--primary-green);
+}
+
+.kl-action-btn:focus-visible {
+    outline: 2px solid var(--accent-green);
+    outline-offset: 2px;
+}
+
+.kl-action-btn::after {
+    display: none !important;
+}
+
+.kl-action-menu {
+    min-width: 205px;
+    padding: 0.45rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 14px;
+    box-shadow: 0 16px 36px -8px rgba(15, 23, 42, 0.18), 0 4px 12px rgba(15, 23, 42, 0.06);
+    z-index: 1055 !important;
+    background-color: #ffffff;
+}
+
+.kl-action-menu .dropdown-header {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #94a3b8;
+    padding: 0.35rem 0.65rem 0.25rem;
+}
+
+.kl-action-menu .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0.7rem;
+    border-radius: 9px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    color: #1e293b;
+    transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.kl-action-menu .dropdown-item i {
+    width: 16px;
+    text-align: center;
+    font-size: 0.85rem;
+}
+
+.kl-action-menu .dropdown-item:hover,
+.kl-action-menu .dropdown-item:focus {
+    background-color: #f1f5f9;
+    color: var(--primary-green);
+}
+
+.kl-action-menu .dropdown-item.text-danger {
+    color: #dc2626 !important;
+}
+
+.kl-action-menu .dropdown-item.text-danger:hover,
+.kl-action-menu .dropdown-item.text-danger:focus {
+    background-color: #fef2f2;
+    color: #b91c1c !important;
+}
+
+.kl-action-menu .dropdown-divider {
+    margin: 0.35rem 0.25rem;
+    border-color: #f1f5f9;
+}
+
+/* Unified Compact Metric Strip */
+.kl-metric-strip {
+    background: #ffffff;
+    border: 1px solid rgba(16, 54, 27, 0.06);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.kl-metric-strip > .row {
+    margin-top: -1px;
+    margin-left: -1px;
+}
+
+.kl-metric-strip-col {
+    border-top: 1px solid #f1f5f9;
+    border-left: 1px solid #f1f5f9;
+}
+
+.kl-metric-strip-item {
+    padding: 0.95rem 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    height: 100%;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Compact Executive Plan Cards */
+.kl-plan-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+.kl-plan-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.08);
+}
+
+.kl-plan-card.is-featured {
+    border: 2px solid var(--accent-green);
+    box-shadow: 0 14px 32px rgba(20, 83, 45, 0.11);
+}
+
+.kl-plan-price-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.kl-plan-quota-pill {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 0.45rem 0.65rem;
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.4rem;
+}
+
+.kl-plan-feature-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.45rem;
+}
+
+.kl-plan-feature-chip {
+    font-size: 0.76rem;
+    padding: 0.35rem 0.55rem;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #eef2f6;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kl-plan-feature-chip.is-enabled {
+    background: #f0fdf4;
+    border-color: #dcfce7;
+    color: #166534;
+    font-weight: 500;
+}
+
+.kl-plan-feature-chip.is-disabled {
+    color: #94a3b8;
+}
+
+/* Segmented Toggle Control (Billing / Plans) */
+.kl-segmented {
+    display: inline-flex;
+    align-items: center;
+    background: #f1f5f9;
+    padding: 4px;
+    border-radius: 999px;
+    border: 1px solid #e2e8f0;
+    gap: 3px;
+}
+
+.kl-segmented .btn {
+    border-radius: 999px;
+    border: none;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.38rem 0.95rem;
+    color: #475569;
+    background: transparent;
+}
+
+.kl-segmented .btn.active {
+    background: var(--primary-green);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(17, 54, 27, 0.22);
+}
+
+/* Compact Collapsible Filter Toolbar */
+.kl-filter-toolbar {
+    background: #ffffff;
+    border: 1px solid rgba(16, 54, 27, 0.06);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+}
+
+.kl-filter-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.84rem;
+    white-space: nowrap;
+}
+
+

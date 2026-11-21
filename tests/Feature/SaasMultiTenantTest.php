@@ -978,4 +978,98 @@ class SaasMultiTenantTest extends TestCase
             ->assertSee($inv1->invoice_number)
             ->assertSee('Enterprise Multi');
     }
+
+    public function test_ui_efficiency_components_render_across_superadmin_and_tenant_views(): void
+    {
+        $superAdmin = User::where('username', 'superadmin')->firstOrFail();
+
+        $subService = app(SubscriptionService::class);
+        $store = $subService->provisionTenant(
+            ['name' => 'Kopi Efisien', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Owner Efisien', 'username' => 'efisien_admin', 'email' => 'efisien@test.id', 'password' => 'secret123'],
+            true
+        );
+        $proPlan = Plan::where('slug', 'pro')->firstOrFail();
+
+        // Ensure there is an unpaid invoice so Super Admin invoice hamburger menu renders
+        $subService->createInvoice($store['tenant'], $proPlan, 'monthly', 'transfer');
+
+        // Ensure there is at least 1 transaction & 1 expense via real endpoints so table action menus render
+        $menu = Menu::withoutGlobalScope('tenant')->where('tenant_id', $store['tenant']->id)->firstOrFail();
+
+        $this->actingAs($store['user'])->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 1]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 50000,
+            'customer_name' => 'Pelanggan UI',
+        ])->assertStatus(200);
+
+        $this->actingAs($store['user'])->post('/expenses', [
+            'expense_date' => now()->format('Y-m-d'),
+            'category' => 'Bahan Baku',
+            'description' => 'Beli Es Batu',
+            'amount' => 12000,
+            'payment_method' => 'tunai',
+        ])->assertRedirect('/expenses');
+
+        // Super Admin: compact metric strip, hamburger action menus, executive plan summary cards + edit modals
+        $this->actingAs($superAdmin)->get('/superadmin')
+            ->assertStatus(200)
+            ->assertSee('kl-metric-strip', false);
+
+        $this->actingAs($superAdmin)->get('/superadmin/tenants')
+            ->assertStatus(200)
+            ->assertSee('kl-action-dropdown', false)
+            ->assertSee('kl-action-menu', false);
+
+        $this->actingAs($superAdmin)->get('/superadmin/invoices')
+            ->assertStatus(200)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($superAdmin)->get('/superadmin/plans')
+            ->assertStatus(200)
+            ->assertSee('kl-plan-card', false)
+            ->assertSee('editPlanModal' . $proPlan->id, false);
+
+        // Tenant Admin: unified metric strip, collapsible filters, hamburger action menus, compact billing switcher
+        $this->actingAs($store['user'])->get('/dashboard')
+            ->assertStatus(200)
+            ->assertSee('kl-metric-strip', false)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/transactions')
+            ->assertStatus(200)
+            ->assertSee('kl-filter-toolbar', false)
+            ->assertSee('trxAdvancedFilters', false)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/expenses')
+            ->assertStatus(200)
+            ->assertSee('kl-filter-toolbar', false)
+            ->assertSee('expAdvancedFilters', false)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/menus')
+            ->assertStatus(200)
+            ->assertSee('kl-filter-toolbar', false)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/categories')
+            ->assertStatus(200)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/users')
+            ->assertStatus(200)
+            ->assertSee('kl-action-dropdown', false);
+
+        $this->actingAs($store['user'])->get('/reports')
+            ->assertStatus(200)
+            ->assertSee('kl-filter-toolbar', false)
+            ->assertSee('Ekspor &amp; Bagikan', false);
+
+        $this->actingAs($store['user'])->get('/billing')
+            ->assertStatus(200)
+            ->assertSee('kl-segmented', false)
+            ->assertSee('kl-plan-card', false);
+    }
 }

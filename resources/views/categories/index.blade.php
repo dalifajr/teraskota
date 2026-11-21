@@ -25,7 +25,7 @@
                                     <th>Slug</th>
                                     <th class="text-center">Jumlah Menu</th>
                                     <th class="text-center">Status (1-Klik)</th>
-                                    <th class="text-center" style="width: 140px;">Aksi</th>
+                                    <th class="text-end" style="width: 72px;">Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -49,23 +49,36 @@
                                                 @endif
                                             </form>
                                         </td>
-                                        <td class="text-center">
-                                            <div class="btn-group btn-group-sm" role="group">
-                                                <button
-                                                    type="button"
-                                                    class="btn btn-outline-primary btn-edit-category"
-                                                    data-id="{{ $cat->id }}"
-                                                    data-name="{{ $cat->name }}"
-                                                    data-status="{{ $cat->status ? '1' : '0' }}"
-                                                    title="Edit Kategori"
-                                                >
-                                                    <i class="fa-solid fa-edit"></i>
+                                        <td class="text-end">
+                                            <div class="dropdown kl-action-dropdown d-inline-block">
+                                                <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $cat->name }}" title="Menu Aksi">
+                                                    <i class="fa-solid fa-bars"></i>
                                                 </button>
-                                                <form action="{{ route('categories.destroy', $cat->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus kategori {{ $cat->name }}? Kategori yang masih memiliki menu di dalamnya tidak dapat dihapus.">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-                                                </form>
+                                                <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                                    <li>
+                                                        <button
+                                                            type="button"
+                                                            class="dropdown-item btn-edit-category"
+                                                            data-id="{{ $cat->id }}"
+                                                            data-name="{{ $cat->name }}"
+                                                            data-status="{{ $cat->status ? '1' : '0' }}"
+                                                        >
+                                                            <i class="fa-solid fa-pen-to-square text-primary"></i>
+                                                            <span>Edit Kategori</span>
+                                                        </button>
+                                                    </li>
+                                                    <li><hr class="dropdown-divider"></li>
+                                                    <li>
+                                                        <form action="{{ route('categories.destroy', $cat->id) }}" method="POST" class="m-0" data-confirm="Apakah Anda yakin ingin menghapus kategori {{ $cat->name }}? Kategori yang masih memiliki menu di dalamnya tidak dapat dihapus.">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="dropdown-item text-danger">
+                                                                <i class="fa-solid fa-trash"></i>
+                                                                <span>Hapus Kategori</span>
+                                                            </button>
+                                                        </form>
+                                                    </li>
+                                                </ul>
                                             </div>
                                         </td>
                                     </tr>

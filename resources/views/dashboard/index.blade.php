@@ -35,27 +35,57 @@
                 . "--------------------------------\n"
                 . "*LABA BERSIH HARI INI: Rp" . number_format($todayNetProfit, 0, ',', '.') . "*";
         @endphp
-        <div class="d-flex align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
             <a href="{{ route('pos.index') }}" target="_blank" class="btn btn-primary-green quick-action-btn shadow-sm" title="Buka Aplikasi Kasir POS di Tab Baru">
                 <i class="fa-solid fa-cash-register text-lime"></i>
                 <span>Buka Kasir POS</span>
                 <i class="fa-solid fa-arrow-up-right-from-square small opacity-75"></i>
             </a>
 
-            <a href="https://wa.me/?text={{ urlencode($dailyWaMsg) }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-success quick-action-btn bg-white" title="Kirim Ringkasan Penjualan Hari Ini ke WhatsApp">
-                <i class="fa-brands fa-whatsapp text-success"></i>
-                <span>Rekap WA</span>
-            </a>
+            <!-- Desktop Quick Links -->
+            <div class="d-none d-xl-flex align-items-center gap-2">
+                <a href="https://wa.me/?text={{ urlencode($dailyWaMsg) }}" target="_blank" rel="noopener noreferrer" class="btn btn-outline-success quick-action-btn bg-white" title="Kirim Ringkasan Penjualan Hari Ini ke WhatsApp">
+                    <i class="fa-brands fa-whatsapp text-success"></i>
+                    <span>Rekap WA</span>
+                </a>
+                <a href="{{ route('expenses.index') }}" class="btn btn-outline-danger quick-action-btn bg-white" title="Catat Pengeluaran Kas Operasional">
+                    <i class="fa-solid fa-plus-circle text-danger"></i>
+                    <span>Pengeluaran</span>
+                </a>
+                <a href="{{ route('reports.index') }}" class="btn btn-outline-secondary quick-action-btn bg-white" title="Buka Laporan Penjualan Lengkap">
+                    <i class="fa-solid fa-file-invoice-dollar text-muted"></i>
+                    <span>Laporan</span>
+                </a>
+            </div>
 
-            <a href="{{ route('expenses.index') }}" class="btn btn-outline-danger quick-action-btn bg-white" title="Catat Pengeluaran Kas Operasional">
-                <i class="fa-solid fa-plus-circle text-danger"></i>
-                <span>Catat Pengeluaran</span>
-            </a>
-
-            <a href="{{ route('reports.index') }}" class="btn btn-outline-secondary quick-action-btn bg-white" title="Buka Laporan Penjualan Lengkap">
-                <i class="fa-solid fa-file-invoice-dollar text-muted"></i>
-                <span>Laporan</span>
-            </a>
+            <!-- Compact Hamburger Quick Actions for Tablet / Mobile -->
+            <div class="dropdown kl-action-dropdown d-xl-none">
+                <button type="button" class="btn btn-outline-secondary quick-action-btn bg-white" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Aksi Cepat Lainnya">
+                    <i class="fa-solid fa-bars"></i>
+                    <span class="d-none d-sm-inline">Aksi Cepat</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                    <li><h6 class="dropdown-header">Pintasan Operasional</h6></li>
+                    <li>
+                        <a href="https://wa.me/?text={{ urlencode($dailyWaMsg) }}" target="_blank" rel="noopener noreferrer" class="dropdown-item">
+                            <i class="fa-brands fa-whatsapp text-success"></i>
+                            <span>Kirim Rekap Harian WA</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('expenses.index') }}" class="dropdown-item">
+                            <i class="fa-solid fa-plus-circle text-danger"></i>
+                            <span>Catat Pengeluaran Kas</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('reports.index') }}" class="dropdown-item">
+                            <i class="fa-solid fa-file-invoice-dollar text-secondary"></i>
+                            <span>Buka Laporan Penjualan</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -246,63 +276,53 @@
         </div>
     </div>
 
-    <!-- SECTION 2: OPERATIONAL VOLUME & AVERAGE TICKET (4 METRIC CARDS) -->
-    <div class="row g-3 mb-4">
-        <!-- Total Transaksi -->
-        <div class="col-6 col-xl-3">
-            <div class="card premium-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="card-icon-wrapper bg-light text-primary" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+    <!-- SECTION 2: OPERATIONAL VOLUME & AVERAGE TICKET (UNIFIED COMPACT METRIC STRIP) -->
+    <div class="kl-metric-strip mb-4">
+        <div class="row g-0">
+            <div class="col-6 col-xl-3 kl-metric-strip-col">
+                <div class="kl-metric-strip-item">
+                    <div class="card-icon-wrapper bg-light text-primary flex-shrink-0" style="width:38px; height:38px; font-size:1rem; border-radius:10px;">
                         <i class="fa-solid fa-receipt"></i>
                     </div>
-                    <div>
-                        <div class="stat-value fs-4 text-dark mb-0">{{ number_format($totalTransactions, 0, ',', '.') }}</div>
-                        <div class="stat-label small">Struk / Transaksi</div>
+                    <div class="min-w-0">
+                        <div class="fw-bold fs-5 text-dark lh-sm">{{ number_format($totalTransactions, 0, ',', '.') }}</div>
+                        <div class="text-muted small text-truncate">Struk / Transaksi</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Total Produk Terjual -->
-        <div class="col-6 col-xl-3">
-            <div class="card premium-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="card-icon-wrapper bg-light text-success" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+            <div class="col-6 col-xl-3 kl-metric-strip-col">
+                <div class="kl-metric-strip-item">
+                    <div class="card-icon-wrapper bg-light text-success flex-shrink-0" style="width:38px; height:38px; font-size:1rem; border-radius:10px;">
                         <i class="fa-solid fa-mug-saucer"></i>
                     </div>
-                    <div>
-                        <div class="stat-value fs-4 text-dark mb-0">{{ number_format($totalQuantity, 0, ',', '.') }} <span class="fs-6 fw-normal text-muted">pcs</span></div>
-                        <div class="stat-label small">Item / Produk Terjual</div>
+                    <div class="min-w-0">
+                        <div class="fw-bold fs-5 text-dark lh-sm">{{ number_format($totalQuantity, 0, ',', '.') }} <span class="fs-6 fw-normal text-muted">pcs</span></div>
+                        <div class="text-muted small text-truncate">Item / Produk Terjual</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Rata-rata Nilai Transaksi -->
-        <div class="col-6 col-xl-3">
-            <div class="card premium-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="card-icon-wrapper bg-light text-info" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+            <div class="col-6 col-xl-3 kl-metric-strip-col">
+                <div class="kl-metric-strip-item">
+                    <div class="card-icon-wrapper bg-light text-info flex-shrink-0" style="width:38px; height:38px; font-size:1rem; border-radius:10px;">
                         <i class="fa-solid fa-calculator"></i>
                     </div>
-                    <div>
-                        <div class="stat-value fs-4 text-dark mb-0">Rp{{ number_format($averageSales, 0, ',', '.') }}</div>
-                        <div class="stat-label small">Rata-rata per Struk</div>
+                    <div class="min-w-0">
+                        <div class="fw-bold fs-5 text-dark lh-sm">Rp{{ number_format($averageSales, 0, ',', '.') }}</div>
+                        <div class="text-muted small text-truncate">Rata-rata Struk</div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Diskon Promo -->
-        <div class="col-6 col-xl-3">
-            <div class="card premium-card p-3 h-100">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="card-icon-wrapper bg-light text-warning" style="width:42px; height:42px; font-size:1.15rem; border-radius:10px;">
+            <div class="col-6 col-xl-3 kl-metric-strip-col">
+                <div class="kl-metric-strip-item">
+                    <div class="card-icon-wrapper bg-light text-warning flex-shrink-0" style="width:38px; height:38px; font-size:1rem; border-radius:10px;">
                         <i class="fa-solid fa-tags"></i>
                     </div>
-                    <div>
-                        <div class="stat-value fs-4 text-dark mb-0">Rp{{ number_format($totalDiscount, 0, ',', '.') }}</div>
-                        <div class="stat-label small">Diskon Promo Diberikan</div>
+                    <div class="min-w-0">
+                        <div class="fw-bold fs-5 text-dark lh-sm">Rp{{ number_format($totalDiscount, 0, ',', '.') }}</div>
+                        <div class="text-muted small text-truncate">Diskon Promo</div>
                     </div>
                 </div>
             </div>

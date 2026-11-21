@@ -434,12 +434,44 @@
         document.querySelectorAll('.tk-btn-submitting').forEach(el => el.classList.remove('tk-btn-submitting'));
     });
 
+    function initActionDropdowns() {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return;
+
+        document.querySelectorAll('.kl-action-dropdown [data-bs-toggle="dropdown"]').forEach((toggleEl) => {
+            if (toggleEl.dataset.klDropdownInit === '1') return;
+            toggleEl.dataset.klDropdownInit = '1';
+
+            bootstrap.Dropdown.getOrCreateInstance(toggleEl, {
+                popperConfig(defaultBsPopperConfig) {
+                    return Object.assign({}, defaultBsPopperConfig, {
+                        strategy: 'fixed'
+                    });
+                }
+            });
+        });
+    }
+
+    window.KLInitActionDropdowns = initActionDropdowns;
+
+    // Ensure clicking modal/JS action buttons inside .kl-action-menu closes the dropdown cleanly
+    document.addEventListener('click', function (e) {
+        const item = e.target.closest('.kl-action-menu .dropdown-item');
+        if (!item) return;
+        const wrapper = item.closest('.kl-action-dropdown');
+        const toggleEl = wrapper ? wrapper.querySelector('[data-bs-toggle="dropdown"]') : null;
+        if (toggleEl && typeof bootstrap !== 'undefined' && bootstrap.Dropdown) {
+            const inst = bootstrap.Dropdown.getInstance(toggleEl);
+            if (inst) inst.hide();
+        }
+    });
+
     // =========================================================================
     // 6. STAGGERED ENTRANCE & MENU OPENING ANIMATIONS
     // =========================================================================
     function applyStaggeredAnimations() {
         portalModalsToBody();
         convertInlineConfirmForms();
+        initActionDropdowns();
 
         // Stagger Dashboard & Page Cards, then remove animation class on end so no transform containing block persists
         const cards = document.querySelectorAll('.premium-card, .card:not(.pos-product-card)');

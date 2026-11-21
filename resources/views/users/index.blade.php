@@ -93,7 +93,7 @@
                         <th>Email</th>
                         <th>Peran (Role)</th>
                         <th>Dibuat Tanggal</th>
-                        <th class="text-center" style="width: 140px;">Aksi</th>
+                        <th class="text-end" style="width: 72px;">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -129,27 +129,37 @@
                                 @endif
                             </td>
                             <td>{{ $u->created_at->format('d M Y') }}</td>
-                            <td class="text-center">
-                                <div class="d-flex justify-content-center gap-1">
-                                    <button
-                                        type="button"
-                                        class="btn btn-sm btn-outline-primary"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#editUserModal{{ $u->id }}"
-                                        title="Edit Pengguna"
-                                    >
-                                        <i class="fa-solid fa-pen-to-square"></i>
+                            <td class="text-end">
+                                <div class="dropdown kl-action-dropdown d-inline-block">
+                                    <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $u->name }}" title="Menu Aksi">
+                                        <i class="fa-solid fa-bars"></i>
                                     </button>
-
-                                    @if($u->id !== Auth::id())
-                                        <form action="{{ route('users.destroy', $u->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus pengguna {{ $u->name }}?" class="d-inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Hapus Pengguna">
-                                                <i class="fa-solid fa-trash"></i>
+                                    <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                        <li>
+                                            <button
+                                                type="button"
+                                                class="dropdown-item"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#editUserModal{{ $u->id }}"
+                                            >
+                                                <i class="fa-solid fa-pen-to-square text-primary"></i>
+                                                <span>Edit Pengguna</span>
                                             </button>
-                                        </form>
-                                    @endif
+                                        </li>
+                                        @if($u->id !== Auth::id())
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form action="{{ route('users.destroy', $u->id) }}" method="POST" data-confirm="Apakah Anda yakin ingin menghapus pengguna {{ $u->name }}?" class="m-0">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        <span>Hapus Pengguna</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                    </ul>
                                 </div>
                             </td>
                         </tr>

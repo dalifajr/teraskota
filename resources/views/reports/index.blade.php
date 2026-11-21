@@ -8,66 +8,64 @@
 @endsection
 
 @section('content')
-<!-- Filters card -->
-<div class="card premium-card mb-4">
-    <div class="card-body p-4">
-        <form action="{{ route('reports.index') }}" method="GET" id="reportFilterForm" class="row g-3 align-items-end">
-            <!-- Period dropdown -->
-            <div class="col-md-2">
-                <label for="period" class="form-label fw-semibold text-dark"><i class="fa-solid fa-calendar text-success me-1"></i> Periode</label>
-                <select name="period" id="period" class="form-select">
-                    <option value="today" {{ $period === 'today' ? 'selected' : '' }}>Hari Ini</option>
-                    <option value="this_week" {{ $period === 'this_week' ? 'selected' : '' }}>Minggu Ini</option>
-                    <option value="this_month" {{ $period === 'this_month' ? 'selected' : '' }}>Bulan Ini</option>
-                    <option value="this_year" {{ $period === 'this_year' ? 'selected' : '' }}>Tahun Ini</option>
-                    <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}>Rentang Tanggal...</option>
-                </select>
-            </div>
+<!-- Compact Filter Toolbar -->
+<div class="kl-filter-toolbar p-3 mb-4">
+    <form action="{{ route('reports.index') }}" method="GET" id="reportFilterForm" class="row g-2 align-items-end">
+        <!-- Period dropdown -->
+        <div class="col-6 col-md-2">
+            <label for="period" class="form-label fw-semibold text-dark small mb-1"><i class="fa-solid fa-calendar text-success me-1"></i>Periode</label>
+            <select name="period" id="period" class="form-select form-select-sm">
+                <option value="today" {{ $period === 'today' ? 'selected' : '' }}>Hari Ini</option>
+                <option value="this_week" {{ $period === 'this_week' ? 'selected' : '' }}>Minggu Ini</option>
+                <option value="this_month" {{ $period === 'this_month' ? 'selected' : '' }}>Bulan Ini</option>
+                <option value="this_year" {{ $period === 'this_year' ? 'selected' : '' }}>Tahun Ini</option>
+                <option value="custom" {{ $period === 'custom' ? 'selected' : '' }}>Rentang Tanggal...</option>
+            </select>
+        </div>
 
-            <!-- Custom date parameters -->
-            <div class="col-md-2 custom-date-field" id="start_date_container" style="display: none;">
-                <label for="start_date" class="form-label fw-semibold text-dark">Tanggal Mulai</label>
-                <input type="date" name="start_date" id="start_date" class="form-control" value="{{ $start_date }}">
-            </div>
+        <!-- Custom date parameters -->
+        <div class="col-6 col-md-2 custom-date-field" id="start_date_container" style="display: none;">
+            <label for="start_date" class="form-label fw-semibold text-dark small mb-1">Mulai</label>
+            <input type="date" name="start_date" id="start_date" class="form-control form-control-sm" value="{{ $start_date }}">
+        </div>
 
-            <div class="col-md-2 custom-date-field" id="end_date_container" style="display: none;">
-                <label for="end_date" class="form-label fw-semibold text-dark">Tanggal Akhir</label>
-                <input type="date" name="end_date" id="end_date" class="form-control" value="{{ $end_date }}">
-            </div>
+        <div class="col-6 col-md-2 custom-date-field" id="end_date_container" style="display: none;">
+            <label for="end_date" class="form-label fw-semibold text-dark small mb-1">Akhir</label>
+            <input type="date" name="end_date" id="end_date" class="form-control form-control-sm" value="{{ $end_date }}">
+        </div>
 
-            <!-- Category selection -->
-            <div class="col-md-2">
-                <label for="category_id" class="form-label fw-semibold text-dark"><i class="fa-solid fa-tag text-success me-1"></i> Kategori</label>
-                <select name="category_id" id="category_id" class="form-select">
-                    <option value="">-- Semua Kategori --</option>
-                    @foreach($categories as $cat)
-                        <option value="{{ $cat->id }}" {{ $category_id == $cat->id ? 'selected' : '' }}>
-                            {{ $cat->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+        <!-- Category selection -->
+        <div class="col-6 col-md-2">
+            <label for="category_id" class="form-label fw-semibold text-dark small mb-1"><i class="fa-solid fa-tag text-success me-1"></i>Kategori</label>
+            <select name="category_id" id="category_id" class="form-select form-select-sm">
+                <option value="">Semua Kategori</option>
+                @foreach($categories as $cat)
+                    <option value="{{ $cat->id }}" {{ $category_id == $cat->id ? 'selected' : '' }}>
+                        {{ $cat->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
-            <!-- Menu selection -->
-            <div class="col-md-2">
-                <label for="menu_id" class="form-label fw-semibold text-dark"><i class="fa-solid fa-mug-hot text-success me-1"></i> Menu</label>
-                <select name="menu_id" id="menu_id" class="form-select">
-                    <option value="">-- Semua Menu --</option>
-                    @foreach($menus as $menu)
-                        <option value="{{ $menu->id }}" {{ $menu_id == $menu->id ? 'selected' : '' }}>
-                            [{{ $menu->code }}] {{ $menu->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+        <!-- Menu selection -->
+        <div class="col-6 col-md-2">
+            <label for="menu_id" class="form-label fw-semibold text-dark small mb-1"><i class="fa-solid fa-mug-hot text-success me-1"></i>Menu</label>
+            <select name="menu_id" id="menu_id" class="form-select form-select-sm">
+                <option value="">Semua Menu</option>
+                @foreach($menus as $menu)
+                    <option value="{{ $menu->id }}" {{ $menu_id == $menu->id ? 'selected' : '' }}>
+                        [{{ $menu->code }}] {{ $menu->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
-            <!-- Buttons -->
-            <div class="col-md-4 d-flex gap-2">
-                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-filter me-1"></i> Filter</button>
-                <a href="{{ route('reports.index') }}" class="btn btn-outline-secondary" title="Reset Filter"><i class="fa-solid fa-rotate-left"></i></a>
-            </div>
-        </form>
-    </div>
+        <!-- Buttons -->
+        <div class="col-12 col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-sm btn-primary-green flex-grow-1"><i class="fa-solid fa-filter me-1"></i>Terapkan</button>
+            <a href="{{ route('reports.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset Filter"><i class="fa-solid fa-rotate-left"></i></a>
+        </div>
+    </form>
 </div>
 
 <!-- Metrics summary boxes (Fixed valid Bootstrap 5 5-column responsive grid) -->
@@ -194,19 +192,31 @@
             <small class="text-muted">Menampilkan data periode: <strong>{{ $date_range_label }}</strong></small>
         </div>
         
-        <!-- Print, Share WA & Export Buttons -->
-        <div class="d-flex flex-wrap gap-2">
-            <a href="https://wa.me/?text={{ urlencode($waReportSummary) }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm fw-semibold">
-                <i class="fa-brands fa-whatsapp me-1"></i> Bagikan WA
-            </a>
-            <!-- Cetak PDF -->
+        <!-- Print, Share WA & Export Actions (Primary + Compact Dropdown) -->
+        <div class="kl-action-group">
             <a href="{{ route('reports.pdf', request()->query()) }}" target="_blank" class="btn btn-outline-danger btn-sm fw-semibold">
-                <i class="fa-solid fa-file-pdf me-1"></i> Cetak PDF
+                <i class="fa-solid fa-file-pdf me-1"></i>Cetak PDF
             </a>
-            <!-- Ekspor Excel/CSV -->
-            <a href="{{ route('reports.export', request()->query()) }}" class="btn btn-outline-success btn-sm fw-semibold">
-                <i class="fa-solid fa-file-csv me-1"></i> Ekspor CSV
-            </a>
+            <div class="dropdown kl-action-dropdown">
+                <button type="button" class="btn btn-sm btn-outline-secondary fw-semibold d-inline-flex align-items-center gap-2" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Opsi Ekspor dan Bagikan">
+                    <i class="fa-solid fa-bars"></i>
+                    <span>Ekspor &amp; Bagikan</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                    <li>
+                        <a href="https://wa.me/?text={{ urlencode($waReportSummary) }}" target="_blank" rel="noopener noreferrer" class="dropdown-item">
+                            <i class="fa-brands fa-whatsapp text-success"></i>
+                            <span>Bagikan WA</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ route('reports.export', request()->query()) }}" class="dropdown-item">
+                            <i class="fa-solid fa-file-csv text-success"></i>
+                            <span>Unduh CSV / Excel</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
         </div>
     </div>
     

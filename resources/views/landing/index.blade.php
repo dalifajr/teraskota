@@ -292,29 +292,59 @@
                 <h2 class="fw-bold">Mulai Gratis {{ $trialDays }} Hari, Lanjut Sesuai Kebutuhan</h2>
                 <p class="text-muted mb-4">Tanpa potongan komisi per transaksi. Data usaha Anda tetap aman kapan pun.</p>
 
+                @php
+                    $landingMaxSave = 0;
+                    foreach ($plans as $lpCheck) {
+                        $lpYf = (float) $lpCheck->price_monthly * 12;
+                        if ($lpYf > 0 && (float) $lpCheck->price_yearly < $lpYf) {
+                            $lpPct = (int) round((1 - ((float) $lpCheck->price_yearly / $lpYf)) * 100);
+                            if ($lpPct > $landingMaxSave) $landingMaxSave = $lpPct;
+                        }
+                    }
+                @endphp
                 <div class="btn-group bg-white p-1 rounded-pill shadow-sm border" role="group">
                     <button type="button" class="btn btn-sm btn-success rounded-pill px-4 fw-semibold" id="btnCycleMonthly">Bulanan</button>
-                    <button type="button" class="btn btn-sm btn-light rounded-pill px-4 fw-semibold" id="btnCycleYearly">Tahunan <span class="badge bg-warning text-dark ms-1">Hemat 2 Bulan</span></button>
+                    <button type="button" class="btn btn-sm btn-light rounded-pill px-4 fw-semibold" id="btnCycleYearly">
+                        Tahunan
+                        @if($landingMaxSave > 0)
+                            <span class="badge bg-warning text-dark ms-1">Hemat {{ $landingMaxSave }}%</span>
+                        @endif
+                    </button>
                 </div>
             </div>
 
             <div class="row justify-content-center g-4 mt-2">
                 @foreach($plans as $plan)
-                    <div class="col-md-6 col-lg-5">
-                        <div class="pricing-card {{ $plan->is_featured ? 'featured' : '' }}">
+                    @php
+                        $lpYearlyFull = (float) $plan->price_monthly * 12;
+                        $lpSavePct = ($lpYearlyFull > 0 && (float) $plan->price_yearly < $lpYearlyFull)
+                            ? (int) round((1 - ((float) $plan->price_yearly / $lpYearlyFull)) * 100)
+                            : 0;
+                    @endphp
+                    <div class="col-md-6 col-lg-{{ $plans->count() >= 3 ? '4' : '5' }}">
+                        <div class="pricing-card d-flex flex-column {{ $plan->is_featured ? 'featured' : '' }}">
                             @if($plan->is_featured)
                                 <span class="badge bg-success position-absolute top-0 end-0 m-3 px-3 py-2 rounded-pill">PALING POPULER</span>
                             @endif
                             <h4 class="fw-bold mb-1">{{ $plan->name }}</h4>
-                            <p class="text-muted small mb-4">{{ $plan->description }}</p>
+                            <p class="text-muted small mb-3">{{ $plan->description }}</p>
 
-                            <div class="mb-4" style="font-variant-numeric: tabular-nums;">
-                                <span class="display-6 fw-bold text-dark price-display"
-                                      data-monthly="Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}"
-                                      data-yearly="Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}">
-                                    Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}
-                                </span>
-                                <span class="text-muted cycle-label">/ bulan</span>
+                            <div class="p-3 rounded-3 bg-light border mb-4" style="font-variant-numeric: tabular-nums;">
+                                <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2">
+                                    <div>
+                                        <span class="display-6 fw-bold text-dark price-display"
+                                              data-monthly="Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}"
+                                              data-yearly="Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}">
+                                            Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}
+                                        </span>
+                                        <span class="text-muted cycle-label">/ bulan</span>
+                                    </div>
+                                    @if($lpSavePct > 0)
+                                        <span class="badge bg-success bg-opacity-10 text-success rounded-pill lp-save-badge d-none">
+                                            Hemat {{ $lpSavePct }}%
+                                        </span>
+                                    @endif
+                                </div>
                             </div>
 
                             <ul class="list-unstyled d-grid gap-2 mb-4 small">
@@ -330,7 +360,7 @@
                                 @endif
                             </ul>
 
-                            <a href="{{ route('register') }}" class="btn {{ $plan->is_featured ? 'btn-kl-primary' : 'btn-outline-success' }} w-100 py-2 rounded-pill fw-bold">
+                            <a href="{{ route('register') }}" class="btn {{ $plan->is_featured ? 'btn-kl-primary' : 'btn-outline-success' }} w-100 py-2 rounded-pill fw-bold mt-auto">
                                 Mulai Uji Coba Gratis {{ $trialDays }} Hari
                             </a>
                         </div>
@@ -410,16 +440,20 @@
         const labels = document.querySelectorAll('.cycle-label');
 
         function setCycle(cycle) {
+            const isYearly = cycle === 'yearly';
             prices.forEach(el => {
-                el.textContent = cycle === 'yearly' ? el.dataset.yearly : el.dataset.monthly;
+                el.textContent = isYearly ? el.dataset.yearly : el.dataset.monthly;
             });
             labels.forEach(el => {
-                el.textContent = cycle === 'yearly' ? '/ tahun' : '/ bulan';
+                el.textContent = isYearly ? '/ tahun' : '/ bulan';
             });
-            btnMonthly.classList.toggle('btn-success', cycle === 'monthly');
-            btnMonthly.classList.toggle('btn-light', cycle !== 'monthly');
-            btnYearly.classList.toggle('btn-success', cycle === 'yearly');
-            btnYearly.classList.toggle('btn-light', cycle !== 'yearly');
+            document.querySelectorAll('.lp-save-badge').forEach(el => {
+                el.classList.toggle('d-none', !isYearly);
+            });
+            btnMonthly.classList.toggle('btn-success', !isYearly);
+            btnMonthly.classList.toggle('btn-light', isYearly);
+            btnYearly.classList.toggle('btn-success', isYearly);
+            btnYearly.classList.toggle('btn-light', !isYearly);
         }
 
         btnMonthly?.addEventListener('click', () => setCycle('monthly'));

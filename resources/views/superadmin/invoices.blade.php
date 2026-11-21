@@ -46,7 +46,7 @@
                     <th>Nominal (Unik)</th>
                     <th>Metode / Referensi</th>
                     <th>Status</th>
-                    <th class="text-end">Aksi</th>
+                    <th class="text-end" style="width: 145px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -93,20 +93,38 @@
                         </td>
                         <td class="text-end">
                             @if($inv->status === 'unpaid')
-                                <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
-                                    @if($invPhone !== '')
-                                        <a href="https://wa.me/{{ $invPhone }}?text={{ urlencode($waBillText) }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-success py-0 px-2" title="Kirim Pengingat Tagihan via WhatsApp">
-                                            <i class="fa-brands fa-whatsapp"></i>
-                                        </a>
-                                    @endif
-                                    <form action="{{ route('superadmin.invoices.approve', $inv->id) }}" method="POST" class="d-inline" data-confirm="Konfirmasi invoice {{ $inv->invoice_number }} LUNAS dan aktifkan langganan usaha {{ $inv->tenant?->name }}?">
+                                <div class="kl-action-group">
+                                    <form action="{{ route('superadmin.invoices.approve', $inv->id) }}" method="POST" class="m-0" data-confirm="Konfirmasi invoice {{ $inv->invoice_number }} LUNAS dan aktifkan langganan usaha {{ $inv->tenant?->name }}?">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-success py-0 px-2">Approve Lunas</button>
+                                        <button type="submit" class="btn btn-sm btn-success px-2 py-1 fw-semibold" title="Approve Lunas & Aktifkan Paket">
+                                            <i class="fa-solid fa-check me-1"></i>Approve
+                                        </button>
                                     </form>
-                                    <form action="{{ route('superadmin.invoices.cancel', $inv->id) }}" method="POST" class="d-inline" data-confirm="Batalkan invoice {{ $inv->invoice_number }}?">
-                                        @csrf
-                                        <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Batal</button>
-                                    </form>
+                                    <div class="dropdown kl-action-dropdown">
+                                        <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi Invoice {{ $inv->invoice_number }}" title="Aksi Lainnya">
+                                            <i class="fa-solid fa-bars"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                            @if($invPhone !== '')
+                                                <li>
+                                                    <a href="https://wa.me/{{ $invPhone }}?text={{ urlencode($waBillText) }}" target="_blank" rel="noopener noreferrer" class="dropdown-item">
+                                                        <i class="fa-brands fa-whatsapp text-success"></i>
+                                                        <span>Kirim Pengingat WA</span>
+                                                    </a>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                            @endif
+                                            <li>
+                                                <form action="{{ route('superadmin.invoices.cancel', $inv->id) }}" method="POST" class="m-0" data-confirm="Batalkan invoice {{ $inv->invoice_number }}?">
+                                                    @csrf
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="fa-solid fa-xmark"></i>
+                                                        <span>Batalkan Invoice</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
                                 </div>
                             @else
                                 <span class="text-muted">—</span>

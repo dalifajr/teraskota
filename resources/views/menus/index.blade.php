@@ -37,46 +37,42 @@
 </div>
 @endif
 
-<!-- Filter Panel -->
-<div class="card premium-card mb-4">
-    <div class="card-body p-4">
-        <form action="{{ route('menus.index') }}" method="GET" class="row g-3 align-items-end">
-            <!-- Search Menu -->
-            <div class="col-md-4">
-                <label for="search" class="form-label fw-medium text-dark">Cari Nama atau Kode Menu</label>
-                <input type="text" name="search" id="search" class="form-control" placeholder="Contoh: Kopi Susu atau MNM-001..." value="{{ request('search') }}">
+<!-- Compact Filter Toolbar -->
+<div class="kl-filter-toolbar p-3 mb-4">
+    <form action="{{ route('menus.index') }}" method="GET" class="row g-2 align-items-center">
+        <div class="col-12 col-md-4">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="search" id="search" class="form-control border-start-0" placeholder="Cari nama atau kode menu..." value="{{ request('search') }}">
             </div>
-            
-            <!-- Category Filter -->
-            <div class="col-md-3">
-                <label for="category_id" class="form-label fw-medium text-dark">Kategori</label>
-                <select name="category_id" id="category_id" class="form-select">
-                    <option value="">-- Semua Kategori --</option>
-                    @foreach($categories as $category)
-                        <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
-                            {{ $category->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
+        </div>
 
-            <!-- Status Filter -->
-            <div class="col-md-2">
-                <label for="status" class="form-label fw-medium text-dark">Status</label>
-                <select name="status" id="status" class="form-select">
-                    <option value="">Semua Status</option>
-                    <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktif (Tersedia)</option>
-                    <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Habis / Nonaktif</option>
-                </select>
-            </div>
+        <div class="col-6 col-md-3">
+            <select name="category_id" id="category_id" class="form-select form-select-sm" aria-label="Filter Kategori">
+                <option value="">Semua Kategori</option>
+                @foreach($categories as $category)
+                    <option value="{{ $category->id }}" {{ request('category_id') == $category->id ? 'selected' : '' }}>
+                        {{ $category->name }}
+                    </option>
+                @endforeach
+            </select>
+        </div>
 
-            <!-- Buttons -->
-            <div class="col-md-3 d-flex gap-2">
-                <button type="submit" class="btn btn-primary-green flex-grow-1"><i class="fa-solid fa-search me-1"></i> Cari</button>
-                <a href="{{ route('menus.index') }}" class="btn btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
-            </div>
-        </form>
-    </div>
+        <div class="col-6 col-md-3">
+            <select name="status" id="status" class="form-select form-select-sm" aria-label="Filter Status">
+                <option value="">Semua Status</option>
+                <option value="active" {{ request('status') === 'active' ? 'selected' : '' }}>Aktif (Tersedia)</option>
+                <option value="inactive" {{ request('status') === 'inactive' ? 'selected' : '' }}>Habis / Nonaktif</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-sm btn-primary-green flex-grow-1"><i class="fa-solid fa-search me-1"></i>Cari</button>
+            @if(request()->hasAny(['search', 'category_id', 'status']) && (filled(request('search')) || filled(request('category_id')) || filled(request('status'))))
+                <a href="{{ route('menus.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
+            @endif
+        </div>
+    </form>
 </div>
 
 <!-- Menus Table List -->
@@ -98,7 +94,7 @@
                             <th class="text-center">Tipe Margin</th>
                             <th class="text-center">Margin Keuntungan</th>
                             <th class="text-center">Status</th>
-                            <th class="text-center" style="width: 150px;">Aksi</th>
+                            <th class="text-end" style="width: 72px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -107,7 +103,7 @@
                                 <td class="fw-bold text-success">{{ $menu->code }}</td>
                                 <td class="fw-semibold text-dark">{{ $menu->name }}</td>
                                 <td><span class="badge bg-mint-soft text-success">{{ $menu->category->name }}</span></td>
-                                <td class="text-end fw-bold text-dark">Rp{{ number_format($menu->price, 0, ',', '.') }}</td>
+                                <td class="text-end fw-bold text-dark" style="font-variant-numeric: tabular-nums;">Rp{{ number_format($menu->price, 0, ',', '.') }}</td>
                                 <td class="text-center">
                                     @if($menu->use_global_profit)
                                         <span class="badge bg-secondary">Global</span>
@@ -137,15 +133,40 @@
                                         @endif
                                     </form>
                                 </td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm" role="group">
-                                        <a href="{{ route('menus.edit', $menu->id) }}" class="btn btn-outline-primary" title="Edit"><i class="fa-solid fa-edit"></i></a>
-                                        
-                                        <form action="{{ route('menus.destroy', $menu->id) }}" method="POST" class="d-inline" data-confirm="Apakah Anda yakin ingin menghapus menu {{ $menu->name }}? Menu yang memiliki riwayat transaksi akan dinonaktifkan (soft delete).">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-                                        </form>
+                                <td class="text-end">
+                                    <div class="dropdown kl-action-dropdown d-inline-block">
+                                        <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $menu->name }}" title="Menu Aksi">
+                                            <i class="fa-solid fa-bars"></i>
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                            <li>
+                                                <a href="{{ route('menus.edit', $menu->id) }}" class="dropdown-item">
+                                                    <i class="fa-solid fa-pen-to-square text-primary"></i>
+                                                    <span>Edit Menu</span>
+                                                </a>
+                                            </li>
+                                            <li>
+                                                <form action="{{ route('menus.toggle-status', $menu->id) }}" method="POST" class="m-0">
+                                                    @csrf
+                                                    @method('PATCH')
+                                                    <button type="submit" class="dropdown-item">
+                                                        <i class="fa-solid {{ $menu->status ? 'fa-toggle-off text-warning' : 'fa-toggle-on text-success' }}"></i>
+                                                        <span>{{ $menu->status ? 'Tandai Habis / Nonaktif' : 'Aktifkan Menu' }}</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form action="{{ route('menus.destroy', $menu->id) }}" method="POST" class="m-0" data-confirm="Apakah Anda yakin ingin menghapus menu {{ $menu->name }}? Menu yang memiliki riwayat transaksi akan dinonaktifkan (soft delete).">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        <span>Hapus Menu</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
                                     </div>
                                 </td>
                             </tr>

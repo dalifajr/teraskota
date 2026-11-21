@@ -43,7 +43,7 @@
                     <th>Statistik</th>
                     <th>Paket &amp; Masa Aktif</th>
                     <th>Status</th>
-                    <th class="text-end">Aksi</th>
+                    <th class="text-end" style="width: 120px;">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -97,38 +97,76 @@
                             </span>
                         </td>
                         <td class="text-end">
-                            <div class="d-inline-flex flex-wrap gap-1 justify-content-end">
-                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" data-bs-toggle="modal" data-bs-target="#detailModal{{ $tenant->id }}" title="Lihat Detail & Riwayat Usaha">
-                                    <i class="fa-solid fa-eye"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-info text-dark py-0 px-2" data-bs-toggle="modal" data-bs-target="#editTenantModal{{ $tenant->id }}" title="Edit Info Usaha">
-                                    <i class="fa-solid fa-pen"></i>
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-success py-0 px-2" data-bs-toggle="modal" data-bs-target="#subModal{{ $tenant->id }}">
-                                    Paket
-                                </button>
-                                <button type="button" class="btn btn-sm btn-outline-warning text-dark py-0 px-2" data-bs-toggle="modal" data-bs-target="#pwdModal{{ $tenant->id }}" title="Reset Password Pemilik">
-                                    <i class="fa-solid fa-key"></i>
-                                </button>
-                                <form action="{{ route('superadmin.tenants.impersonate', $tenant->id) }}" method="POST" class="d-inline">
+                            <div class="kl-action-group">
+                                <form action="{{ route('superadmin.tenants.impersonate', $tenant->id) }}" method="POST" class="m-0">
                                     @csrf
-                                    <button type="submit" class="btn btn-sm btn-outline-primary py-0 px-2" title="Masuk ke Dashboard Usaha (Mode Support)">Masuk</button>
-                                </form>
-                                <form action="{{ route('superadmin.tenants.toggle', $tenant->id) }}" method="POST" class="d-inline" data-confirm="Ubah status aktif/suspend untuk usaha {{ $tenant->name }}?">
-                                    @csrf
-                                    <button type="submit" class="btn btn-sm {{ $tenant->is_active ? 'btn-outline-danger' : 'btn-outline-secondary' }} py-0 px-2">
-                                        {{ $tenant->is_active ? 'Suspend' : 'Aktifkan' }}
+                                    <button type="submit" class="btn btn-sm btn-outline-primary px-2 py-1 fw-semibold" title="Masuk ke Dashboard Usaha (Mode Support)">
+                                        <i class="fa-solid fa-right-to-bracket me-1"></i>Masuk
                                     </button>
                                 </form>
-                                @if(!$tenant->is_active && !$tenant->is_lifetime)
-                                    <form action="{{ route('superadmin.tenants.destroy', $tenant->id) }}" method="POST" class="d-inline" data-confirm="PERINGATAN: Hapus permanen usaha {{ $tenant->name }} beserta seluruh data user, menu, transaksi, dan invoice-nya? Tindakan ini tidak dapat dibatalkan!">
-                                        @csrf
-                                        @method('DELETE')
-                                        <button type="submit" class="btn btn-sm btn-danger py-0 px-2" title="Hapus Permanen Usaha">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
-                                    </form>
-                                @endif
+
+                                <div class="dropdown kl-action-dropdown">
+                                    <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $tenant->name }}" title="Aksi Lainnya">
+                                        <i class="fa-solid fa-bars"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                        <li><h6 class="dropdown-header">Kelola Usaha</h6></li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#detailModal{{ $tenant->id }}">
+                                                <i class="fa-solid fa-eye text-secondary"></i>
+                                                <span>Detail &amp; Riwayat</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#editTenantModal{{ $tenant->id }}">
+                                                <i class="fa-solid fa-pen text-info"></i>
+                                                <span>Edit Info Usaha</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#subModal{{ $tenant->id }}">
+                                                <i class="fa-solid fa-crown text-success"></i>
+                                                <span>Atur Paket &amp; Masa Aktif</span>
+                                            </button>
+                                        </li>
+                                        <li>
+                                            <button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#pwdModal{{ $tenant->id }}">
+                                                <i class="fa-solid fa-key text-warning"></i>
+                                                <span>Reset Password Owner</span>
+                                            </button>
+                                        </li>
+                                        @if($tenant->phone)
+                                            <li>
+                                                <a href="https://wa.me/{{ $waNumber }}?text={{ urlencode($waGreeting) }}" target="_blank" rel="noopener noreferrer" class="dropdown-item">
+                                                    <i class="fa-brands fa-whatsapp text-success"></i>
+                                                    <span>Hubungi via WhatsApp</span>
+                                                </a>
+                                            </li>
+                                        @endif
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <form action="{{ route('superadmin.tenants.toggle', $tenant->id) }}" method="POST" class="m-0" data-confirm="Ubah status aktif/suspend untuk usaha {{ $tenant->name }}?">
+                                                @csrf
+                                                <button type="submit" class="dropdown-item {{ $tenant->is_active ? 'text-danger' : 'text-success' }}">
+                                                    <i class="fa-solid {{ $tenant->is_active ? 'fa-ban' : 'fa-circle-check' }}"></i>
+                                                    <span>{{ $tenant->is_active ? 'Suspend Usaha' : 'Aktifkan Kembali' }}</span>
+                                                </button>
+                                            </form>
+                                        </li>
+                                        @if(!$tenant->is_active && !$tenant->is_lifetime)
+                                            <li>
+                                                <form action="{{ route('superadmin.tenants.destroy', $tenant->id) }}" method="POST" class="m-0" data-confirm="PERINGATAN: Hapus permanen usaha {{ $tenant->name }} beserta seluruh data user, menu, transaksi, dan invoice-nya? Tindakan ini tidak dapat dibatalkan!">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger fw-semibold">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        <span>Hapus Permanen</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        @endif
+                                    </ul>
+                                </div>
                             </div>
                         </td>
                     </tr>

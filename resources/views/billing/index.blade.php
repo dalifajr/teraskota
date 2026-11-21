@@ -45,16 +45,34 @@
                     </p>
                 @endif
 
-                <div class="bg-light rounded-3 p-3 border mb-3">
-                    <div class="d-flex justify-content-between small mb-2">
-                        <span class="text-muted"><i class="fa-solid fa-users me-1"></i>Akun Pengguna</span>
-                        <strong>{{ $userUsage['current'] }} / {{ $userUsage['limit'] ?? 'Unlimited' }}</strong>
+                <div class="bg-light rounded-3 p-3 border mb-0">
+                    @php
+                        $userPct = $userUsage['limit'] ? min(100, (int) round(($userUsage['current'] / max(1, $userUsage['limit'])) * 100)) : 0;
+                        $menuPct = $menuUsage['limit'] ? min(100, (int) round(($menuUsage['current'] / max(1, $menuUsage['limit'])) * 100)) : 0;
+                    @endphp
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1" style="font-variant-numeric: tabular-nums;">
+                            <span class="text-muted"><i class="fa-solid fa-users me-1"></i>Akun Pengguna</span>
+                            <strong>{{ $userUsage['current'] }} / {{ $userUsage['limit'] ?? 'Unlimited' }}</strong>
+                        </div>
+                        @if($userUsage['limit'])
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {{ $userPct >= 100 ? 'bg-danger' : ($userPct >= 80 ? 'bg-warning' : 'bg-success') }}" style="width: {{ $userPct }}%"></div>
+                            </div>
+                        @endif
                     </div>
-                    <div class="d-flex justify-content-between small mb-2">
-                        <span class="text-muted"><i class="fa-solid fa-mug-hot me-1"></i>Menu Produk</span>
-                        <strong>{{ $menuUsage['current'] }} / {{ $menuUsage['limit'] ?? 'Unlimited' }}</strong>
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1" style="font-variant-numeric: tabular-nums;">
+                            <span class="text-muted"><i class="fa-solid fa-mug-hot me-1"></i>Menu Produk</span>
+                            <strong>{{ $menuUsage['current'] }} / {{ $menuUsage['limit'] ?? 'Unlimited' }}</strong>
+                        </div>
+                        @if($menuUsage['limit'])
+                            <div class="progress" style="height: 6px;">
+                                <div class="progress-bar {{ $menuPct >= 100 ? 'bg-danger' : ($menuPct >= 80 ? 'bg-warning' : 'bg-success') }}" style="width: {{ $menuPct }}%"></div>
+                            </div>
+                        @endif
                     </div>
-                    <div class="d-flex justify-content-between small">
+                    <div class="d-flex justify-content-between small pt-1 border-top">
                         <span class="text-muted"><i class="fa-solid fa-qrcode me-1"></i>QRIS Auto-Verify</span>
                         <strong class="{{ $tenant->hasFeature('qris_dynamic') ? 'text-success' : 'text-muted' }}">
                             {{ $tenant->hasFeature('qris_dynamic') ? 'Aktif' : 'Terkunci (Paket Pro)' }}
@@ -146,73 +164,136 @@
 </div>
 
 <!-- Pilihan Paket -->
-<h5 class="fw-bold mb-3">Pilihan Paket Langganan {{ $platformName }}</h5>
-<div class="row g-4 mb-5">
+@php
+    $maxSavePct = 0;
+    foreach ($plans as $pCheck) {
+        $yf = (float) $pCheck->price_monthly * 12;
+        if ($yf > 0 && (float) $pCheck->price_yearly < $yf) {
+            $pct = (int) round((1 - ((float) $pCheck->price_yearly / $yf)) * 100);
+            if ($pct > $maxSavePct) $maxSavePct = $pct;
+        }
+    }
+    $defaultMethod = $bankInfo['has_platform_qris'] ? 'qris' : 'transfer';
+@endphp
+
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+    <div>
+        <h5 class="fw-bold m-0">Pilihan Paket Langganan {{ $platformName }}</h5>
+        <small class="text-muted">Pilih siklus &amp; metode bayar sekali di atas, lalu klik paket pilihan Anda.</small>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- Global Cycle Toggle -->
+        <div class="kl-segmented" role="group" aria-label="Pilih Siklus Langganan">
+            <button type="button" class="btn active js-billing-cycle-btn" data-cycle="monthly">Bulanan</button>
+            <button type="button" class="btn js-billing-cycle-btn" data-cycle="yearly">
+                Tahunan
+                @if($maxSavePct > 0)
+                    <span class="badge bg-warning text-dark ms-1 rounded-pill" style="font-size: 0.68rem;">Hemat {{ $maxSavePct }}%</span>
+                @endif
+            </button>
+        </div>
+
+        <!-- Global Payment Method Toggle -->
+        @if($bankInfo['has_platform_qris'])
+            <div class="kl-segmented" role="group" aria-label="Pilih Metode Pembayaran">
+                <button type="button" class="btn active js-billing-method-btn" data-method="qris">
+                    <i class="fa-solid fa-qrcode me-1"></i>QRIS
+                </button>
+                <button type="button" class="btn js-billing-method-btn" data-method="transfer">
+                    <i class="fa-solid fa-building-columns me-1"></i>Transfer
+                </button>
+            </div>
+        @endif
+    </div>
+</div>
+
+<div class="row g-3 g-lg-4 mb-5">
     @foreach($plans as $plan)
-        <div class="col-md-6">
-            <div class="card border-0 shadow-sm rounded-4 h-100 {{ $plan->is_featured ? 'border border-2 border-success' : '' }}">
-                <div class="card-body p-4 d-flex flex-column">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="fw-bold m-0">{{ $plan->name }}</h5>
+        @php
+            $isCurrentPlan = !$tenant->is_lifetime && $subscription?->plan_id === $plan->id;
+            $yearlyFull = (float) $plan->price_monthly * 12;
+            $planSavePct = ($yearlyFull > 0 && (float) $plan->price_yearly < $yearlyFull)
+                ? (int) round((1 - ((float) $plan->price_yearly / $yearlyFull)) * 100)
+                : 0;
+        @endphp
+        <div class="col-md-6 col-xl-{{ $plans->count() >= 3 ? '4' : '6' }}">
+            <div class="kl-plan-card p-3 p-md-4 {{ $plan->is_featured ? 'is-featured' : '' }}">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                        <h5 class="fw-bold text-dark m-0">{{ $plan->name }}</h5>
+                        <p class="text-muted small mb-0 mt-1">{{ $plan->description }}</p>
+                    </div>
+                    <div class="d-flex flex-column align-items-end gap-1 flex-shrink-0">
                         @if($plan->is_featured)
                             <span class="badge bg-success rounded-pill">Rekomendasi</span>
                         @endif
+                        @if($isCurrentPlan)
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill">Paket Anda</span>
+                        @endif
                     </div>
-                    <p class="text-muted small mb-3">{{ $plan->description }}</p>
-
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <div class="p-2 bg-light rounded-3 border text-center">
-                                <small class="text-muted d-block">Bulanan</small>
-                                <strong class="text-dark">Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}</strong>
-                            </div>
-                        </div>
-                        <div class="col-6">
-                            <div class="p-2 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 text-center">
-                                <small class="text-success d-block fw-semibold">Tahunan (Hemat 2 Bln)</small>
-                                <strong class="text-success">Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}</strong>
-                            </div>
-                        </div>
-                    </div>
-
-                    <ul class="list-unstyled small d-grid gap-1 mb-4">
-                        <li><i class="fa-solid fa-check text-success me-2"></i>{{ $plan->max_users ? "Hingga {$plan->max_users} akun pengguna" : 'Pengguna unlimited' }}</li>
-                        <li><i class="fa-solid fa-check text-success me-2"></i>{{ $plan->max_menus ? "Hingga {$plan->max_menus} menu" : 'Menu tanpa batas' }}</li>
-                        <li><i class="fa-solid fa-check text-success me-2"></i>Mode Offline POS + Auto-Sync</li>
-                        <li><i class="fa-solid fa-check text-success me-2"></i>Pengeluaran Kas, Laba Bersih &amp; PDF</li>
-                        <li>
-                            @if($plan->hasFeature('qris_dynamic'))
-                                <i class="fa-solid fa-star text-warning me-2"></i><strong class="text-success">QRIS Dinamis + Auto-Verify Listener</strong>
-                            @else
-                                <i class="fa-solid fa-xmark text-muted me-2"></i><span class="text-muted">Tanpa QRIS Dinamis Auto-Verify</span>
-                            @endif
-                        </li>
-                    </ul>
-
-                    <form action="{{ route('billing.subscribe') }}" method="POST" class="mt-auto">
-                        @csrf
-                        <input type="hidden" name="plan_id" value="{{ $plan->id }}">
-                        <div class="row g-2 mb-2">
-                            <div class="col-6">
-                                <select name="billing_cycle" class="form-select form-select-sm">
-                                    <option value="monthly">1 Bulan (Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }})</option>
-                                    <option value="yearly">1 Tahun (Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }})</option>
-                                </select>
-                            </div>
-                            <div class="col-6">
-                                <select name="payment_method" class="form-select form-select-sm">
-                                    @if($bankInfo['has_platform_qris'])
-                                        <option value="qris">QRIS Dinamis</option>
-                                    @endif
-                                    <option value="transfer">Transfer Bank</option>
-                                </select>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn {{ $plan->is_featured ? 'btn-primary-green' : 'btn-outline-success' }} w-100 fw-semibold">
-                            Pilih Paket {{ $plan->name }}
-                        </button>
-                    </form>
                 </div>
+
+                <!-- Dynamic Price Display -->
+                <div class="kl-plan-price-box my-3">
+                    <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2">
+                        <div>
+                            <span class="fs-3 fw-bold text-dark js-billing-price"
+                                  data-monthly="Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}"
+                                  data-yearly="Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}">
+                                Rp{{ number_format((float)$plan->price_monthly, 0, ',', '.') }}
+                            </span>
+                            <span class="text-muted small js-billing-cycle-label">/ bulan</span>
+                        </div>
+                        @if($planSavePct > 0)
+                            <span class="badge bg-success bg-opacity-10 text-success rounded-pill js-billing-save-badge d-none">
+                                Hemat {{ $planSavePct }}%
+                            </span>
+                        @endif
+                    </div>
+                    <small class="text-muted d-block mt-1 js-billing-alt-price"
+                           data-monthly="Atau Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}/tahun{{ $planSavePct > 0 ? ' (hemat ' . $planSavePct . '%)' : '' }}"
+                           data-yearly="Setara Rp{{ number_format(round((float)$plan->price_yearly / 12), 0, ',', '.') }}/bulan">
+                        Atau Rp{{ number_format((float)$plan->price_yearly, 0, ',', '.') }}/tahun{{ $planSavePct > 0 ? ' (hemat ' . $planSavePct . '%)' : '' }}
+                    </small>
+                </div>
+
+                <!-- Compact Quota Pills -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <div class="kl-plan-quota-pill">
+                            <span class="text-muted"><i class="fa-solid fa-users me-1"></i>Akun</span>
+                            <strong class="text-dark">{{ $plan->max_users ? "Maks. {$plan->max_users}" : 'Unlimited' }}</strong>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="kl-plan-quota-pill">
+                            <span class="text-muted"><i class="fa-solid fa-mug-hot me-1"></i>Menu</span>
+                            <strong class="text-dark">{{ $plan->max_menus ? "Maks. {$plan->max_menus}" : 'Unlimited' }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <ul class="list-unstyled small d-grid gap-1 mb-4">
+                    <li><i class="fa-solid fa-check text-success me-2"></i>Mode Offline POS + Auto-Sync</li>
+                    <li><i class="fa-solid fa-check text-success me-2"></i>Pengeluaran Kas, Laba Bersih &amp; PDF</li>
+                    <li>
+                        @if($plan->hasFeature('qris_dynamic'))
+                            <i class="fa-solid fa-star text-warning me-2"></i><strong class="text-success">QRIS Dinamis + Auto-Verify Listener</strong>
+                        @else
+                            <i class="fa-solid fa-xmark text-muted me-2"></i><span class="text-muted">Tanpa QRIS Dinamis Auto-Verify</span>
+                        @endif
+                    </li>
+                </ul>
+
+                <form action="{{ route('billing.subscribe') }}" method="POST" class="mt-auto">
+                    @csrf
+                    <input type="hidden" name="plan_id" value="{{ $plan->id }}">
+                    <input type="hidden" name="billing_cycle" value="monthly" class="js-billing-cycle-input">
+                    <input type="hidden" name="payment_method" value="{{ $defaultMethod }}" class="js-billing-method-input">
+                    <button type="submit" class="btn {{ $plan->is_featured ? 'btn-primary-green' : 'btn-outline-success' }} w-100 fw-semibold">
+                        {{ $isCurrentPlan ? 'Perpanjang Paket ' . $plan->name : 'Pilih Paket ' . $plan->name }}
+                    </button>
+                </form>
             </div>
         </div>
     @endforeach
@@ -263,6 +344,41 @@
 @endsection
 
 @section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Global Cycle Toggle (Monthly / Yearly)
+        const cycleBtns = document.querySelectorAll('.js-billing-cycle-btn');
+        const methodBtns = document.querySelectorAll('.js-billing-method-btn');
+        const priceEls = document.querySelectorAll('.js-billing-price');
+        const altPriceEls = document.querySelectorAll('.js-billing-alt-price');
+        const labelEls = document.querySelectorAll('.js-billing-cycle-label');
+        const saveBadges = document.querySelectorAll('.js-billing-save-badge');
+        const cycleInputs = document.querySelectorAll('.js-billing-cycle-input');
+        const methodInputs = document.querySelectorAll('.js-billing-method-input');
+
+        function setBillingCycle(cycle) {
+            const isYearly = cycle === 'yearly';
+            cycleBtns.forEach(b => b.classList.toggle('active', b.dataset.cycle === cycle));
+            priceEls.forEach(el => { el.textContent = isYearly ? el.dataset.yearly : el.dataset.monthly; });
+            altPriceEls.forEach(el => { el.textContent = isYearly ? el.dataset.yearly : el.dataset.monthly; });
+            labelEls.forEach(el => { el.textContent = isYearly ? '/ tahun' : '/ bulan'; });
+            saveBadges.forEach(el => { el.classList.toggle('d-none', !isYearly); });
+            cycleInputs.forEach(inp => { inp.value = cycle; });
+        }
+
+        cycleBtns.forEach(btn => {
+            btn.addEventListener('click', () => setBillingCycle(btn.dataset.cycle || 'monthly'));
+        });
+
+        methodBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const method = btn.dataset.method || 'transfer';
+                methodBtns.forEach(b => b.classList.toggle('active', b.dataset.method === method));
+                methodInputs.forEach(inp => { inp.value = method; });
+            });
+        });
+    });
+</script>
 @if($activeInvoice)
 @if(!empty($activeInvoice->qris_payload))
 <script src="{{ asset('assets/js/qrcode.min.js') }}"></script>

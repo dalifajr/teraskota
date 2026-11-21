@@ -54,50 +54,80 @@
     </div>
 </div>
 
-<!-- Filter Panel -->
-<div class="card premium-card mb-4">
-    <div class="card-body p-4">
-        <form action="{{ route('expenses.index') }}" method="GET" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label for="search" class="form-label fw-medium text-dark small">Cari Keterangan / No. Bukti</label>
-                <input type="text" name="search" id="search" class="form-control form-control-sm" placeholder="Contoh: Es batu, bahan, listrik..." value="{{ request('search') }}">
+@php
+    $expAdvancedCount = 0;
+    foreach (['category', 'payment_method', 'start_date', 'end_date'] as $efk) {
+        if (filled(request($efk))) $expAdvancedCount++;
+    }
+    $hasAnyExpFilter = $expAdvancedCount > 0 || filled(request('search'));
+@endphp
+
+<!-- Compact Search & Collapsible Filter Toolbar -->
+<div class="kl-filter-toolbar p-3 mb-4">
+    <form action="{{ route('expenses.index') }}" method="GET">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+            <div class="input-group input-group-sm flex-grow-1" style="min-width: 220px;">
+                <span class="input-group-text bg-light border-end-0 text-muted"><i class="fa-solid fa-magnifying-glass"></i></span>
+                <input type="text" name="search" id="search" class="form-control border-start-0" placeholder="Cari keterangan, bahan, listrik, atau no. bukti..." value="{{ request('search') }}">
             </div>
 
-            <div class="col-md-2 col-6">
-                <label for="category" class="form-label fw-medium text-dark small">Kategori Biaya</label>
-                <select name="category" id="category" class="form-select form-select-sm">
-                    <option value="">Semua Kategori</option>
-                    @foreach($categories as $key => $label)
-                        <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $label }}</option>
-                    @endforeach
-                </select>
-            </div>
+            <button type="button"
+                    class="btn btn-sm {{ $expAdvancedCount > 0 ? 'btn-success' : 'btn-outline-secondary' }} kl-filter-toggle-btn"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#expAdvancedFilters"
+                    aria-expanded="{{ $expAdvancedCount > 0 ? 'true' : 'false' }}"
+                    aria-controls="expAdvancedFilters">
+                <i class="fa-solid fa-sliders"></i>
+                <span>Filter</span>
+                @if($expAdvancedCount > 0)
+                    <span class="badge bg-white text-success rounded-pill">{{ $expAdvancedCount }}</span>
+                @endif
+            </button>
 
-            <div class="col-md-2 col-6">
-                <label for="payment_method" class="form-label fw-medium text-dark small">Sumber Dana</label>
-                <select name="payment_method" id="payment_method" class="form-select form-select-sm">
-                    <option value="">Semua Sumber</option>
-                    <option value="tunai" {{ request('payment_method') === 'tunai' ? 'selected' : '' }}>Kas Tunai</option>
-                    <option value="non-tunai" {{ request('payment_method') === 'non-tunai' ? 'selected' : '' }}>Transfer / Non-Tunai</option>
-                </select>
-            </div>
+            <button type="submit" class="btn btn-sm btn-primary-green px-3">
+                <i class="fa-solid fa-search me-1"></i>Cari
+            </button>
 
-            <div class="col-md-2 col-6">
-                <label for="start_date" class="form-label fw-medium text-dark small">Dari Tanggal</label>
-                <input type="date" name="start_date" id="start_date" class="form-control form-control-sm" value="{{ request('start_date') }}">
-            </div>
+            @if($hasAnyExpFilter)
+                <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset Filter">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </a>
+            @endif
+        </div>
 
-            <div class="col-md-2 col-6">
-                <label for="end_date" class="form-label fw-medium text-dark small">Sampai Tanggal</label>
-                <input type="date" name="end_date" id="end_date" class="form-control form-control-sm" value="{{ request('end_date') }}">
-            </div>
+        <div class="collapse {{ $expAdvancedCount > 0 ? 'show' : '' }}" id="expAdvancedFilters">
+            <div class="row g-2 g-md-3 pt-3 mt-3 border-top align-items-end">
+                <div class="col-6 col-md-3">
+                    <label for="category" class="form-label fw-medium text-dark small mb-1">Kategori Biaya</label>
+                    <select name="category" id="category" class="form-select form-select-sm">
+                        <option value="">Semua Kategori</option>
+                        @foreach($categories as $key => $label)
+                            <option value="{{ $key }}" {{ request('category') === $key ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-            <div class="col-md-1 d-flex gap-1">
-                <button type="submit" class="btn btn-sm btn-primary-green flex-grow-1" title="Terapkan Filter"><i class="fa-solid fa-filter"></i></button>
-                <a href="{{ route('expenses.index') }}" class="btn btn-sm btn-outline-secondary" title="Reset"><i class="fa-solid fa-rotate-left"></i></a>
+                <div class="col-6 col-md-3">
+                    <label for="payment_method" class="form-label fw-medium text-dark small mb-1">Sumber Dana</label>
+                    <select name="payment_method" id="payment_method" class="form-select form-select-sm">
+                        <option value="">Semua Sumber</option>
+                        <option value="tunai" {{ request('payment_method') === 'tunai' ? 'selected' : '' }}>Kas Tunai</option>
+                        <option value="non-tunai" {{ request('payment_method') === 'non-tunai' ? 'selected' : '' }}>Transfer / Non-Tunai</option>
+                    </select>
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <label for="start_date" class="form-label fw-medium text-dark small mb-1">Dari Tanggal</label>
+                    <input type="date" name="start_date" id="start_date" class="form-control form-control-sm" value="{{ request('start_date') }}">
+                </div>
+
+                <div class="col-6 col-md-3">
+                    <label for="end_date" class="form-label fw-medium text-dark small mb-1">Sampai Tanggal</label>
+                    <input type="date" name="end_date" id="end_date" class="form-control form-control-sm" value="{{ request('end_date') }}">
+                </div>
             </div>
-        </form>
-    </div>
+        </div>
+    </form>
 </div>
 
 <!-- Expenses Table -->
@@ -126,7 +156,7 @@
                             <th class="text-center">Sumber Dana</th>
                             <th class="text-end">Nominal (Rp)</th>
                             <th>Dicatat Oleh</th>
-                            <th class="text-center" style="width: 120px;">Aksi</th>
+                            <th class="text-end" style="width: 72px;">Aksi</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -148,27 +178,40 @@
                                 </td>
                                 <td class="text-end fw-bold text-danger">Rp{{ number_format($exp->amount, 0, ',', '.') }}</td>
                                 <td><span class="small fw-semibold">{{ $exp->creator->name ?? 'Admin' }}</span></td>
-                                <td class="text-center">
-                                    <div class="btn-group btn-group-sm">
-                                        <button
-                                            type="button"
-                                            class="btn btn-outline-primary btn-edit-expense"
-                                            data-id="{{ $exp->id }}"
-                                            data-date="{{ $exp->expense_date->format('Y-m-d') }}"
-                                            data-category="{{ $exp->category }}"
-                                            data-description="{{ $exp->description }}"
-                                            data-amount="{{ (float) $exp->amount }}"
-                                            data-method="{{ $exp->payment_method }}"
-                                            data-notes="{{ $exp->notes }}"
-                                            title="Edit"
-                                        >
-                                            <i class="fa-solid fa-edit"></i>
+                                <td class="text-end">
+                                    <div class="dropdown kl-action-dropdown d-inline-block">
+                                        <button type="button" class="btn kl-action-btn" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Menu Aksi {{ $exp->expense_number }}" title="Menu Aksi">
+                                            <i class="fa-solid fa-bars"></i>
                                         </button>
-                                        <form action="{{ route('expenses.destroy', $exp->id) }}" method="POST" class="d-inline" data-confirm="Hapus catatan pengeluaran {{ $exp->expense_number }} ({{ $exp->description }})?">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-outline-danger" title="Hapus"><i class="fa-solid fa-trash"></i></button>
-                                        </form>
+                                        <ul class="dropdown-menu dropdown-menu-end kl-action-menu">
+                                            <li>
+                                                <button
+                                                    type="button"
+                                                    class="dropdown-item btn-edit-expense"
+                                                    data-id="{{ $exp->id }}"
+                                                    data-date="{{ $exp->expense_date->format('Y-m-d') }}"
+                                                    data-category="{{ $exp->category }}"
+                                                    data-description="{{ $exp->description }}"
+                                                    data-amount="{{ (float) $exp->amount }}"
+                                                    data-method="{{ $exp->payment_method }}"
+                                                    data-notes="{{ $exp->notes }}"
+                                                >
+                                                    <i class="fa-solid fa-pen-to-square text-primary"></i>
+                                                    <span>Edit Pengeluaran</span>
+                                                </button>
+                                            </li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            <li>
+                                                <form action="{{ route('expenses.destroy', $exp->id) }}" method="POST" class="m-0" data-confirm="Hapus catatan pengeluaran {{ $exp->expense_number }} ({{ $exp->description }})?">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="dropdown-item text-danger">
+                                                        <i class="fa-solid fa-trash"></i>
+                                                        <span>Hapus Pengeluaran</span>
+                                                    </button>
+                                                </form>
+                                            </li>
+                                        </ul>
                                     </div>
                                 </td>
                             </tr>
