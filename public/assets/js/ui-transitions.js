@@ -119,6 +119,7 @@
             const isSilentBackgroundPoll =
                 urlStr.includes('/notifications/unread') ||
                 urlStr.includes('/pos/qris/check-status/') ||
+                urlStr.includes('/pos/bootstrap') ||
                 urlStr.includes('/billing/invoice/');
 
             if (!isSilentBackgroundPoll) {

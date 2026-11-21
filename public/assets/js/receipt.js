@@ -13,18 +13,27 @@ const ReceiptRenderer = (function () {
         }).format(number || 0);
     }
 
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     /**
      * Generate HTML string for thermal receipt.
      */
     function renderHTML(transaction) {
         if (!transaction) return '';
 
-        const isSynced = transaction.sync_status === 'synced';
-        const trxNumber = transaction.transaction_number || transaction.local_number || transaction.sync_id.substring(0, 8);
-        const cashierName = transaction.cashier?.name || (transaction.cashier_name || 'Kasir');
-        const customerName = transaction.customer_name || '-';
-        const dateStr = transaction.transaction_date || new Date().toISOString().split('T')[0];
-        const timeStr = transaction.transaction_time ? transaction.transaction_time.substring(0, 5) : new Date().toTimeString().substring(0, 5);
+        const isSynced = transaction.sync_status === 'synced' || Boolean(transaction.id);
+        const trxNumber = escapeHtml(transaction.transaction_number || transaction.local_number || String(transaction.sync_id || 'OFFLINE').substring(0, 8));
+        const cashierName = escapeHtml(transaction.cashier?.name || (transaction.cashier_name || 'Kasir'));
+        const customerName = transaction.customer_name ? escapeHtml(transaction.customer_name) : '-';
+        const dateStr = escapeHtml(transaction.transaction_date || new Date().toISOString().split('T')[0]);
+        const timeStr = escapeHtml(transaction.transaction_time ? String(transaction.transaction_time).substring(0, 5) : new Date().toTimeString().substring(0, 5));
 
         let itemsHtml = '';
         let totalQty = 0;
@@ -32,7 +41,7 @@ const ReceiptRenderer = (function () {
 
         const items = transaction.details || transaction.items || [];
         items.forEach(item => {
-            const name = item.menu_name_snapshot || item.name || item.menu_name || 'Menu';
+            const name = escapeHtml(item.menu_name_snapshot || item.name || item.menu_name || 'Menu');
             const price = Number(item.price_snapshot || item.price || 0);
             const qty = Number(item.quantity || 1);
             const subtotal = Number(item.subtotal || (price * qty));
@@ -78,18 +87,34 @@ const ReceiptRenderer = (function () {
         ` : '';
 
         const cashTendered = Number(transaction.cash_tendered || totalSales);
-        const changeReturned = Number(transaction.change_returned || (cashTendered - totalSales));
-        const paymentMethod = (transaction.payment_method || 'tunai').toUpperCase();
+        const changeReturned = Number(transaction.change_returned !== undefined && transaction.change_returned !== null ? transaction.change_returned : (cashTendered - totalSales));
+        const paymentMethod = escapeHtml((transaction.payment_method || 'tunai').toUpperCase());
+        const isCash = paymentMethod === 'TUNAI';
+
+        const cashRowsHtml = isCash ? `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                <span style="color: #64748b;">Tunai:</span>
+                <span>${formatRupiah(cashTendered)}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: 600;">
+                <span style="color: #64748b;">Kembali:</span>
+                <span style="color: ${changeReturned >= 0 ? '#15803d' : '#b91c1c'};">${formatRupiah(changeReturned)}</span>
+            </div>
+        ` : '';
 
         const syncBadge = !isSynced 
             ? `<div style="text-align: center; margin-bottom: 8px;"><span style="background: #fef08a; color: #854d0e; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; border: 1px dashed #ca8a04;">NOTA OFFLINE (PENDING SYNC)</span></div>`
             : '';
 
         const tenantInfo = window.POS_TENANT_INFO || {};
-        const storeName = (tenantInfo.name || 'KasirLoka').toUpperCase();
-        const storeAddress = tenantInfo.address || '';
-        const storePhone = tenantInfo.phone || '';
-        const storeFooter = tenantInfo.receipt_footer || 'Terima Kasih Atas Kunjungan Anda';
+        const storeName = escapeHtml((tenantInfo.name || 'KasirLoka').toUpperCase());
+        const storeAddress = escapeHtml(tenantInfo.address || '');
+        const storePhone = escapeHtml(tenantInfo.phone || '');
+        const storeFooter = escapeHtml(tenantInfo.receipt_footer || 'Terima Kasih Atas Kunjungan Anda');
+        const notesHtml = transaction.notes ? `
+                <div style="margin-bottom: 8px; font-size: 10px; color: #64748b; font-style: italic; text-align: center;">
+                    Catatan: ${escapeHtml(transaction.notes)}
+                </div>` : '';
 
         return `
             <div class="receipt-card" style="font-family: 'Courier New', Courier, monospace; width: 100%; max-width: 320px; margin: 0 auto; padding: 12px; background: #ffffff; color: #1e293b; font-size: 12px; line-height: 1.4;">
@@ -143,23 +168,14 @@ const ReceiptRenderer = (function () {
                         <span style="color: #64748b;">Metode Bayar:</span>
                         <span style="font-weight: 600;">${paymentMethod}</span>
                     </div>
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-                        <span style="color: #64748b;">Bayar:</span>
-                        <span>${formatRupiah(cashTendered)}</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; font-weight: 600;">
-                        <span style="color: #64748b;">Kembali:</span>
-                        <span style="color: ${changeReturned >= 0 ? '#15803d' : '#b91c1c'};">${formatRupiah(changeReturned)}</span>
-                    </div>
+                    ${cashRowsHtml}
                 </div>
 
-                ${transaction.notes ? `
-                <div style="margin-bottom: 8px; font-size: 10px; color: #64748b; font-style: italic; text-align: center;">
-                    Catatan: ${transaction.notes}
-                </div>` : ''}
+                ${notesHtml}
 
                 <!-- Footer -->
                 <div style="text-align: center; font-size: 10px; color: #64748b; margin-top: 8px;">
+                    <p style="margin: 0 0 2px 0; font-weight: 600;">*** LUNAS ***</p>
                     <p style="margin: 0 0 2px 0; font-weight: 600;">${storeFooter}</p>
                     <p style="margin: 0; font-size: 9px; opacity: 0.8;">Simpan struk ini sebagai bukti pembayaran</p>
                 </div>

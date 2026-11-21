@@ -269,10 +269,10 @@
                 <img src="{{ $currentTenant && $currentTenant->logo_path ? $currentTenant->logoUrl() : asset('assets/images/logo.png') }}" alt="{{ $currentTenant?->name ?? $platformName }}" class="rounded-circle shadow-sm" style="width: 32px; height: 32px; object-fit: cover; background: #fff;">
                 <span class="text-truncate" style="max-width: 190px;">{{ $currentTenant?->name ?? $platformName }}</span> <small class="text-white opacity-75 fw-normal d-none d-md-inline">POS</small>
             </a>
-            <div class="pos-user-badge">
+            <a href="{{ route('profile.edit') }}" class="pos-user-badge text-decoration-none" title="Profil Kasir & Ganti Password">
                 <i class="fa-solid fa-user-tag"></i>
                 <span>{{ Auth::user()->name }}</span>
-            </div>
+            </a>
 
             <!-- Network Status Badge -->
             <div id="posNetworkBadge" class="pos-badge-status online" title="Status Jaringan POS">
@@ -409,6 +409,7 @@
             'phone' => $currentTenant->phone,
             'receipt_footer' => $currentTenant->receipt_footer,
             'has_qris_dynamic' => $currentTenant->hasFeature('qris_dynamic'),
+            'has_qris_configured' => !empty(\App\Models\Setting::getValue('qris_payload')),
         ] : [
             'id' => null,
             'name' => $platformName ?? 'KasirLoka',
@@ -416,6 +417,7 @@
             'phone' => '',
             'receipt_footer' => 'Terima Kasih Atas Kunjungan Anda',
             'has_qris_dynamic' => true,
+            'has_qris_configured' => !empty(\App\Models\Setting::getValue('qris_payload')),
         ];
     @endphp
     <script>

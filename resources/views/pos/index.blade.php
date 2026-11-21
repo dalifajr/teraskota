@@ -114,6 +114,37 @@
         transform: scale(0.96);
     }
 
+    .pos-product-card.in-cart {
+        border-color: var(--accent-green);
+        background: #f0fdf4;
+        box-shadow: 0 4px 14px rgba(22, 163, 74, 0.14);
+    }
+
+    .pos-card-qty-badge {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        background: var(--primary-green);
+        color: #ffffff;
+        font-size: 0.72rem;
+        font-weight: 800;
+        padding: 2px 7px;
+        border-radius: 999px;
+        font-variant-numeric: tabular-nums;
+        box-shadow: 0 2px 6px rgba(17, 54, 27, 0.25);
+        z-index: 3;
+    }
+
+    .pos-product-price,
+    .pos-grand-total,
+    .pos-floating-total,
+    #checkoutScreenGrandTotal,
+    #screenChangeText,
+    #checkoutModalTotal,
+    #changeAmountText {
+        font-variant-numeric: tabular-nums;
+    }
+
     .pos-product-icon {
         width: 46px;
         height: 46px;
@@ -552,7 +583,7 @@
 <!-- Left Panel: Menu Catalog -->
 <section class="pos-catalog-panel" id="posCatalogSection">
     <!-- Top Search & Info Bar -->
-    <div class="p-3 border-bottom d-flex align-items-center gap-3">
+    <div class="p-3 border-bottom d-flex align-items-center gap-2 gap-md-3">
         <div class="input-group">
             <span class="input-group-text bg-light border-end-0">
                 <i class="fa-solid fa-magnifying-glass text-muted"></i>
@@ -561,16 +592,22 @@
                 type="text"
                 id="posSearchInput"
                 class="form-control border-start-0 ps-0"
-                placeholder="Cari nama atau kode menu... (Tekan F2)"
+                placeholder="Cari nama/kode menu lalu Enter... (F2)"
                 autocomplete="off"
             >
-            <button class="btn btn-outline-secondary d-none" type="button" id="btnClearSearch">
+            <button class="btn btn-outline-secondary d-none" type="button" id="btnClearSearch" aria-label="Bersihkan Pencarian">
                 <i class="fa-solid fa-xmark"></i>
             </button>
         </div>
 
-        <span class="badge bg-success bg-opacity-10 text-success fw-semibold px-3 py-2 rounded-pill d-none d-md-inline-block">
-            <i class="fa-solid fa-store me-1"></i> Mode Kasir Aktif
+        <button type="button" class="btn btn-sm btn-outline-warning text-dark fw-semibold position-relative flex-shrink-0" id="btnOpenHeldOrders" title="Lihat Daftar Pesanan yang Ditahan">
+            <i class="fa-solid fa-pause me-1"></i>
+            <span class="d-none d-sm-inline">Tertahan</span>
+            <span class="badge rounded-pill bg-warning text-dark ms-1" id="heldOrdersBadge">0</span>
+        </button>
+
+        <span class="badge bg-success bg-opacity-10 text-success fw-semibold px-3 py-2 rounded-pill d-none d-xl-inline-block flex-shrink-0">
+            <i class="fa-solid fa-keyboard me-1"></i> F2 Cari · F9 Bayar
         </span>
     </div>
 
@@ -593,16 +630,19 @@
             @foreach($category->menus as $menu)
                 <div
                     class="pos-product-card menu-item-element"
+                    role="button"
+                    tabindex="0"
                     data-id="{{ $menu->id }}"
+                    data-category-id="{{ $category->id }}"
                     data-name="{{ $menu->name }}"
                     data-code="{{ $menu->code }}"
                     data-price="{{ $menu->price }}"
                     data-category="cat-{{ $category->id }}"
-                    onclick="posAddToCart({{ $menu->id }}, '{{ addslashes($menu->name) }}', {{ $menu->price }}, '{{ $menu->code }}')"
                 >
+                    <span class="pos-card-qty-badge d-none" data-badge-for="{{ $menu->id }}">0x</span>
                     <div>
                         <div class="pos-product-icon">
-                            <i class="fa-solid fa-mug-hot"></i>
+                            <i class="fa-solid fa-utensils"></i>
                         </div>
                         <div class="pos-product-code">{{ $menu->code }}</div>
                         <div class="pos-product-name" title="{{ $menu->name }}">{{ $menu->name }}</div>
@@ -626,9 +666,14 @@
             </h6>
             <small class="text-muted" id="cartItemCountText">0 item</small>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-danger" id="btnClearCart" title="Kosongkan Keranjang">
-            <i class="fa-solid fa-trash-can me-1"></i> Kosongkan
-        </button>
+        <div class="d-flex gap-1">
+            <button type="button" class="btn btn-sm btn-outline-warning text-dark" id="btnHoldOrder" title="Tahan Pesanan Sementara (Hold Order)" disabled>
+                <i class="fa-solid fa-pause"></i> Tahan
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="btnClearCart" title="Kosongkan Keranjang">
+                <i class="fa-solid fa-trash-can"></i>
+            </button>
+        </div>
     </div>
 
     <!-- Cart Items List -->
@@ -798,9 +843,14 @@
                             </label>
                         </div>
                         <div class="col-6">
-                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayQris" value="qris">
-                            <label class="btn btn-outline-success w-100 py-3 fw-bold small text-center" for="screenPayQris">
+                            <input type="radio" class="btn-check" name="screen_payment_method" id="screenPayQris" value="qris" @if(!($hasQrisFeature ?? true)) disabled @endif>
+                            <label class="btn {{ ($hasQrisFeature ?? true) ? 'btn-outline-success' : 'btn-outline-secondary opacity-75' }} w-100 py-3 fw-bold small text-center position-relative" for="screenPayQris">
                                 <i class="fa-solid fa-qrcode d-block mb-1 fs-4"></i> QRIS
+                                @if(!($hasQrisFeature ?? true))
+                                    <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="font-size: 0.62rem;">PRO</span>
+                                @elseif(!($hasQrisConfigured ?? true))
+                                    <span class="badge bg-secondary position-absolute top-0 end-0 m-1" style="font-size: 0.6rem;">Belum Diatur</span>
+                                @endif
                             </label>
                         </div>
                     </div>
@@ -901,9 +951,14 @@
                             </label>
                         </div>
                         <div class="col-6">
-                            <input type="radio" class="btn-check" name="payment_method" id="payMethodQris" value="qris">
-                            <label class="btn btn-outline-success w-100 py-2 fw-semibold small" for="payMethodQris">
+                            <input type="radio" class="btn-check" name="payment_method" id="payMethodQris" value="qris" @if(!($hasQrisFeature ?? true)) disabled @endif>
+                            <label class="btn {{ ($hasQrisFeature ?? true) ? 'btn-outline-success' : 'btn-outline-secondary opacity-75' }} w-100 py-2 fw-semibold small position-relative" for="payMethodQris">
                                 <i class="fa-solid fa-qrcode d-block mb-1 fs-5"></i> QRIS
+                                @if(!($hasQrisFeature ?? true))
+                                    <span class="badge bg-warning text-dark position-absolute top-0 end-0 m-1" style="font-size: 0.6rem;">PRO</span>
+                                @elseif(!($hasQrisConfigured ?? true))
+                                    <span class="badge bg-secondary position-absolute top-0 end-0 m-1" style="font-size: 0.58rem;">Belum Diatur</span>
+                                @endif
                             </label>
                         </div>
                     </div>
@@ -965,7 +1020,7 @@
             </div>
 
             <div class="modal-footer bg-light border-0 p-3">
-                <button type="button" class="btn btn-secondary px-3" data-bs-dismiss="modal">Batal</button>
+                <button type="button" class="btn btn-light px-3" data-bs-dismiss="modal">Batal</button>
                 <button type="button" class="btn btn-primary-green px-4 fw-bold" id="btnSubmitPayment">
                     <i class="fa-solid fa-circle-check me-2"></i> Proses Pembayaran
                 </button>
@@ -1087,8 +1142,11 @@
                     <p class="mt-2 text-muted small">Memuat ringkasan kasir...</p>
                 </div>
             </div>
-            <div class="modal-footer bg-light border-0 p-3">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+            <div class="modal-footer bg-light border-0 p-3 d-flex justify-content-between">
+                <button type="button" class="btn btn-success btn-sm fw-semibold d-none" id="btnShareShiftWa">
+                    <i class="fa-brands fa-whatsapp me-1"></i> Kirim Rekap Shift WA
+                </button>
+                <button type="button" class="btn btn-light ms-auto" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>
     </div>
@@ -1249,6 +1307,9 @@
             if (checkoutScreen && checkoutScreen.style.display === 'block') {
                 showCatalogView();
             }
+            const holdBtnEmpty = document.getElementById('btnHoldOrder');
+            if (holdBtnEmpty) holdBtnEmpty.disabled = true;
+            syncProductCardBadges();
             return;
         }
 
@@ -1318,7 +1379,185 @@
         if (screen && screen.style.display === 'block') {
             populateCheckoutScreen();
         }
+        const holdBtnActive = document.getElementById('btnHoldOrder');
+        if (holdBtnActive) holdBtnActive.disabled = false;
+        syncProductCardBadges();
     }
+
+    // Sync live item quantity badges on catalog product cards
+    function syncProductCardBadges() {
+        const qtyMap = new Map();
+        cart.forEach(item => qtyMap.set(String(item.id), item.qty));
+
+        document.querySelectorAll('#posProductGrid .pos-product-card').forEach(card => {
+            const id = String(card.getAttribute('data-id') || '');
+            const qty = qtyMap.get(id) || 0;
+            const badge = card.querySelector('.pos-card-qty-badge');
+            if (qty > 0) {
+                card.classList.add('in-cart');
+                if (badge) {
+                    badge.textContent = `${qty}x`;
+                    badge.classList.remove('d-none');
+                }
+            } else {
+                card.classList.remove('in-cart');
+                if (badge) badge.classList.add('d-none');
+            }
+        });
+    }
+
+    // Clean event delegation for catalog product cards (click + Enter/Space keyboard access)
+    document.getElementById('posProductGrid')?.addEventListener('click', function (e) {
+        const card = e.target.closest('.pos-product-card');
+        if (!card) return;
+        posAddToCart(
+            Number(card.getAttribute('data-id')),
+            card.getAttribute('data-name') || '',
+            parseFloat(card.getAttribute('data-price') || 0),
+            card.getAttribute('data-code') || ''
+        );
+    });
+
+    document.getElementById('posProductGrid')?.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        const card = e.target.closest('.pos-product-card');
+        if (!card) return;
+        e.preventDefault();
+        posAddToCart(
+            Number(card.getAttribute('data-id')),
+            card.getAttribute('data-name') || '',
+            parseFloat(card.getAttribute('data-price') || 0),
+            card.getAttribute('data-code') || ''
+        );
+    });
+
+    // ==========================================
+    // Hold / Park Order Engine (Tenant-Isolated localStorage)
+    // ==========================================
+    const HELD_ORDERS_KEY = `kl_held_orders_t_${window.POS_TENANT_ID || 'default'}`;
+
+    function getHeldOrders() {
+        try {
+            const raw = localStorage.getItem(HELD_ORDERS_KEY);
+            const parsed = raw ? JSON.parse(raw) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function saveHeldOrders(list) {
+        try {
+            localStorage.setItem(HELD_ORDERS_KEY, JSON.stringify(list));
+        } catch (e) {}
+        updateHeldOrdersBadge();
+    }
+
+    function updateHeldOrdersBadge() {
+        const badge = document.getElementById('heldOrdersBadge');
+        if (badge) {
+            const count = getHeldOrders().length;
+            badge.textContent = count;
+        }
+    }
+
+    document.getElementById('btnHoldOrder')?.addEventListener('click', async function () {
+        if (cart.length === 0) return;
+
+        const { value: label, isConfirmed } = await Swal.fire({
+            title: 'Tahan Pesanan (Hold Order)',
+            input: 'text',
+            inputLabel: 'Nama Pelanggan / Nomor Meja (Opsional)',
+            inputPlaceholder: 'Contoh: Meja 3 / Bpk. Andi',
+            showCancelButton: true,
+            reverseButtons: true,
+            confirmButtonColor: '#14532d',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Tahan Pesanan',
+            cancelButtonText: 'Batal'
+        });
+
+        if (!isConfirmed) return;
+
+        const list = getHeldOrders();
+        const total = cart.reduce((sum, i) => sum + (i.price * i.qty), 0);
+        list.unshift({
+            id: 'hold-' + Date.now(),
+            label: (label || '').trim() || ('Pesanan #' + (list.length + 1)),
+            time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            total: total,
+            items: cart.map(i => ({ ...i }))
+        });
+
+        saveHeldOrders(list.slice(0, 20));
+        cart = [];
+        renderCart();
+
+        Swal.fire({
+            icon: 'success',
+            title: 'Pesanan Ditahan',
+            text: 'Keranjang dikosongkan dan siap melayani pelanggan berikutnya.',
+            timer: 1500,
+            showConfirmButton: false
+        });
+    });
+
+    window.resumeHeldOrder = function (holdId) {
+        const list = getHeldOrders();
+        const idx = list.findIndex(o => o.id === holdId);
+        if (idx === -1) return;
+        const order = list[idx];
+        cart = order.items.map(i => ({ ...i }));
+        list.splice(idx, 1);
+        saveHeldOrders(list);
+        renderCart();
+        Swal.close();
+    };
+
+    window.deleteHeldOrder = function (holdId) {
+        const list = getHeldOrders().filter(o => o.id !== holdId);
+        saveHeldOrders(list);
+        document.getElementById('btnOpenHeldOrders')?.click();
+    };
+
+    document.getElementById('btnOpenHeldOrders')?.addEventListener('click', function () {
+        const list = getHeldOrders();
+        if (list.length === 0) {
+            Swal.fire({
+                icon: 'info',
+                title: 'Tidak Ada Pesanan Tertahan',
+                text: 'Gunakan tombol "Tahan" di keranjang jika pelanggan ingin menunggu atau menambah pesanan nanti.',
+                confirmButtonColor: '#14532d'
+            });
+            return;
+        }
+
+        const rowsHtml = list.map(o => {
+            const qtyTotal = o.items.reduce((s, i) => s + i.qty, 0);
+            const safeLabel = String(o.label).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return `
+                <div class="d-flex justify-content-between align-items-center p-2 mb-2 bg-light border rounded-3 text-start">
+                    <div>
+                        <div class="fw-bold text-dark small">${safeLabel}</div>
+                        <small class="text-muted">${o.time} · ${qtyTotal} pcs · <strong class="text-success">${formatRupiah(o.total)}</strong></small>
+                    </div>
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-sm btn-success py-1 px-2" onclick="window.resumeHeldOrder('${o.id}')">Panggil</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger py-1 px-2" onclick="window.deleteHeldOrder('${o.id}')"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        Swal.fire({
+            title: `Pesanan Tertahan (${list.length})`,
+            html: `<div style="max-height: 55vh; overflow-y: auto;">${rowsHtml}</div>`,
+            showConfirmButton: false,
+            showCloseButton: true
+        });
+    });
+
+    updateHeldOrdersBadge();
 
     // Window Resize Sync for Mobile Floating Bar
     window.addEventListener('resize', function() {
@@ -2377,10 +2616,33 @@
         });
     });
 
-    // Search Input Event Handlers
+    // Search Input Event Handlers + Enter-to-Add (Barcode / Quick Code Support)
     const posSearchInputEl = document.getElementById('posSearchInput');
     posSearchInputEl?.addEventListener('input', function() {
         filterCatalog();
+    });
+
+    posSearchInputEl?.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+        const query = (this.value || '').trim().toLowerCase();
+        if (!query) return;
+
+        const allCards = Array.from(document.querySelectorAll('#posProductGrid .menu-item-element'));
+        const exactCodeCard = allCards.find(c => (c.getAttribute('data-code') || '').trim().toLowerCase() === query);
+        const visibleCards = allCards.filter(c => c.style.display !== 'none');
+        const targetCard = exactCodeCard || (visibleCards.length === 1 ? visibleCards[0] : null);
+
+        if (targetCard) {
+            e.preventDefault();
+            posAddToCart(
+                Number(targetCard.getAttribute('data-id')),
+                targetCard.getAttribute('data-name') || '',
+                parseFloat(targetCard.getAttribute('data-price') || 0),
+                targetCard.getAttribute('data-code') || ''
+            );
+            this.value = '';
+            filterCatalog();
+        }
     });
 
     document.getElementById('btnClearSearch')?.addEventListener('click', function() {
@@ -2505,11 +2767,25 @@
             }));
         }
 
+        window._summaryRecentTransactions = combinedRecent.slice(0, 5);
+        window.reprintSummaryTx = function(index) {
+            const tx = window._summaryRecentTransactions?.[index];
+            if (tx && window.ReceiptRenderer) {
+                ReceiptRenderer.printReceipt(tx);
+            }
+        };
+        window.whatsappSummaryTx = function(index) {
+            const tx = window._summaryRecentTransactions?.[index];
+            if (tx && typeof window.KLWhatsAppReceipt === 'function') {
+                window.KLWhatsAppReceipt(tx);
+            }
+        };
+
         let trHtml = '';
         if (combinedRecent.length === 0) {
-            trHtml = '<tr><td colspan="4" class="text-center text-muted py-3">Belum ada transaksi hari ini</td></tr>';
+            trHtml = '<tr><td colspan="5" class="text-center text-muted py-3">Belum ada transaksi hari ini</td></tr>';
         } else {
-            combinedRecent.slice(0, 5).forEach(t => {
+            combinedRecent.slice(0, 5).forEach((t, idx) => {
                 const pendingBadge = t.is_pending 
                     ? '<span class="badge bg-warning text-dark ms-1" style="font-size:0.6rem;">Pending</span>' 
                     : '';
@@ -2519,9 +2795,35 @@
                         <td><small>${(t.transaction_time || '').substring(0, 5)}</small></td>
                         <td><span class="badge bg-secondary text-uppercase" style="font-size:0.7rem;">${t.payment_method || 'tunai'}</span></td>
                         <td class="text-end fw-bold text-success">${formatRupiah(t.total_sales)}</td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-outline-dark py-0 px-1" onclick="window.reprintSummaryTx(${idx})" title="Cetak Ulang Struk"><i class="fa-solid fa-print"></i></button>
+                                <button type="button" class="btn btn-outline-success py-0 px-1" onclick="window.whatsappSummaryTx(${idx})" title="Kirim Struk WA"><i class="fa-brands fa-whatsapp"></i></button>
+                            </div>
+                        </td>
                     </tr>
                 `;
             });
+        }
+
+        const shiftWaBtn = document.getElementById('btnShareShiftWa');
+        if (shiftWaBtn) {
+            shiftWaBtn.classList.remove('d-none');
+            shiftWaBtn.onclick = function () {
+                const storeTitle = (window.POS_TENANT_INFO?.name || 'KasirLoka').toUpperCase();
+                const msg = [
+                    `*REKAP SHIFT KASIR ${storeTitle}*`,
+                    `Kasir   : ${cashierName}`,
+                    `Tanggal : ${dateFormatted}`,
+                    '--------------------------------',
+                    `Total Transaksi : ${totalTransactions} nota (${totalQty} pcs)`,
+                    `Omzet Tunai     : ${formatRupiah(totalTunai)}`,
+                    `Omzet QRIS      : ${formatRupiah(totalNonTunai)}`,
+                    '--------------------------------',
+                    `*TOTAL PENJUALAN: ${formatRupiah(totalSales)}*`
+                ].join('\n');
+                window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank', 'noopener,noreferrer');
+            };
         }
 
         const pendingNotice = localPendingTxs.length > 0
@@ -2563,15 +2865,16 @@
                 </div>
             </div>
 
-            <h6 class="fw-bold text-dark small mb-2">5 Transaksi Terakhir:</h6>
+            <h6 class="fw-bold text-dark small mb-2">5 Transaksi Terakhir (Cetak Ulang / WA):</h6>
             <div class="table-responsive border rounded-3">
-                <table class="table table-sm table-striped mb-0">
+                <table class="table table-sm table-striped align-middle mb-0">
                     <thead>
                         <tr class="table-light">
                             <th>No. Nota</th>
                             <th>Jam</th>
                             <th>Metode</th>
                             <th class="text-end">Total</th>
+                            <th class="text-end">Struk</th>
                         </tr>
                     </thead>
                     <tbody>${trHtml}</tbody>
@@ -2612,14 +2915,16 @@
                 if (domCards.length > 0) {
                     const extractedMenus = [];
                     domCards.forEach(card => {
-                        const id = Number(card.getAttribute('data-product-id'));
+                        const id = Number(card.getAttribute('data-id'));
                         const catId = Number(card.getAttribute('data-category-id'));
-                        const name = card.getAttribute('data-product-name');
-                        const price = parseFloat(card.getAttribute('data-product-price') || 0);
+                        const name = card.getAttribute('data-name');
+                        const code = card.getAttribute('data-code') || '';
+                        const price = parseFloat(card.getAttribute('data-price') || 0);
                         if (id && name) {
                             extractedMenus.push({
                                 id: id,
                                 category_id: catId,
+                                code: code,
                                 name: name,
                                 price: price,
                                 status: true
@@ -2632,11 +2937,14 @@
                     domCats.forEach(btn => {
                         const catVal = btn.getAttribute('data-category');
                         if (catVal && catVal !== 'all') {
-                            extractedCats.push({
-                                id: Number(catVal),
-                                name: btn.textContent.trim(),
-                                status: true
-                            });
+                            const numericCatId = Number(catVal.replace(/^cat-/, ''));
+                            if (!Number.isNaN(numericCatId) && numericCatId > 0) {
+                                extractedCats.push({
+                                    id: numericCatId,
+                                    name: btn.textContent.trim(),
+                                    status: true
+                                });
+                            }
                         }
                     });
 

@@ -777,4 +777,59 @@ class SaasMultiTenantTest extends TestCase
             ->assertSee('js-billing-copy')
             ->assertSee('billing/invoice/');
     }
+
+    public function test_cashier_pos_upgrade_suite_profile_link_hold_order_starter_qris_lock_and_summary_details(): void
+    {
+        $subService = app(SubscriptionService::class);
+        $starterPlan = Plan::where('slug', 'starter')->firstOrFail();
+
+        $store = $subService->provisionTenant(
+            ['name' => 'Kedai Kasir Pro', 'business_type' => 'Kedai Minuman / Kopi'],
+            ['name' => 'Owner Kasir', 'username' => 'owner_pos_test', 'email' => 'ownerpos@test.id', 'password' => 'secret123'],
+            true
+        );
+
+        $cashier = User::create([
+            'tenant_id' => $store['tenant']->id,
+            'name' => 'Dina Kasir',
+            'username' => 'dina_kasir',
+            'email' => 'dina@test.id',
+            'password' => bcrypt('secret123'),
+            'role' => 'kasir',
+        ]);
+
+        // 1. Trial/Pro Cashier POS page has Profile link, Hold Order, Qty badges, clean data-category-id (no inline onclick)
+        $posPage = $this->actingAs($cashier)->get('/pos');
+        $posPage->assertStatus(200)
+            ->assertSee(route('profile.edit'))
+            ->assertSee('btnHoldOrder')
+            ->assertSee('btnOpenHeldOrders')
+            ->assertSee('pos-card-qty-badge')
+            ->assertSee('data-category-id=')
+            ->assertSee('btnShareShiftWa')
+            ->assertDontSee('onclick="posAddToCart(');
+
+        // 2. Cashier creates a transaction and /pos/summary-today returns details & cashier for reprint/WA
+        $menu = Menu::withoutGlobalScope('tenant')->where('tenant_id', $store['tenant']->id)->firstOrFail();
+        $this->actingAs($cashier)->postJson('/pos/checkout', [
+            'items' => [['menu_id' => $menu->id, 'quantity' => 2]],
+            'payment_method' => 'tunai',
+            'cash_tendered' => 50000,
+        ])->assertStatus(200);
+
+        $summaryRes = $this->actingAs($cashier)->getJson('/pos/summary-today');
+        $summaryRes->assertStatus(200)
+            ->assertJsonPath('total_transactions', 1)
+            ->assertJsonStructure([
+                'transactions' => [
+                    ['id', 'transaction_number', 'details', 'cashier'],
+                ],
+            ]);
+
+        // 3. Switching tenant to Starter plan locks QRIS radio visually with PRO badge in POS UI
+        $subService->assignSubscriptionManually($store['tenant'], $starterPlan, 'monthly');
+        $starterPos = $this->actingAs($cashier)->get('/pos');
+        $starterPos->assertStatus(200)
+            ->assertSee('PRO');
+    }
 }

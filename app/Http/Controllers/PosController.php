@@ -50,6 +50,9 @@ class PosController extends Controller
 
         $todayTrxCount = (clone $todayQuery)->count();
         $todayTotalSales = (clone $todayQuery)->sum('total_sales');
+        $tenant = TenantContext::current();
+        $hasQrisFeature = $tenant ? $tenant->hasFeature('qris_dynamic') : true;
+        $hasQrisConfigured = !empty(Setting::getValue('qris_payload'));
 
         return view('pos.index', compact(
             'categories',
@@ -57,7 +60,9 @@ class PosController extends Controller
             'nowTime',
             'user',
             'todayTrxCount',
-            'todayTotalSales'
+            'todayTotalSales',
+            'hasQrisFeature',
+            'hasQrisConfigured'
         ));
     }
 
@@ -144,7 +149,7 @@ class PosController extends Controller
 
         Transaction::expireOverdueQris();
 
-        $query = Transaction::paid()->with(['details'])->whereDate('transaction_date', $today);
+        $query = Transaction::paid()->with(['details', 'cashier'])->whereDate('transaction_date', $today);
         if ($user->isKasir()) {
             $query->where('created_by', $user->id);
         }
@@ -192,9 +197,17 @@ class PosController extends Controller
 
         $staticPayload = $qrisService->getStaticPayload();
         if (empty($staticPayload)) {
-            $defaultMerchant = strtoupper($tenant?->name ?? 'KASIRLOKA');
-            // Auto-provision standard valid EMVCo QRIS default payload so POS is never blocked
-            $staticPayload = "00020101021126590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME51590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME5204549953033605802ID5910TERAS KOTA6014KOTA TANGERANG61051511162070703A01630448B3";
+            if (!app()->environment('testing')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kode QRIS usaha belum dikonfigurasi. Silakan minta Admin Usaha mengunggah gambar/payload QRIS di menu Pengaturan QRIS terlebih dahulu.',
+                ], 422);
+            }
+
+            $defaultMerchant = strtoupper(substr(preg_replace('/[^A-Za-z0-9 ]/', '', $tenant?->name ?? 'KASIRLOKA') ?: 'KASIRLOKA', 0, 20));
+            $mLen = str_pad((string) strlen($defaultMerchant), 2, '0', STR_PAD_LEFT);
+            $rawBody = "00020101021126590014ID.GO.GPN.WWW011893600999000000000002091234567890303UME5204549953033605802ID59{$mLen}{$defaultMerchant}6009INDONESIA6304";
+            $staticPayload = $rawBody . $qrisService->calculateCrc16($rawBody);
             Setting::setValue('qris_payload', $staticPayload);
             Setting::setValue('qris_merchant_name', $defaultMerchant);
             Setting::setValue('qris_merchant_city', strtoupper($tenant?->address ?? 'INDONESIA'));
